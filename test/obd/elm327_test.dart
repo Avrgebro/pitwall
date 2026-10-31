@@ -112,6 +112,46 @@ void main() {
     expect(await elm.supportedPids(), {0x01, 0x20});
   });
 
+  test(
+    'a dropped connection fails the pending command and later ones',
+    () async {
+      final transport = FakeTransport({});
+      final logged = <String>[];
+      final elm = Elm327(
+        transport,
+        log: (command, raw) => logged.add('$command|$raw'),
+      );
+      final isDisconnected = throwsA(
+        isA<ElmException>().having(
+          (e) => e.error,
+          'error',
+          ElmError.disconnected,
+        ),
+      );
+
+      final pending = elm.send('0100');
+      await Future<void>.delayed(Duration.zero);
+      await transport.disconnect();
+
+      await expectLater(pending, isDisconnected);
+      expect(elm.isClosed, isTrue);
+      expect(logged, ['0100|(disconnected)']);
+      await expectLater(elm.send('ATRV'), isDisconnected);
+    },
+  );
+
+  test('log receives each command and raw reply', () async {
+    final logged = <String>[];
+    final elm = Elm327(
+      FakeTransport({'010D': 'SEARCHING...\r410D34'}),
+      log: (command, raw) => logged.add('$command|$raw'),
+    );
+
+    await elm.requestPid(0x0D);
+
+    expect(logged, ['010D|SEARCHING...\r410D34\r\r']);
+  });
+
   test('battery voltage comes from ATRV', () async {
     final elm = Elm327(FakeTransport({'ATRV': '12.6V'}));
 

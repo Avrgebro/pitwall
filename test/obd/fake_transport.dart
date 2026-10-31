@@ -20,6 +20,9 @@ class FakeTransport implements ObdTransport {
   @override
   Stream<List<int>> get input => _input.stream;
 
+  /// Simulates the adapter dropping the connection.
+  Future<void> disconnect() => _input.close();
+
   @override
   Future<void> write(List<int> bytes) async {
     final command = latin1.decode(bytes).trim();

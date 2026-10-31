@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "io.github.avrgebro.pitwall"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37 // permission_handler requires it
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -22,6 +22,9 @@ enum ElmError {
 
   /// No `>` prompt arrived in time.
   timeout,
+
+  /// The connection to the adapter closed.
+  disconnected,
 }
 
 class ElmException implements Exception {
@@ -41,9 +44,17 @@ class ElmException implements Exception {
 /// After an [ElmError.timeout] the adapter may still be answering the old
 /// command, so callers should run [initialize] again before continuing.
 class Elm327 {
-  Elm327(this._transport) {
-    _subscription = _transport.input.listen(_onData);
+  /// [log], if given, receives each command and the adapter's raw reply,
+  /// which is handy for recording real replies as test data.
+  Elm327(this._transport, {this.log}) {
+    _subscription = _transport.input.listen(
+      _onData,
+      onError: (_) => _onClosed(),
+      onDone: _onClosed,
+    );
   }
+
+  final void Function(String command, String rawReply)? log;
 
   static const defaultTimeout = Duration(seconds: 3);
   static const resetTimeout = Duration(seconds: 5);
@@ -63,7 +74,12 @@ class Elm327 {
   late final StreamSubscription<List<int>> _subscription;
   final _buffer = StringBuffer();
   Completer<String>? _pending;
+  String _pendingCommand = '';
+  bool _closed = false;
   Future<void> _queue = Future.value();
+
+  /// Whether the connection to the adapter has closed.
+  bool get isClosed => _closed;
 
   /// Resets the adapter and configures it for compact, header-free replies
   /// with automatic protocol detection. Returns the adapter's banner, such as
@@ -161,18 +177,31 @@ class Elm327 {
   }
 
   Future<String> _exchange(String command, Duration timeout) async {
+    if (_closed) throw ElmException(ElmError.disconnected, command);
     _buffer.clear();
     final completer = Completer<String>();
     _pending = completer;
+    _pendingCommand = command;
     await _transport.write(latin1.encode('$command\r'));
     final String raw;
     try {
       raw = await completer.future.timeout(timeout);
     } on TimeoutException {
       _pending = null;
+      log?.call(command, '(timeout)');
       throw ElmException(ElmError.timeout, command);
     }
+    log?.call(command, raw);
     return _clean(raw, command);
+  }
+
+  void _onClosed() {
+    _closed = true;
+    final pending = _pending;
+    _pending = null;
+    if (pending == null) return;
+    log?.call(_pendingCommand, '(disconnected)');
+    pending.completeError(ElmException(ElmError.disconnected, _pendingCommand));
   }
 
   void _onData(List<int> bytes) {
