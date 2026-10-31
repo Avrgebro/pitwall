@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -7,6 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../bluetooth/classic_bluetooth.dart';
 import '../obd/elm327.dart';
 import '../obd/pids.dart';
+import '../profiles/profile_reader.dart';
+import '../profiles/signal_set.dart';
 
 /// Temporary screen for trying the adapter by hand: pick a paired device,
 /// connect, see what the car supports and read live values. The log shows
@@ -20,6 +24,25 @@ class DebugScreen extends StatefulWidget {
 
 class _DebugScreenState extends State<DebugScreen> {
   static const _maxLogLines = 300;
+
+  /// Checks where a 2023 Hyundai Tucson (NX4) reports fuel level, based on
+  /// OBDb's signal definitions: which ECU answers the standard fuel PID, the
+  /// instrument cluster's 22 B002 and the engine ECU's 22 E007. Flow control
+  /// is set by hand so the cluster's long reply arrives in full.
+  static const _tucsonFuelCheck = [
+    'ATH1', '012F', 'ATH0', //
+    'ATSH7C6', 'ATFCSH7C6', 'ATFCSD300000', 'ATFCSM1', 'ATCRA7CE', '22B002',
+    'ATSH7E0', 'ATFCSH7E0', 'ATCRA7E8', '22E007',
+  ];
+
+  final _commandController = TextEditingController();
+
+  /// OBDb files are around 100 KB; anything far larger isn't one.
+  static const _maxProfileBytes = 5 * 1024 * 1024;
+
+  final _yearController = TextEditingController();
+  SignalSet? _profile;
+  String? _profileName;
 
   List<BondedDevice>? _devices;
   ClassicTransport? _transport;
@@ -38,6 +61,8 @@ class _DebugScreenState extends State<DebugScreen> {
   void dispose() {
     _autoRead?.cancel();
     _transport?.close();
+    _commandController.dispose();
+    _yearController.dispose();
     super.dispose();
   }
 
@@ -79,17 +104,68 @@ class _DebugScreenState extends State<DebugScreen> {
     final elm = _elm;
     if (elm == null || _busy) return;
     await _run(null, () async {
+      final standard = <String, double>{};
       final voltage = await elm.readBatteryVoltage();
-      if (voltage != null) _values['battery_v'] = '$voltage V';
+      if (voltage != null) standard['battery_v'] = voltage;
       for (final definition in standardPids) {
         if (!_supported.contains(definition.pid)) continue;
         final value = await elm.read(definition);
-        _values[definition.key] = value == null
-            ? 'no data'
-            : '${_format(value)} ${definition.unit}';
+        if (value != null) standard[definition.key] = value;
       }
-      setState(() {});
+      final profile = _profile;
+      final year = _modelYear;
+      final fromProfile = profile != null && year != null
+          ? await readProfile(elm, profile, year)
+          : <String, double>{};
+      final merged = mergeValues(standard, fromProfile);
+      setState(() {
+        _values
+          ..clear()
+          ..addAll({
+            for (final MapEntry(:key, :value) in merged.entries)
+              key: '${_format(value)} ${_unitFor(key)}',
+          });
+      });
     });
+  }
+
+  Future<void> _importProfile() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (file == null) return;
+    try {
+      if ((await file.length() ?? 0) > _maxProfileBytes) {
+        throw const FormatException('The file is too large.');
+      }
+      final profile = SignalSet.parse(utf8.decode(await file.readAsBytes()));
+      setState(() {
+        _profile = profile;
+        _profileName = file.name;
+        _status = 'Imported ${file.name}.';
+      });
+    } on FormatException catch (e) {
+      _setStatus('Could not import ${file.name}: ${e.message}');
+    }
+  }
+
+  int? get _modelYear {
+    final year = int.tryParse(_yearController.text);
+    return year != null && year >= 1996 && year <= 2100 ? year : null;
+  }
+
+  String _unitFor(String key) {
+    if (key == 'battery_v') return 'V';
+    if (standardPids.where((d) => d.key == key).firstOrNull case final d?) {
+      return d.unit;
+    }
+    for (final command in _profile?.commands ?? const <ProfileCommand>[]) {
+      for (final signal in command.signals) {
+        if (signal.key == key) return signal.unit;
+      }
+    }
+    return '';
   }
 
   void _toggleAutoRead(bool on) {
@@ -98,6 +174,37 @@ class _DebugScreenState extends State<DebugScreen> {
         ? Timer.periodic(const Duration(seconds: 2), (_) => _readValues())
         : null;
     setState(() {});
+  }
+
+  /// Sends raw commands in order. Replies and errors show up in the log;
+  /// an error on one command doesn't stop the rest.
+  Future<void> _sendCommands(List<String> commands) async {
+    final elm = _elm;
+    if (elm == null || _busy || commands.isEmpty) return;
+    // Auto-read would interleave with header changes.
+    if (_autoRead != null) _toggleAutoRead(false);
+    await _run(null, () async {
+      for (final command in commands) {
+        try {
+          await elm.send(command);
+        } on ElmException catch (e) {
+          if (e.error == ElmError.disconnected) rethrow;
+        }
+      }
+      // Raw AT commands can change settings the app keeps track of, like
+      // which module it's talking to, so start again from a clean adapter.
+      if (commands.any((c) => c.startsWith('AT'))) await elm.initialize();
+      _setStatus('Sent ${commands.length} command(s). See the log.');
+    });
+  }
+
+  void _sendTypedCommand() {
+    final commands = _commandController.text
+        .split(RegExp(r'[,\s]+'))
+        .where((c) => c.isNotEmpty)
+        .map((c) => c.toUpperCase())
+        .toList();
+    _sendCommands(commands);
   }
 
   Future<void> _disconnect() async {
@@ -171,6 +278,7 @@ class _DebugScreenState extends State<DebugScreen> {
           if (_busy) const LinearProgressIndicator(),
           if (!_connected) ..._buildDevicePicker(),
           if (_connected) ..._buildConnected(theme),
+          ..._buildProfile(theme),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -193,6 +301,59 @@ class _DebugScreenState extends State<DebugScreen> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildProfile(ThemeData theme) {
+    final profile = _profile;
+    final year = _modelYear;
+    return [
+      const SizedBox(height: 24),
+      Text('Vehicle profile', style: theme.textTheme.titleMedium),
+      Row(
+        children: [
+          OutlinedButton(
+            onPressed: _busy ? null : _importProfile,
+            child: Text(profile == null ? 'Import JSON' : 'Replace'),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _yearController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Model year'),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ],
+      ),
+      if (profile != null) ...[
+        const SizedBox(height: 8),
+        Text(
+          '$_profileName: ${profile.commands.length} requests, '
+          '${profile.signalCount} signals.',
+        ),
+        Text(
+          year == null
+              ? 'Enter the model year to use it.'
+              : '${profile.commandsFor(year).length} requests apply to $year. '
+                    'They run with "Read values".',
+        ),
+        if (profile.skipped.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text('Skipped: ${profile.skipped.length}'),
+            children: [
+              for (final skipped in profile.skipped)
+                ListTile(
+                  dense: true,
+                  title: Text(skipped.description),
+                  subtitle: Text(skipped.reason),
+                ),
+            ],
+          ),
+      ],
+    ];
   }
 
   List<Widget> _buildDevicePicker() => [
@@ -234,6 +395,34 @@ class _DebugScreenState extends State<DebugScreen> {
         title: Text(entry.key),
         trailing: Text(entry.value, style: theme.textTheme.titleMedium),
       ),
+    const SizedBox(height: 16),
+    Text('Raw commands', style: theme.textTheme.titleMedium),
+    Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _commandController,
+            decoration: const InputDecoration(
+              hintText: 'e.g. ATSH7C6 22B002',
+              helperText: 'Separate several commands with spaces',
+            ),
+            textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            onSubmitted: (_) => _sendTypedCommand(),
+          ),
+        ),
+        IconButton(
+          onPressed: _busy ? null : _sendTypedCommand,
+          icon: const Icon(Icons.send),
+          tooltip: 'Send',
+        ),
+      ],
+    ),
+    const SizedBox(height: 8),
+    OutlinedButton(
+      onPressed: _busy ? null : () => _sendCommands(_tucsonFuelCheck),
+      child: const Text('Run Tucson fuel check'),
+    ),
     const SizedBox(height: 16),
     Text('Supported PIDs', style: theme.textTheme.titleMedium),
     Text(
