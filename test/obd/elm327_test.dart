@@ -152,6 +152,74 @@ void main() {
     expect(logged, ['010D|SEARCHING...\r410D34\r\r']);
   });
 
+  test('setTarget only sends what changed', () async {
+    final transport = FakeTransport({
+      'ATSH7C6': 'OK',
+      'ATFCSH7C6': 'OK',
+      'ATFCSD300000': 'OK',
+      'ATFCSM1': 'OK',
+      'ATCRA7CE': 'OK',
+      'ATSH7DF': 'OK',
+      'ATFCSM0': 'OK',
+      'ATCRA': 'OK',
+    });
+    final elm = Elm327(transport);
+
+    await elm.setTarget('7C6', receive: '7CE');
+    await elm.setTarget('7C6', receive: '7CE');
+    await elm.setTarget(null);
+
+    expect(transport.sent, [
+      'ATSH7C6',
+      // Flow control goes to the module, so long replies arrive in full.
+      'ATFCSH7C6',
+      'ATFCSD300000',
+      'ATFCSM1',
+      'ATCRA7CE',
+      'ATSH7DF',
+      'ATFCSM0',
+      'ATCRA',
+    ]);
+  });
+
+  test('adapters without flow-control commands still work', () async {
+    final transport = FakeTransport({
+      'ATSH7C6': 'OK',
+      'ATFCSH7C6': '?',
+      'ATCRA7CE': 'OK',
+      'ATSH7E0': 'OK',
+    });
+    final elm = Elm327(transport);
+
+    await elm.setTarget('7C6', receive: '7CE');
+    await elm.setTarget('7E0', receive: '7CE');
+
+    expect(transport.sent, ['ATSH7C6', 'ATFCSH7C6', 'ATCRA7CE', 'ATSH7E0']);
+  });
+
+  test('a multi-frame reply with missing frames is dropped', () async {
+    // Recorded: the module announced 15 bytes, only the first frame came.
+    final elm = Elm327(FakeTransport({'22B002': '00F\r0:62B002E00000'}));
+
+    expect(await elm.request(0x22, [0xB0, 0x02]), isEmpty);
+  });
+
+  test('setTarget rejects anything but a CAN id', () async {
+    final elm = Elm327(FakeTransport({}));
+
+    expect(() => elm.setTarget('7E0 ATZ'), throwsArgumentError);
+  });
+
+  test('request joins a multi-frame reply', () async {
+    final elm = Elm327(
+      FakeTransport({'22B002': '00A\r0:62B002010203\r1:04050607AAAAAA'}),
+    );
+
+    expect(await elm.request(0x22, [0xB0, 0x02]), [
+      [1, 2, 3, 4, 5, 6, 7],
+    ]);
+  });
+
   test('battery voltage comes from ATRV', () async {
     final elm = Elm327(FakeTransport({'ATRV': '12.6V'}));
 

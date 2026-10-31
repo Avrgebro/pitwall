@@ -69,6 +69,12 @@ class Elm327 {
     r'LV RESET|ERR\d+|BUS INIT:.*ERROR)$',
   );
   static final _voltage = RegExp(r'(\d+(?:\.\d+)?)\s*V');
+  static final _canId = RegExp(r'^[0-9A-F]{3}$');
+  static final _byteCount = RegExp(r'^[0-9A-F]{3}$');
+  static final _frameLine = RegExp(r'^[0-9A-F]:');
+
+  /// Functional address: every emissions-related module listens to it.
+  static const _broadcastHeader = '7DF';
 
   final ObdTransport _transport;
   late final StreamSubscription<List<int>> _subscription;
@@ -77,6 +83,10 @@ class Elm327 {
   String _pendingCommand = '';
   bool _closed = false;
   Future<void> _queue = Future.value();
+  String _header = _broadcastHeader;
+  String? _receiveFilter;
+  bool _manualFlowControl = false;
+  bool _flowControlSupported = true;
 
   /// Whether the connection to the adapter has closed.
   bool get isClosed => _closed;
@@ -86,6 +96,9 @@ class Elm327 {
   /// `ELM327 v1.5`.
   Future<String> initialize() async {
     final banner = await send('ATZ', timeout: resetTimeout);
+    _header = _broadcastHeader;
+    _receiveFilter = null;
+    _manualFlowControl = false;
     for (final command in ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATSP0']) {
       await send(command);
     }
@@ -156,25 +169,88 @@ class Elm327 {
     _pending = null;
   }
 
-  Future<List<List<int>>> _mode01(int pid, {required Duration timeout}) async {
+  /// Addresses following requests to the module with CAN id [header]
+  /// (`ATSH`) and, if [receive] is given, only accepts replies from that id
+  /// (`ATCRA`). Pass null to go back to the default broadcast to all
+  /// modules. Commands are only sent when something changes.
+  ///
+  /// Ids are 11-bit, written as three hex digits like `7E0`.
+  Future<void> setTarget(String? header, {String? receive}) async {
+    final target = header ?? _broadcastHeader;
+    for (final id in [target, ?receive]) {
+      if (!_canId.hasMatch(id)) throw ArgumentError.value(id, 'CAN id');
+    }
+    if (target != _header) {
+      await send('ATSH$target');
+      _header = target;
+      await _setFlowControl(target);
+    }
+    if (receive != _receiveFilter) {
+      await send(receive == null ? 'ATCRA' : 'ATCRA$receive');
+      _receiveFilter = receive;
+    }
+  }
+
+  /// Long replies arrive in several CAN frames, and the module waits for a
+  /// flow-control frame ("go ahead") after the first one. The adapter only
+  /// sends it on its own for the standard 7E0-7E7 range, so for a specific
+  /// module it's told explicitly: send to [target], all frames, no pauses.
+  /// Back on the broadcast address it returns to automatic.
+  ///
+  /// Adapters that don't know these commands keep working; only long
+  /// replies from modules outside 7E0-7E7 stay cut off.
+  Future<void> _setFlowControl(String target) async {
+    if (!_flowControlSupported) return;
+    try {
+      if (target == _broadcastHeader) {
+        if (_manualFlowControl) await send('ATFCSM0');
+        _manualFlowControl = false;
+      } else {
+        await send('ATFCSH$target');
+        if (!_manualFlowControl) {
+          await send('ATFCSD300000');
+          await send('ATFCSM1');
+        }
+        _manualFlowControl = true;
+      }
+    } on ElmException catch (e) {
+      if (e.error != ElmError.unknownCommand) rethrow;
+      _flowControlSupported = false;
+    }
+  }
+
+  /// Sends a request for [service] with identifier bytes [id] (a PID or a
+  /// data identifier) and returns the reply data after the echoed service
+  /// and identifier, one list per module that answered.
+  ///
+  /// Empty if no module answered or the module refused the request.
+  Future<List<List<int>>> request(
+    int service,
+    List<int> id, {
+    Duration timeout = defaultTimeout,
+  }) async {
+    final idHex = id.map(_hex).join();
     final String response;
     try {
-      response = await send('01${_hex(pid)}', timeout: timeout);
+      response = await send('${_hex(service)}$idHex', timeout: timeout);
     } on ElmException catch (e) {
       if (e.error == ElmError.noData) return [];
       rethrow;
     }
-    // Each ECU that answers sends its own line.
-    final header = '41${_hex(pid)}';
+    // A positive reply echoes the service + 0x40 and the identifier. Refusals
+    // (`7F <service> <reason>`) don't match and are left out.
+    final prefix = '${_hex(service + 0x40)}$idHex';
     final replies = <List<int>>[];
-    for (final line in response.split('\n')) {
-      final compact = line.replaceAll(' ', '');
-      if (!compact.startsWith(header)) continue;
-      final data = _parseHex(compact.substring(header.length));
+    for (final message in _messages(response)) {
+      if (!message.startsWith(prefix)) continue;
+      final data = _parseHex(message.substring(prefix.length));
       if (data != null) replies.add(data);
     }
     return replies;
   }
+
+  Future<List<List<int>>> _mode01(int pid, {required Duration timeout}) =>
+      request(0x01, [pid], timeout: timeout);
 
   Future<String> _exchange(String command, Duration timeout) async {
     if (_closed) throw ElmException(ElmError.disconnected, command);
@@ -246,6 +322,47 @@ class Elm327 {
     _ when _busError.hasMatch(line) => ElmError.busError,
     _ => null,
   };
+
+  /// Splits a cleaned reply into messages, without spaces. Single-frame
+  /// replies are one line each, one per module. A multi-frame reply (CAN,
+  /// headers off) is a byte-count line like `00F` followed by numbered lines
+  /// like `0:62B002...`, which are joined into one message.
+  static List<String> _messages(String response) {
+    final messages = <String>[];
+    final frames = StringBuffer();
+    int? length;
+
+    void finishMultiFrame() {
+      if (frames.isEmpty) return;
+      final data = frames.toString();
+      final count = length;
+      if (count == null) {
+        messages.add(data);
+      } else if (data.length >= count * 2) {
+        // The last frame is padded; cut it to the announced byte count.
+        messages.add(data.substring(0, count * 2));
+      }
+      // Fewer bytes than announced means frames went missing. A partial
+      // reply would decode to wrong values, so it's dropped.
+      frames.clear();
+      length = null;
+    }
+
+    for (final line in response.split('\n')) {
+      final compact = line.replaceAll(' ', '');
+      if (_byteCount.hasMatch(compact)) {
+        finishMultiFrame();
+        length = int.parse(compact, radix: 16);
+      } else if (_frameLine.hasMatch(compact)) {
+        frames.write(compact.substring(2));
+      } else {
+        finishMultiFrame();
+        messages.add(compact);
+      }
+    }
+    finishMultiFrame();
+    return messages;
+  }
 
   static String _hex(int byte) =>
       byte.toRadixString(16).padLeft(2, '0').toUpperCase();
