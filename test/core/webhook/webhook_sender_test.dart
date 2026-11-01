@@ -194,4 +194,24 @@ void main() {
     );
     pitwall.dispose();
   });
+
+  test('the end-of-trip message never replaces the latest reading', () async {
+    failNext = 1000;
+    final pitwall = sender();
+    await pitwall.init();
+
+    await sendFuel(pitwall, 47.5);
+    await pitwall.send(device: 'tucson', values: const {}, connected: false);
+
+    final latest = pitwall.status.value.latest!;
+    expect(latest.values, {'fuel_level_l': 47.5});
+    expect(latest.delivered, isFalse);
+    expect(pitwall.status.value.queued, 2);
+
+    failNext = 0;
+    await pitwall.flush();
+    expect(pitwall.status.value.latest!.delivered, isTrue);
+    expect(pitwall.status.value.latest!.values, {'fuel_level_l': 47.5});
+    pitwall.dispose();
+  });
 }

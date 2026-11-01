@@ -51,7 +51,7 @@ class WebhookSender {
 
   List<String> _queue = [];
   int _seq = 0;
-  String? _lastDelivered;
+  String? _lastReading;
   int _failures = 0;
   bool _flushing = false;
   Timer? _retry;
@@ -61,7 +61,7 @@ class WebhookSender {
     final state = await _storage.load();
     _queue = [...state.queue];
     _seq = state.seq;
-    _lastDelivered = state.lastDelivered;
+    _lastReading = state.lastReading;
     _update();
     unawaited(flush());
   }
@@ -73,17 +73,17 @@ class WebhookSender {
     required bool connected,
   }) async {
     _seq++;
-    _queue.add(
-      jsonEncode(
-        buildPayload(
-          device: device,
-          seq: _seq,
-          timestamp: _clock(),
-          values: values,
-          connected: connected,
-        ),
+    final payload = jsonEncode(
+      buildPayload(
+        device: device,
+        seq: _seq,
+        timestamp: _clock(),
+        values: values,
+        connected: connected,
       ),
     );
+    _queue.add(payload);
+    if (values.isNotEmpty) _lastReading = payload;
     if (_queue.length > maxQueued) {
       _queue.removeRange(0, _queue.length - maxQueued);
     }
@@ -120,7 +120,7 @@ class WebhookSender {
           _fail(error);
           return;
         }
-        _lastDelivered = _queue.removeAt(0);
+        _queue.removeAt(0);
         _failures = 0;
         await _persist();
         _update(lastSuccess: _clock(), clearError: true);
@@ -216,11 +216,7 @@ class WebhookSender {
   }
 
   Future<void> _persist() => _storage.save(
-    DeliveryState(
-      queue: List.of(_queue),
-      seq: _seq,
-      lastDelivered: _lastDelivered,
-    ),
+    DeliveryState(queue: List.of(_queue), seq: _seq, lastReading: _lastReading),
   );
 
   void _update({
@@ -244,8 +240,7 @@ class WebhookSender {
   }
 
   Reading? _latest() {
-    final queued = _queue.isNotEmpty;
-    final source = queued ? _queue.last : _lastDelivered;
+    final source = _lastReading;
     if (source == null) return null;
     try {
       final json = jsonDecode(source) as Map<String, Object?>;
@@ -257,7 +252,9 @@ class WebhookSender {
               in (json['values'] as Map<String, Object?>? ?? const {}).entries)
             if (value is num) key: value,
         },
-        delivered: !queued,
+        // Payloads are unique (each has its own seq), so still being in the
+        // queue means not delivered yet.
+        delivered: !_queue.contains(source),
       );
     } on Object {
       return null;

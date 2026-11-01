@@ -100,7 +100,8 @@ class DeliveryStatus {
   /// Why the last attempt failed. Null after a success.
   final DeliveryError? lastError;
 
-  /// The newest reading: the last one queued, or else the last delivered.
+  /// The newest reading with values, delivered or not. End-of-trip
+  /// messages carry no values and never replace it.
   final Reading? latest;
 }
 

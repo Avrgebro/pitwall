@@ -4,19 +4,18 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 /// What the sender keeps across restarts: the payloads still to deliver,
-/// oldest first, the last sequence number used, and the last payload
-/// delivered (shown as "last values sent").
+/// oldest first, the last sequence number used, and the newest payload that
+/// carried values (shown on Home).
 class DeliveryState {
-  const DeliveryState({
-    this.queue = const [],
-    this.seq = 0,
-    this.lastDelivered,
-  });
+  const DeliveryState({this.queue = const [], this.seq = 0, this.lastReading});
 
   /// Encoded JSON bodies, ready to POST.
   final List<String> queue;
   final int seq;
-  final String? lastDelivered;
+
+  /// The newest payload with values. End-of-trip messages carry none, so
+  /// they never replace it.
+  final String? lastReading;
 }
 
 abstract interface class DeliveryStorage {
@@ -40,7 +39,7 @@ class FileDeliveryStorage implements DeliveryStorage {
       return DeliveryState(
         queue: [...(json['queue'] as List? ?? const []).whereType<String>()],
         seq: (json['seq'] as num? ?? 0).toInt(),
-        lastDelivered: json['lastDelivered'] as String?,
+        lastReading: json['lastReading'] as String?,
       );
     } on Object {
       return const DeliveryState();
@@ -55,7 +54,7 @@ class FileDeliveryStorage implements DeliveryStorage {
       jsonEncode({
         'seq': state.seq,
         'queue': state.queue,
-        'lastDelivered': state.lastDelivered,
+        'lastReading': state.lastReading,
       }),
       flush: true,
     );
