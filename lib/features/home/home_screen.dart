@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
 import '../../core/readings/readings.dart';
@@ -9,6 +8,7 @@ import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/webhook_state.dart';
+import '../common/widgets/no_vehicles_card.dart';
 import '../../ui/ui.dart';
 import 'home_view_model.dart';
 import 'widgets/delivery_status_card.dart';
@@ -36,15 +36,7 @@ class HomeScreen extends ConsumerWidget {
       return AppPage(
         title: 'Pitwall',
         children: [
-          const SizedBox(height: Insets.xxl * 2),
-          EmptyState(
-            icon: Symbols.directions_car_rounded,
-            title: 'No vehicles yet',
-            message: 'Add your car and the OBD-II adapter plugged into it.',
-            actionLabel: 'Add vehicle',
-            actionIcon: Symbols.add_rounded,
-            onAction: () => context.push(Routes.addVehicle),
-          ),
+          NoVehiclesCard(onAdd: () => context.push(Routes.addVehicle)),
         ],
       );
     }

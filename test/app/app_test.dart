@@ -192,4 +192,89 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No vehicles yet'), findsOneWidget);
   });
+
+  testWidgets('a tab page scrolls its last item clear of the nav bar', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    );
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+
+    final last = tester.getRect(find.text('Developer tools'));
+    final bar = tester.getRect(find.byType(FloatingNavBar));
+    expect(last.bottom, lessThan(bar.top));
+  });
+
+  testWidgets('the vehicle list ends with a slot for adding another', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    );
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FloatingActionButton), findsNothing);
+
+    await tester.tap(find.text('Add vehicle'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FloatingNavBar), findsNothing);
+  });
+
+  testWidgets('values to send are searchable from the top bar', (tester) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    );
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tucson'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Values to send'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Search values'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'coolant');
+    await tester.pumpAndSettle();
+
+    // The page stays underneath the search view, so each value appears
+    // once there, and once more in the view when it matches.
+    expect(find.text('coolant_temp_c'), findsNWidgets(2));
+    expect(find.text('rpm'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text('No values match "zzz".'), findsOneWidget);
+  });
+
+  testWidgets('a pinned action stays above the keyboard', (tester) async {
+    await _pumpApp(tester, settings: const AppSettings(setupDone: true));
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    // On the small test screen the card's button starts under the floating
+    // navigation bar; scroll it into view, as a person would.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add vehicle'));
+    await tester.pumpAndSettle();
+    expect(find.text('Name this vehicle'), findsOneWidget);
+
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    const keyboard = 300.0;
+    tester.view.viewInsets = FakeViewPadding(
+      bottom: keyboard * tester.view.devicePixelRatio,
+    );
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    final button = tester.getRect(find.byType(GlassButton));
+    expect(button.bottom, lessThanOrEqualTo(screen.height - keyboard));
+  });
 }

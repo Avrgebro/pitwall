@@ -123,4 +123,113 @@ void main() {
     await tester.tap(find.text('Fix'));
     expect(fixed, isTrue);
   });
+
+  testWidgets('a section header centres its icon on the title', (tester) async {
+    await tester.pumpWidget(
+      _frame(
+        const SectionHeader(
+          'Delivery',
+          icon: Icons.cloud_upload,
+          trailing: '2 rows',
+        ),
+      ),
+    );
+
+    final icon = tester.getCenter(find.byIcon(Icons.cloud_upload)).dy;
+    final title = tester.getCenter(find.text('Delivery')).dy;
+    expect(icon, moreOrLessEquals(title, epsilon: 0.5));
+  });
+
+  testWidgets('a note keeps its icon on the first line of long text', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _frame(
+        SizedBox(
+          width: 200,
+          child: InfoNote(text: TextSpan(text: 'A long note that wraps ' * 4)),
+        ),
+      ),
+    );
+
+    final icon = tester.getRect(find.byIcon(Icons.info_outline));
+    final text = tester.getRect(find.byType(RichText).last);
+    expect(text.height, greaterThan(icon.height * 2));
+    expect(icon.top, greaterThanOrEqualTo(text.top));
+    expect(icon.bottom, lessThan(text.top + text.height / 2));
+  });
+
+  testWidgets('the selected option outlines its segment in the accent', (
+    tester,
+  ) async {
+    final theme = AppTheme.light();
+    await tester.pumpWidget(
+      _frame(
+        RadioGroup<int>(
+          groupValue: 2,
+          onChanged: (_) {},
+          child: const RowGroup(
+            children: [
+              ChoiceRow(value: 1, title: 'One'),
+              ChoiceRow(value: 2, title: 'Two'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Color outlineOf(String title) {
+      final box = tester.widget<AnimatedContainer>(
+        find.ancestor(
+          of: find.text(title),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      final shape =
+          (box.foregroundDecoration! as ShapeDecoration).shape
+              as RoundedRectangleBorder;
+      return shape.side.color;
+    }
+
+    expect(outlineOf('Two'), theme.colorScheme.primary);
+    expect(outlineOf('One').a, 0);
+  });
+
+  testWidgets('glass buttons are standard height, floating height pinned', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: PinnedBottom(
+          bottom: GlassButton(onPressed: () {}, child: const Text('Pinned')),
+          child: Center(
+            child: GlassButton(onPressed: () {}, child: const Text('Inline')),
+          ),
+        ),
+      ),
+    );
+
+    double heightOf(String label) => tester
+        .getSize(
+          find.ancestor(
+            of: find.text(label),
+            matching: find.byType(FilledButton),
+          ),
+        )
+        .height;
+    expect(heightOf('Pinned'), Sizes.floatingControl);
+    expect(heightOf('Inline'), 48);
+  });
+
+  testWidgets('a step number is centred on its title', (tester) async {
+    await tester.pumpWidget(
+      _frame(const NumberedSteps(steps: [NumberedStep('Add it here')])),
+    );
+
+    final number = tester.getCenter(find.text('1')).dy;
+    final title = tester.getCenter(find.text('Add it here')).dy;
+    expect(number, moreOrLessEquals(title, epsilon: 0.5));
+  });
 }

@@ -8,6 +8,7 @@ import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
+import '../common/widgets/no_vehicles_card.dart';
 import 'widgets/vehicle_card.dart';
 
 class VehiclesScreen extends ConsumerWidget {
@@ -28,18 +29,7 @@ class VehiclesScreen extends ConsumerWidget {
       return AppPage(
         title: 'Vehicles',
         children: [
-          const SizedBox(height: Insets.xxl * 3),
-          EmptyState(
-            icon: Symbols.directions_car_rounded,
-            title: 'No vehicles yet',
-            message:
-                'Add your car and the OBD-II adapter plugged into it. It '
-                'takes about two minutes.',
-            actionLabel: 'Add vehicle',
-            actionIcon: Symbols.add_rounded,
-            onAction: () => context.push(Routes.addVehicle),
-            footnote: 'Any ELM327-compatible Bluetooth adapter works.',
-          ),
+          NoVehiclesCard(onAdd: () => context.push(Routes.addVehicle)),
         ],
       );
     }
@@ -56,11 +46,6 @@ class VehiclesScreen extends ConsumerWidget {
 
     return AppPage(
       title: 'Vehicles',
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(Routes.addVehicle),
-        icon: const Icon(Symbols.add_rounded),
-        label: const Text('Add vehicle'),
-      ),
       children: [
         for (final vehicle in vehicles) ...[
           VehicleCard(
@@ -71,6 +56,7 @@ class VehiclesScreen extends ConsumerWidget {
           ),
           const SizedBox(height: Insets.m),
         ],
+        _AddVehicleCard(onTap: () => context.push(Routes.addVehicle)),
         if (vehicles.length == 1)
           const InfoNote(
             text: TextSpan(
@@ -80,6 +66,34 @@ class VehiclesScreen extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// An empty slot at the end of the list, for adding another vehicle.
+class _AddVehicleCard extends StatelessWidget {
+  const _AddVehicleCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+    return ContentCard(
+      dashed: true,
+      onTap: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Symbols.add_rounded, color: color),
+          const SizedBox(width: Insets.s),
+          Text(
+            'Add vehicle',
+            style: theme.textTheme.titleMedium?.copyWith(color: color),
+          ),
+        ],
+      ),
     );
   }
 }
