@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/obd/elm327.dart';
 import 'package:pitwall/obd/pids.dart';
+import 'package:pitwall/profiles/signal_set.dart';
 
 import 'fake_transport.dart';
 
@@ -28,6 +29,11 @@ const recordedReplies = {
 };
 
 void main() {
+  group('standard requests', standardTests);
+  group('instrument cluster', clusterTests);
+}
+
+void standardTests() {
   late Elm327 elm;
 
   setUp(() async {
@@ -57,5 +63,32 @@ void main() {
     expect(await read(0x0D), 0);
     expect(await read(0x2F), 0);
     expect(await read(0xA6), closeTo(33999.7, 0.001));
+  });
+}
+
+/// Instrument cluster reply recorded from the same car (2023 Hyundai Tucson
+/// NX4, Latin America) after setting flow control. Byte positions follow the
+/// cluster's 22 B002 layout: fuel volume in half litres at byte 4, odometer
+/// in km at bytes 6-8, odometer in miles (unused here) at bytes 9-11.
+void clusterTests() {
+  test('cluster reply decodes to fuel and odometer', () async {
+    final elm = Elm327(
+      FakeTransport({
+        '22B002': '00F\r0:62B002E00000\r1:005FAC0084CF00\r2:0000',
+      }),
+    );
+
+    final data = (await elm.request(0x22, [0xB0, 0x02])).single;
+
+    expect(data.length, 12);
+    expect(
+      const SignalFormat(bitIndex: 32, bitLength: 8, divide: 2).decode(data),
+      47.5,
+    );
+    expect(const SignalFormat(bitIndex: 48, bitLength: 24).decode(data), 33999);
+    expect(
+      const SignalFormat(bitIndex: 72, bitLength: 24, nullMin: 0).decode(data),
+      isNull,
+    );
   });
 }
