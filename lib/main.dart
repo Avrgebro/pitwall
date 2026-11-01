@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'debug/debug_screen.dart';
+import 'settings/settings_store.dart';
 
 void main() {
-  runApp(const PitwallApp());
+  runApp(PitwallApp(store: SettingsStore()));
 }
 
 class PitwallApp extends StatelessWidget {
-  const PitwallApp({super.key});
+  const PitwallApp({super.key, required this.store});
+
+  final SettingsStore store;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +21,7 @@ class PitwallApp extends StatelessWidget {
         colorSchemeSeed: Colors.teal,
         brightness: Brightness.dark,
       ),
-      home: const DebugScreen(),
+      home: DebugScreen(store: store),
     );
   }
 }

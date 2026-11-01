@@ -1,22 +1,25 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../bluetooth/classic_bluetooth.dart';
 import '../obd/elm327.dart';
-import '../obd/pids.dart';
-import '../profiles/profile_reader.dart';
 import '../profiles/signal_set.dart';
+import '../readings/readings.dart';
+import '../settings/settings.dart';
+import '../settings/settings_screen.dart';
+import '../settings/settings_store.dart';
 
-/// Temporary screen for trying the adapter by hand: pick a paired device,
-/// connect, see what the car supports and read live values. The log shows
-/// every raw exchange, so real replies can be copied into tests.
+/// Temporary screen for trying the adapter by hand: connect to the adapter
+/// chosen in settings, see what the car supports and read the chosen
+/// values. The log shows every raw exchange, so real replies can be copied
+/// into tests.
 class DebugScreen extends StatefulWidget {
-  const DebugScreen({super.key});
+  const DebugScreen({super.key, required this.store});
+
+  final SettingsStore store;
 
   @override
   State<DebugScreen> createState() => _DebugScreenState();
@@ -25,26 +28,10 @@ class DebugScreen extends StatefulWidget {
 class _DebugScreenState extends State<DebugScreen> {
   static const _maxLogLines = 300;
 
-  /// Checks where a 2023 Hyundai Tucson (NX4) reports fuel level, based on
-  /// OBDb's signal definitions: which ECU answers the standard fuel PID, the
-  /// instrument cluster's 22 B002 and the engine ECU's 22 E007. Flow control
-  /// is set by hand so the cluster's long reply arrives in full.
-  static const _tucsonFuelCheck = [
-    'ATH1', '012F', 'ATH0', //
-    'ATSH7C6', 'ATFCSH7C6', 'ATFCSD300000', 'ATFCSM1', 'ATCRA7CE', '22B002',
-    'ATSH7E0', 'ATFCSH7E0', 'ATCRA7E8', '22E007',
-  ];
-
   final _commandController = TextEditingController();
 
-  /// OBDb files are around 100 KB; anything far larger isn't one.
-  static const _maxProfileBytes = 5 * 1024 * 1024;
-
-  final _yearController = TextEditingController();
+  Settings _settings = const Settings();
   SignalSet? _profile;
-  String? _profileName;
-
-  List<BondedDevice>? _devices;
   ClassicTransport? _transport;
   Elm327? _elm;
   String? _status;
@@ -58,36 +45,49 @@ class _DebugScreenState extends State<DebugScreen> {
   bool get _connected => _elm != null;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  @override
   void dispose() {
     _autoRead?.cancel();
     _transport?.close();
     _commandController.dispose();
-    _yearController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadDevices() async {
-    final permission = await Permission.bluetoothConnect.request();
-    if (!permission.isGranted) {
-      setState(() => _status = 'Bluetooth permission was not granted.');
-      return;
-    }
-    try {
-      final devices = await ClassicBluetooth.bondedDevices();
-      setState(() {
-        _devices = devices;
-        _status = devices.isEmpty
-            ? 'No paired devices. Pair the adapter in Android settings first.'
-            : null;
-      });
-    } on PlatformException catch (e) {
-      setState(() => _status = 'Could not list devices: ${e.message}');
-    }
+  Future<void> _loadSettings() async {
+    final settings = await widget.store.load();
+    final profile = await widget.store.loadProfile();
+    if (!mounted) return;
+    setState(() {
+      _settings = settings;
+      _profile = profile?.$1;
+    });
   }
 
-  Future<void> _connect(BondedDevice device) async {
-    await _run('Connecting to ${device.name}...', () async {
-      final transport = await ClassicBluetooth.connect(device.address);
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(store: widget.store),
+      ),
+    );
+    await _loadSettings();
+  }
+
+  Future<void> _connect() async {
+    final address = _settings.adapterAddress;
+    if (address == null) return;
+    final permission = await Permission.bluetoothConnect.request();
+    if (!permission.isGranted) {
+      _setStatus('Bluetooth permission was not granted.');
+      return;
+    }
+    await _run('Connecting to ${_settings.adapterName}...', () async {
+      final transport = await ClassicBluetooth.connect(address);
       final elm = Elm327(transport, log: _addLog);
       _transport = transport;
       _elm = elm;
@@ -103,69 +103,25 @@ class _DebugScreenState extends State<DebugScreen> {
   Future<void> _readValues() async {
     final elm = _elm;
     if (elm == null || _busy) return;
+    final options = valueOptions(_profile, _settings.modelYear);
+    final units = {for (final option in options) option.key: option.unit};
     await _run(null, () async {
-      final standard = <String, double>{};
-      final voltage = await elm.readBatteryVoltage();
-      if (voltage != null) standard['battery_v'] = voltage;
-      for (final definition in standardPids) {
-        if (!_supported.contains(definition.pid)) continue;
-        final value = await elm.read(definition);
-        if (value != null) standard[definition.key] = value;
-      }
-      final profile = _profile;
-      final year = _modelYear;
-      final fromProfile = profile != null && year != null
-          ? await readProfile(elm, profile, year)
-          : <String, double>{};
-      final merged = mergeValues(standard, fromProfile);
+      final values = await readValues(
+        elm,
+        keys: _settings.selectedKeys ?? defaultKeys(options),
+        supportedPids: _supported,
+        profile: _profile,
+        modelYear: _settings.modelYear,
+      );
       setState(() {
         _values
           ..clear()
           ..addAll({
-            for (final MapEntry(:key, :value) in merged.entries)
-              key: '${_format(value)} ${_unitFor(key)}',
+            for (final MapEntry(:key, :value) in values.entries)
+              key: '${_format(value)} ${units[key] ?? ''}',
           });
       });
     });
-  }
-
-  Future<void> _importProfile() async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    if (file == null) return;
-    try {
-      if ((await file.length() ?? 0) > _maxProfileBytes) {
-        throw const FormatException('The file is too large.');
-      }
-      final profile = SignalSet.parse(utf8.decode(await file.readAsBytes()));
-      setState(() {
-        _profile = profile;
-        _profileName = file.name;
-        _status = 'Imported ${file.name}.';
-      });
-    } on FormatException catch (e) {
-      _setStatus('Could not import ${file.name}: ${e.message}');
-    }
-  }
-
-  int? get _modelYear {
-    final year = int.tryParse(_yearController.text);
-    return year != null && year >= 1996 && year <= 2100 ? year : null;
-  }
-
-  String _unitFor(String key) {
-    if (key == 'battery_v') return 'V';
-    if (standardPids.where((d) => d.key == key).firstOrNull case final d?) {
-      return d.unit;
-    }
-    for (final command in _profile?.commands ?? const <ProfileCommand>[]) {
-      for (final signal in command.signals) {
-        if (signal.key == key) return signal.unit;
-      }
-    }
-    return '';
   }
 
   void _toggleAutoRead(bool on) {
@@ -266,7 +222,16 @@ class _DebugScreenState extends State<DebugScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Pitwall (debug)')),
+      appBar: AppBar(
+        title: const Text('Pitwall (debug)'),
+        actions: [
+          IconButton(
+            onPressed: _busy || _connected ? null : _openSettings,
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -276,9 +241,8 @@ class _DebugScreenState extends State<DebugScreen> {
               child: Text(status, style: theme.textTheme.bodyLarge),
             ),
           if (_busy) const LinearProgressIndicator(),
-          if (!_connected) ..._buildDevicePicker(),
+          if (!_connected) ..._buildDisconnected(),
           if (_connected) ..._buildConnected(theme),
-          ..._buildProfile(theme),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -303,70 +267,20 @@ class _DebugScreenState extends State<DebugScreen> {
     );
   }
 
-  List<Widget> _buildProfile(ThemeData theme) {
-    final profile = _profile;
-    final year = _modelYear;
-    return [
-      const SizedBox(height: 24),
-      Text('Vehicle profile', style: theme.textTheme.titleMedium),
-      Row(
-        children: [
-          OutlinedButton(
-            onPressed: _busy ? null : _importProfile,
-            child: Text(profile == null ? 'Import JSON' : 'Replace'),
-          ),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 120,
-            child: TextField(
-              controller: _yearController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Model year'),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-        ],
+  List<Widget> _buildDisconnected() => [
+    if (_settings.adapterName case final name?)
+      FilledButton(
+        onPressed: _busy ? null : _connect,
+        child: Text('Connect to $name'),
+      )
+    else ...[
+      const Text('No adapter chosen yet.'),
+      const SizedBox(height: 8),
+      FilledButton(
+        onPressed: _openSettings,
+        child: const Text('Open settings'),
       ),
-      if (profile != null) ...[
-        const SizedBox(height: 8),
-        Text(
-          '$_profileName: ${profile.commands.length} requests, '
-          '${profile.signalCount} signals.',
-        ),
-        Text(
-          year == null
-              ? 'Enter the model year to use it.'
-              : '${profile.commandsFor(year).length} requests apply to $year. '
-                    'They run with "Read values".',
-        ),
-        if (profile.skipped.isNotEmpty)
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text('Skipped: ${profile.skipped.length}'),
-            children: [
-              for (final skipped in profile.skipped)
-                ListTile(
-                  dense: true,
-                  title: Text(skipped.description),
-                  subtitle: Text(skipped.reason),
-                ),
-            ],
-          ),
-      ],
-    ];
-  }
-
-  List<Widget> _buildDevicePicker() => [
-    FilledButton(
-      onPressed: _busy ? null : _loadDevices,
-      child: const Text('Show paired devices'),
-    ),
-    for (final device in _devices ?? const <BondedDevice>[])
-      ListTile(
-        title: Text(device.name),
-        subtitle: Text(device.address),
-        onTap: _busy ? null : () => _connect(device),
-      ),
+    ],
   ];
 
   List<Widget> _buildConnected(ThemeData theme) => [
@@ -417,11 +331,6 @@ class _DebugScreenState extends State<DebugScreen> {
           tooltip: 'Send',
         ),
       ],
-    ),
-    const SizedBox(height: 8),
-    OutlinedButton(
-      onPressed: _busy ? null : () => _sendCommands(_tucsonFuelCheck),
-      child: const Text('Run Tucson fuel check'),
     ),
     const SizedBox(height: 16),
     Text('Supported PIDs', style: theme.textTheme.titleMedium),
