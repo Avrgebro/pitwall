@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
+import 'line_icon.dart';
 
 /// A text field for secrets (webhook URL, tokens): hidden by default with a
 /// show/hide toggle, a reassurance line, and room for a warning.
@@ -13,6 +14,7 @@ class SecretTextField extends StatefulWidget {
     this.helperText,
     this.warning,
     this.errorText,
+    this.validator,
     this.onChanged,
     this.keyboardType,
     this.multilineWhenShown = false,
@@ -28,6 +30,10 @@ class SecretTextField extends StatefulWidget {
   /// of the helper text.
   final InlineSpan? warning;
   final String? errorText;
+
+  /// Checks the text once the user has edited it, showing what it returns
+  /// as the error. For checks that need no outside state.
+  final FormFieldValidator<String>? validator;
   final ValueChanged<String>? onChanged;
   final TextInputType? keyboardType;
 
@@ -55,8 +61,10 @@ class _SecretTextFieldState extends State<SecretTextField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
+        TextFormField(
           controller: widget.controller,
+          validator: widget.validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           obscureText: !_visible,
           autocorrect: false,
           enableSuggestions: false,
@@ -106,21 +114,19 @@ class _Helper extends StatelessWidget {
   final InlineSpan text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(Insets.l, Insets.xs, Insets.l, 0),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: Insets.xs + 2),
-        Expanded(
-          child: Text.rich(
-            text,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: color),
-          ),
-        ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(color: color);
+    return Padding(
+      // Lined up with the field's edge, a little apart from it.
+      padding: const EdgeInsets.only(top: Insets.s),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LineIcon(icon, style: style, size: 14, color: color),
+          const SizedBox(width: Insets.xs + 2),
+          Expanded(child: Text.rich(text, style: style)),
+        ],
+      ),
+    );
+  }
 }

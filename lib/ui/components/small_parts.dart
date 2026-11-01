@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
+import 'line_icon.dart';
 
 /// A small outlined label beside a name, such as "Bluetooth LE".
 class TagLabel extends StatelessWidget {
@@ -115,16 +116,19 @@ class SummaryRow extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
     );
-    final labelText = Text(
-      label,
-      style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-    );
+    final labelStyle = theme.textTheme.bodyMedium?.copyWith(color: muted);
+    final labelText = Text(label, style: labelStyle);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Insets.s),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: Sizes.iconSmall, color: muted),
+          LineIcon(
+            icon,
+            style: labelStyle,
+            size: Sizes.iconSmall,
+            color: muted,
+          ),
           const SizedBox(width: Insets.l),
           Expanded(
             child: stacked

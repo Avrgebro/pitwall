@@ -89,20 +89,24 @@ class ProfileCard extends StatelessWidget {
               ),
               const SizedBox(height: Insets.m),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
+                  LineIcon(
                     year == null ? Icons.info_outline : Icons.check_circle,
+                    style: theme.textTheme.bodyMedium,
                     size: Sizes.iconSmall,
                     color: year == null
                         ? theme.colorScheme.onSurfaceVariant
                         : healthy.accent,
                   ),
                   const SizedBox(width: Insets.s),
-                  Text(
-                    year == null
-                        ? 'Choose the year to use this profile'
-                        : ProfileText.applies(profile, year),
-                    style: theme.textTheme.bodyMedium,
+                  Expanded(
+                    child: Text(
+                      year == null
+                          ? 'Choose the year to use this profile'
+                          : ProfileText.applies(profile, year),
+                      style: theme.textTheme.bodyMedium,
+                    ),
                   ),
                 ],
               ),

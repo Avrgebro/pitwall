@@ -56,7 +56,8 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
           },
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(Insets.l, Insets.xs, Insets.l, 0),
+          // Lined up with the field's edge, like the other field notes.
+          padding: const EdgeInsets.only(top: Insets.s),
           child: Text.rich(
             TextSpan(
               children: [

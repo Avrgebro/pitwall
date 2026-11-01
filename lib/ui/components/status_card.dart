@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
 import 'icon_badge.dart';
+import 'line_icon.dart';
 import 'stat_tile.dart';
 
 /// A status with an icon, a sentence and optional details: delivery health,
@@ -124,6 +125,10 @@ class ResultBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = context.tone(tone);
     final healthy = tone == StatusTone.healthy || tone == StatusTone.active;
+    final titleStyle = theme.textTheme.titleSmall?.copyWith(
+      color: colors.onContainer,
+      fontWeight: FontWeight.w600,
+    );
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: Insets.l,
@@ -136,8 +141,9 @@ class ResultBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          LineIcon(
             healthy ? Icons.check_circle : Icons.error,
+            style: titleStyle,
             size: Sizes.iconSmall,
             color: colors.onContainer,
           ),
@@ -146,13 +152,7 @@ class ResultBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colors.onContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(title, style: titleStyle),
                 Text(
                   message,
                   style: theme.textTheme.bodyMedium?.copyWith(

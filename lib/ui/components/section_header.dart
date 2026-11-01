@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
+import 'line_icon.dart';
 
 /// Title of a group on a page, with optional meta text on the right
 /// ("Last values sent ······ Updated 40 s ago").
@@ -34,40 +35,48 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final titleStyle =
+        (icon == null
+                ? theme.textTheme.titleSmall
+                : theme.textTheme.titleMedium)
+            ?.copyWith(
+              color: icon == null
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            );
+    // The texts share a baseline; the icon is centred on the title's line.
+    final texts = Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(child: Text(title, style: titleStyle)),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: trailingTone == null
+                  ? theme.colorScheme.onSurfaceVariant
+                  : context.tone(trailingTone!).accent,
+            ),
+          ),
+      ],
+    );
     return Padding(
       padding: padding,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 20, color: theme.colorScheme.primary),
+            LineIcon(
+              icon!,
+              style: titleStyle,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(width: Insets.m),
           ],
-          Expanded(
-            child: Text(
-              title,
-              style:
-                  (icon == null
-                          ? theme.textTheme.titleSmall
-                          : theme.textTheme.titleMedium)
-                      ?.copyWith(
-                        color: icon == null
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-            ),
-          ),
-          if (trailing != null)
-            Text(
-              trailing!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: trailingTone == null
-                    ? theme.colorScheme.onSurfaceVariant
-                    : context.tone(trailingTone!).accent,
-              ),
-            ),
+          Expanded(child: texts),
         ],
       ),
     );
