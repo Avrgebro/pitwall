@@ -91,6 +91,7 @@ class SummaryRow extends StatelessWidget {
     required this.value,
     this.caption,
     this.valueColor,
+    this.color,
     this.stacked = false,
   });
 
@@ -102,17 +103,22 @@ class SummaryRow extends StatelessWidget {
   final String? caption;
   final Color? valueColor;
 
+  /// The text colour on a tinted surface; the icon and label take a softer
+  /// shade of it.
+  final Color? color;
+
   /// Value under the label instead of on the right, for long values.
   final bool stacked;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final muted =
+        color?.withValues(alpha: 0.75) ?? theme.colorScheme.onSurfaceVariant;
     final valueText = Text(
       value,
       style: theme.textTheme.bodyMedium?.copyWith(
-        color: valueColor ?? theme.colorScheme.onSurface,
+        color: valueColor ?? color ?? theme.colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
     );

@@ -92,17 +92,30 @@ void main() {
     );
 
     expect(model.hero.state, HeroState.waiting);
-    expect(
-      model.hero.subtitle,
-      'Starts on its own when the car\'s Bluetooth connects',
-    );
-    expect(model.hero.stats.map((s) => s.value), [
-      'Not in range',
-      'Off',
-      'Ended 2 h ago',
+    expect(model.hero.subtitle, isNull);
+    expect(model.hero.stats.map((s) => (s.label, s.value)), [
+      ('Adapter', 'Not connected'),
+      ('Last connected', '2 h ago'),
+      ('Last reading', '2 h ago'),
     ]);
-    expect(model.delivery.message, 'Every reading from the last trip arrived');
+    expect(model.delivery.message, isNull);
     expect(model.values!.meta, 'Updated 2 h ago');
+  });
+
+  test('parked after another car sent the latest reading', () {
+    final model = build(
+      delivery: DeliveryStatus(
+        latest: Reading(
+          device: 'mazda',
+          timestamp: now.subtract(const Duration(minutes: 5)),
+          values: const {'rpm': 800},
+          delivered: true,
+        ),
+      ),
+    );
+
+    // This car's last reading isn't known, so the row is left out.
+    expect(model.hero.stats.map((s) => s.label), ['Adapter', 'Last connected']);
   });
 
   test('1c no signal: readings queued, nothing to do', () {

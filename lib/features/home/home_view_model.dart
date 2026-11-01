@@ -14,22 +14,35 @@ import '../common/value_display.dart';
 
 enum HeroState { running, connecting, waiting }
 
-enum HeroStatKind { adapter, adapterMissing, car, carOff, trip, lastTrip }
+enum HeroStatKind {
+  adapter,
+  adapterMissing,
+  car,
+  carOff,
+  trip,
+  lastConnected,
+  lastReading,
+}
 
 enum DeliveryCardKind { healthy, queued, failing }
+
+enum DeliveryStatKind { lastSent, failed, queued }
 
 @immutable
 class HeroModel {
   const HeroModel({
     required this.state,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.stats,
   });
 
   final HeroState state;
   final String title;
-  final String subtitle;
+
+  /// What Pitwall is doing right now; none while it waits, as the state
+  /// chip already says so.
+  final String? subtitle;
   final List<({HeroStatKind kind, String label, String value})> stats;
 
   StatusTone get tone =>
@@ -41,7 +54,7 @@ class DeliveryCardModel {
   const DeliveryCardModel({
     required this.kind,
     required this.title,
-    required this.message,
+    this.message,
     required this.stats,
     this.canOpenSettings = false,
     this.canRetry = false,
@@ -49,8 +62,11 @@ class DeliveryCardModel {
 
   final DeliveryCardKind kind;
   final String title;
-  final String message;
-  final List<({String label, String value})> stats;
+
+  /// What's going on, when the title doesn't say it all: none while
+  /// healthy, an explanation when something's wrong.
+  final String? message;
+  final List<({DeliveryStatKind kind, String label, String value})> stats;
   final bool canOpenSettings;
   final bool canRetry;
 
@@ -98,6 +114,12 @@ class HomeViewModel {
     final ownSession = session.vehicleId == vehicle.id;
     final connected = ownSession && session.isConnected;
     final card = _delivery(delivery, connected, now);
+    // Only the newest reading is kept, so this car's last one is known only
+    // when the newest came from it.
+    final latest = delivery.latest;
+    final lastReading = latest?.device == vehicle.deviceId
+        ? latest?.timestamp
+        : null;
     return HomeViewModel(
       hero: _hero(
         vehicle: vehicle,
@@ -106,6 +128,7 @@ class HomeViewModel {
         connected: connected,
         connecting: ownSession && session.phase == SessionPhase.connecting,
         deliveryHealthy: !card.isProblem,
+        lastReading: lastReading,
         now: now,
       ),
       delivery: card,
@@ -126,15 +149,16 @@ class HomeViewModel {
     required bool connected,
     required bool connecting,
     required bool deliveryHealthy,
+    required DateTime? lastReading,
     required DateTime now,
   }) {
     final every = Formatters.every(settings.interval);
-    final lastTrip = (
-      kind: HeroStatKind.lastTrip,
-      label: 'Last trip',
+    final lastConnected = (
+      kind: HeroStatKind.lastConnected,
+      label: 'Last connected',
       value: switch (vehicle.lastSeen) {
-        final seen? => 'Ended ${Formatters.ago(seen, now)}',
-        null => 'None yet',
+        final seen? => Formatters.ago(seen, now),
+        null => 'Never',
       },
     );
     if (connected) {
@@ -169,30 +193,28 @@ class HomeViewModel {
         stats: [
           (kind: HeroStatKind.adapter, label: 'Adapter', value: 'Connecting'),
           (kind: HeroStatKind.car, label: 'Car', value: 'Checking'),
-          lastTrip,
+          lastConnected,
         ],
       );
     }
     return HeroModel(
       state: HeroState.waiting,
       title: vehicle.name,
-      subtitle: switch (settings.wakeTrigger) {
-        WakeTrigger.carBluetooth when settings.headUnitAddress == null =>
-          'Choose your car\'s Bluetooth in Settings so Pitwall can start on '
-              'its own',
-        WakeTrigger.carBluetooth =>
-          'Starts on its own when the car\'s Bluetooth connects',
-        WakeTrigger.drivingDetection =>
-          'Starts on its own when driving is detected',
-      },
+      // Without a connection there's no telling whether the car is on, or
+      // whether the adapter is near; only what was last heard from it.
       stats: [
         (
           kind: HeroStatKind.adapterMissing,
           label: 'Adapter',
-          value: 'Not in range',
+          value: 'Not connected',
         ),
-        (kind: HeroStatKind.carOff, label: 'Car', value: 'Off'),
-        lastTrip,
+        lastConnected,
+        if (lastReading != null)
+          (
+            kind: HeroStatKind.lastReading,
+            label: 'Last reading',
+            value: Formatters.ago(lastReading, now),
+          ),
       ],
     );
   }
@@ -222,24 +244,31 @@ class HomeViewModel {
           title: queued == 1 ? '1 reading waiting' : '$queued readings waiting',
           message: 'Sending now.',
           stats: [
-            (label: 'Last sent', value: ago(status.lastSuccess)),
-            (label: 'Failed', value: 'None'),
-            (label: 'Queued', value: count(queued)),
+            (
+              kind: DeliveryStatKind.lastSent,
+              label: 'Last sent',
+              value: ago(status.lastSuccess),
+            ),
+            (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
+            (
+              kind: DeliveryStatKind.queued,
+              label: 'Queued',
+              value: count(queued),
+            ),
           ],
         );
       }
       return DeliveryCardModel(
         kind: DeliveryCardKind.healthy,
         title: status.latest == null ? 'Ready to send' : 'Delivery healthy',
-        message: switch ((status.latest, connected)) {
-          (null, _) => 'The first reading goes out when the car connects.',
-          (_, true) => 'Every reading reached the webhook',
-          (_, false) => 'Every reading from the last trip arrived',
-        },
         stats: [
-          (label: 'Last sent', value: ago(status.lastSuccess)),
-          (label: 'Failed', value: 'None'),
-          (label: 'Queued', value: 'None'),
+          (
+            kind: DeliveryStatKind.lastSent,
+            label: 'Last sent',
+            value: ago(status.lastSuccess),
+          ),
+          (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
+          (kind: DeliveryStatKind.queued, label: 'Queued', value: 'None'),
         ],
       );
     }
@@ -258,9 +287,17 @@ class HomeViewModel {
                   'online. Nothing to do.'
             : DeliveryText.error(error).message,
         stats: [
-          (label: 'Last sent', value: ago(status.lastSuccess)),
-          (label: 'Failed', value: 'None'),
-          (label: 'Queued', value: count(queued)),
+          (
+            kind: DeliveryStatKind.lastSent,
+            label: 'Last sent',
+            value: ago(status.lastSuccess),
+          ),
+          (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
+          (
+            kind: DeliveryStatKind.queued,
+            label: 'Queued',
+            value: count(queued),
+          ),
         ],
         canRetry: true,
       );
@@ -275,9 +312,17 @@ class HomeViewModel {
       title: text.title,
       message: text.message,
       stats: [
-        (label: 'Last success', value: ago(status.lastSuccess)),
-        (label: 'Failed', value: count(status.failedAttempts)),
-        (label: 'Queued', value: count(queued)),
+        (
+          kind: DeliveryStatKind.lastSent,
+          label: 'Last success',
+          value: ago(status.lastSuccess),
+        ),
+        (
+          kind: DeliveryStatKind.failed,
+          label: 'Failed',
+          value: count(status.failedAttempts),
+        ),
+        (kind: DeliveryStatKind.queued, label: 'Queued', value: count(queued)),
       ],
       canOpenSettings: true,
       canRetry: !userMustAct,

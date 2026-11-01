@@ -4,6 +4,7 @@ library;
 
 export 'components/checklist_row.dart';
 export 'components/content_card.dart';
+export 'components/detail_rows.dart';
 export 'components/floating_nav_bar.dart';
 export 'components/glass_bar.dart';
 export 'components/glass_button.dart';
@@ -19,7 +20,6 @@ export 'components/secret_text_field.dart';
 export 'components/section_header.dart';
 export 'components/shape_illustration.dart';
 export 'components/small_parts.dart';
-export 'components/stat_tile.dart';
 export 'components/status_card.dart';
 export 'components/status_chip.dart';
 export 'components/value_tile.dart';

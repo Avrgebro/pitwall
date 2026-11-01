@@ -30,7 +30,10 @@ class DeliveryStatusCard extends StatelessWidget {
       },
       title: model.title,
       message: model.message,
-      stats: model.stats,
+      stats: [
+        for (final stat in model.stats)
+          (icon: _icon(stat.kind), label: stat.label, value: stat.value),
+      ],
       actions: [
         if (model.canOpenSettings)
           FilledButton.icon(
@@ -51,4 +54,10 @@ class DeliveryStatusCard extends StatelessWidget {
       ],
     );
   }
+
+  static IconData _icon(DeliveryStatKind kind) => switch (kind) {
+    DeliveryStatKind.lastSent => Symbols.schedule_send_rounded,
+    DeliveryStatKind.failed => Symbols.sync_problem_rounded,
+    DeliveryStatKind.queued => Symbols.pending_rounded,
+  };
 }

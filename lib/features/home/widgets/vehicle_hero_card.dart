@@ -27,7 +27,7 @@ class VehicleHeroCard extends StatelessWidget {
     final foreground = running
         ? context.tone(StatusTone.active).onContainer
         : scheme.onSurface;
-    final tileBackground = scheme.surface.withValues(alpha: 0.4);
+    final panel = scheme.surface.withValues(alpha: 0.4);
 
     return GlassSurface(
       borderRadius: Corners.heroRadius,
@@ -40,30 +40,25 @@ class VehicleHeroCard extends StatelessWidget {
             _chip(),
             const SizedBox(height: Insets.l),
             _title(theme.textTheme.displaySmall?.copyWith(color: foreground)),
-            const SizedBox(height: Insets.xs),
-            Text(
-              model.subtitle,
-              style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
-            ),
-            const SizedBox(height: Insets.l),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < model.stats.length; i++) ...[
-                    if (i > 0) const SizedBox(width: Insets.s),
-                    Expanded(
-                      child: StatTile(
-                        icon: _icon(model.stats[i].kind),
-                        label: model.stats[i].label,
-                        value: model.stats[i].value,
-                        background: tileBackground,
-                        foreground: foreground,
-                      ),
-                    ),
-                  ],
-                ],
+            if (model.subtitle case final subtitle?) ...[
+              const SizedBox(height: Insets.xs),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
               ),
+            ],
+            const SizedBox(height: Insets.l),
+            DetailRows(
+              background: panel,
+              color: foreground,
+              rows: [
+                for (final stat in model.stats)
+                  (
+                    icon: _icon(stat.kind),
+                    label: stat.label,
+                    value: stat.value,
+                  ),
+              ],
             ),
           ],
         ),
@@ -121,6 +116,7 @@ class VehicleHeroCard extends StatelessWidget {
     HeroStatKind.car => Symbols.directions_car_rounded,
     HeroStatKind.carOff => Symbols.power_settings_new_rounded,
     HeroStatKind.trip => Symbols.timer_rounded,
-    HeroStatKind.lastTrip => Symbols.history_rounded,
+    HeroStatKind.lastConnected => Symbols.history_rounded,
+    HeroStatKind.lastReading => Symbols.cloud_upload_rounded,
   };
 }

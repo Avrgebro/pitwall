@@ -67,8 +67,8 @@ void main() {
           title: 'The webhook is refusing readings',
           message: 'Not authorised (HTTP 401)',
           stats: const [
-            (label: 'Failed', value: '12'),
-            (label: 'Queued', value: '12'),
+            (icon: Icons.sync_problem, label: 'Failed', value: '12'),
+            (icon: Icons.pending, label: 'Queued', value: '12'),
           ],
           actions: [
             FilledButton(onPressed: () {}, child: const Text('Settings')),

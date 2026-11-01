@@ -2,20 +2,21 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
+import 'detail_rows.dart';
+import 'glass_surface.dart';
 import 'icon_badge.dart';
 import 'line_icon.dart';
-import 'stat_tile.dart';
 
-/// A status with an icon, a sentence and optional details: delivery health,
-/// queued readings, failures. Warning and error states are filled so
-/// problems stand out; other states are outlined.
+/// A status with an icon, an optional sentence and details: delivery
+/// health, queued readings, failures. Warning and error states are filled
+/// so problems stand out; other states are glass like the cards around.
 class StatusCard extends StatelessWidget {
   const StatusCard({
     super.key,
     required this.tone,
     required this.icon,
     required this.title,
-    required this.message,
+    this.message,
     this.stats = const [],
     this.actions = const [],
     this.trailing,
@@ -24,10 +25,12 @@ class StatusCard extends StatelessWidget {
   final StatusTone tone;
   final IconData icon;
   final String title;
-  final String message;
 
-  /// Figures under a divider ("Last sent · Failed · Queued").
-  final List<({String label, String value})> stats;
+  /// What it means, when the title doesn't say it all.
+  final String? message;
+
+  /// Details as rows ("Last sent", "Failed", "Queued").
+  final List<({IconData icon, String label, String value})> stats;
 
   /// Buttons at the bottom.
   final List<Widget> actions;
@@ -45,13 +48,8 @@ class StatusCard extends StatelessWidget {
     final titleColor = _filled ? colors.onContainer : scheme.onSurface;
     final bodyColor = _filled ? colors.onContainer : scheme.onSurfaceVariant;
 
-    return Container(
+    final content = Padding(
       padding: Insets.card,
-      decoration: BoxDecoration(
-        color: _filled ? colors.container : scheme.surface,
-        borderRadius: Corners.extraLargeRadius,
-        border: _filled ? null : Border.all(color: scheme.outlineVariant),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -75,12 +73,13 @@ class StatusCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(
-                      message,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: bodyColor,
+                    if (message case final message?)
+                      Text(
+                        message,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: bodyColor,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -91,11 +90,14 @@ class StatusCard extends StatelessWidget {
             ],
           ),
           if (stats.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Insets.m),
-              child: Divider(color: bodyColor.withValues(alpha: 0.25)),
+            const SizedBox(height: Insets.l),
+            DetailRows(
+              rows: stats,
+              color: titleColor,
+              background: _filled
+                  ? colors.onContainer.withValues(alpha: 0.08)
+                  : scheme.surface.withValues(alpha: 0.4),
             ),
-            LabeledValueRow(items: stats, color: titleColor),
           ],
           if (actions.isNotEmpty) ...[
             const SizedBox(height: Insets.m),
@@ -103,6 +105,14 @@ class StatusCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+    if (!_filled) return GlassSurface(child: content);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.container,
+        borderRadius: Corners.extraLargeRadius,
+      ),
+      child: content,
     );
   }
 }
