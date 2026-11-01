@@ -40,7 +40,14 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   path_provider: ^2.1.6
   http: ^1.6.0
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.1.2
+  dynamic_color: ^2.1.0
+  material_symbols_icons: ^4.2960.0
+  package_info_plus: ^10.2.2
+  url_launcher: ^6.3.3
 
+  material_ui: ^1.9.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

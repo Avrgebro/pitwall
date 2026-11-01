@@ -1,37 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'debug/debug_screen.dart';
-import 'settings/settings_store.dart';
-import 'webhook/delivery_storage.dart';
-import 'webhook/webhook_sender.dart';
+import 'app/app.dart';
+import 'state/infrastructure.dart';
+import 'state/settings_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final store = SettingsStore();
-  final sender = WebhookSender(
-    storage: FileDeliveryStorage(),
-    webhookTarget: store.loadWebhookTarget,
+  final container = ProviderContainer();
+  // Settings decide the first screen; queued readings resume right away.
+  await container.read(appSettingsProvider.future);
+  await container.read(webhookSenderProvider).init();
+  runApp(
+    UncontrolledProviderScope(container: container, child: const PitwallApp()),
   );
-  await sender.init();
-  runApp(PitwallApp(store: store, sender: sender));
-}
-
-class PitwallApp extends StatelessWidget {
-  const PitwallApp({super.key, required this.store, required this.sender});
-
-  final SettingsStore store;
-  final WebhookSender sender;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pitwall',
-      theme: ThemeData(colorSchemeSeed: Colors.teal),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-      ),
-      home: DebugScreen(store: store, sender: sender),
-    );
-  }
 }
