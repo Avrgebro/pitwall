@@ -1,0 +1,237 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/bluetooth/bluetooth_gateway.dart';
+import '../core/obd/elm327.dart';
+import '../core/platform/permission_gateway.dart';
+import '../core/readings/readings.dart';
+import '../core/session/car_state.dart';
+import '../core/vehicles/vehicle.dart';
+import 'infrastructure.dart';
+import 'settings_state.dart';
+
+enum SessionPhase { idle, connecting, connected }
+
+enum SessionProblem {
+  /// Bluetooth permission wasn't granted.
+  permissionDenied,
+
+  /// The adapter couldn't be reached over Bluetooth.
+  connectFailed,
+
+  /// The adapter dropped the connection.
+  disconnected,
+
+  /// The adapter reported an error or stopped answering.
+  adapterError,
+}
+
+/// A live connection to a vehicle's adapter. For now it's started by hand
+/// from the developer tools; the background service will drive it later.
+@immutable
+class SessionState {
+  const SessionState({
+    this.phase = SessionPhase.idle,
+    this.vehicleId,
+    this.connectedAt,
+    this.carState = CarState.unknown,
+    this.supportedPids = const {},
+    this.adapterVersion,
+    this.problem,
+    this.busy = false,
+  });
+
+  final SessionPhase phase;
+  final String? vehicleId;
+  final DateTime? connectedAt;
+  final CarState carState;
+  final Set<int> supportedPids;
+  final String? adapterVersion;
+
+  /// Why the last connection attempt or operation failed.
+  final SessionProblem? problem;
+
+  /// An operation is running on the adapter.
+  final bool busy;
+
+  bool get isConnected => phase == SessionPhase.connected;
+
+  SessionState copyWith({
+    SessionPhase? phase,
+    CarState? carState,
+    Set<int>? supportedPids,
+    String? adapterVersion,
+    SessionProblem? problem,
+    bool clearProblem = false,
+    bool? busy,
+  }) => SessionState(
+    phase: phase ?? this.phase,
+    vehicleId: vehicleId,
+    connectedAt: connectedAt,
+    carState: carState ?? this.carState,
+    supportedPids: supportedPids ?? this.supportedPids,
+    adapterVersion: adapterVersion ?? this.adapterVersion,
+    problem: clearProblem ? null : (problem ?? this.problem),
+    busy: busy ?? this.busy,
+  );
+}
+
+final sessionProvider = NotifierProvider<SessionController, SessionState>(
+  SessionController.new,
+);
+
+class SessionController extends Notifier<SessionState> {
+  ClosableTransport? _transport;
+  Elm327? _elm;
+
+  @override
+  SessionState build() {
+    ref.onDispose(_close);
+    return const SessionState();
+  }
+
+  Future<void> connect(Vehicle vehicle) async {
+    final address = vehicle.adapterAddress;
+    if (address == null || state.phase != SessionPhase.idle) return;
+    final log = ref.read(adapterLogProvider);
+    final granted = await ref
+        .read(permissionGatewayProvider)
+        .request(AppPermission.bluetooth);
+    if (!granted) {
+      state = const SessionState(problem: SessionProblem.permissionDenied);
+      return;
+    }
+    state = SessionState(phase: SessionPhase.connecting, vehicleId: vehicle.id);
+    try {
+      final transport = await ref
+          .read(bluetoothGatewayProvider)
+          .connect(address);
+      final elm = Elm327(transport, log: log.exchange);
+      _transport = transport;
+      _elm = elm;
+      final version = await elm.initialize();
+      final now = DateTime.now();
+      state = SessionState(
+        phase: SessionPhase.connected,
+        vehicleId: vehicle.id,
+        connectedAt: now,
+        adapterVersion: version,
+        busy: true,
+      );
+      await ref.read(appSettingsProvider.notifier).markSeen(vehicle.id, now);
+      try {
+        final supported = await elm.supportedPids();
+        log.note('Car answered, ${supported.length} values supported');
+        state = state.copyWith(
+          carState: CarState.ignitionOn,
+          supportedPids: supported,
+          busy: false,
+        );
+      } on ElmException catch (e) {
+        if (e.error != ElmError.unableToConnect) rethrow;
+        log.note('Car didn\'t answer: ignition off?', warning: true);
+        state = state.copyWith(carState: CarState.off, busy: false);
+      }
+    } on PlatformException {
+      await _close();
+      log.note('Couldn\'t connect to the adapter', warning: true);
+      state = const SessionState(problem: SessionProblem.connectFailed);
+    } on ElmException catch (e) {
+      await _fail(e);
+    }
+  }
+
+  /// Reads the vehicle's chosen values and sends them to the webhook.
+  Future<void> readAndSend() async {
+    final elm = _elm;
+    final vehicleId = state.vehicleId;
+    if (elm == null || vehicleId == null || state.busy) return;
+    final vehicle = ref.read(vehicleProvider(vehicleId));
+    if (vehicle == null) return;
+    final log = ref.read(adapterLogProvider);
+    state = state.copyWith(busy: true, clearProblem: true);
+    try {
+      final profile = await ref.read(vehicleProfileProvider(vehicleId).future);
+      final values = await readValues(
+        elm,
+        keys:
+            vehicle.selectedKeys ??
+            defaultKeys(valueOptions(profile, vehicle.modelYear)),
+        supportedPids: state.supportedPids,
+        profile: profile,
+        modelYear: vehicle.modelYear,
+      );
+      values.forEach(log.value);
+      state = state.copyWith(carState: carStateFrom(values), busy: false);
+      if (values.isEmpty) {
+        log.note('Nothing to send: the car reported none of the values');
+        return;
+      }
+      await ref
+          .read(webhookSenderProvider)
+          .send(device: vehicle.name, values: values, connected: true);
+    } on ElmException catch (e) {
+      await _fail(e);
+    }
+  }
+
+  /// Sends raw commands to the adapter; replies show up in the log. AT
+  /// commands can change settings the app relies on, so the adapter is
+  /// reset afterwards.
+  Future<void> sendRaw(List<String> commands) async {
+    final elm = _elm;
+    if (elm == null || state.busy || commands.isEmpty) return;
+    state = state.copyWith(busy: true);
+    try {
+      for (final command in commands) {
+        try {
+          await elm.send(command);
+        } on ElmException catch (e) {
+          if (e.error == ElmError.disconnected) rethrow;
+        }
+      }
+      if (commands.any((c) => c.startsWith('AT'))) await elm.initialize();
+      state = state.copyWith(busy: false);
+    } on ElmException catch (e) {
+      await _fail(e);
+    }
+  }
+
+  Future<void> disconnect() async {
+    await _close();
+    ref.read(adapterLogProvider).note('Disconnected');
+    state = const SessionState();
+  }
+
+  Future<void> _fail(ElmException error) async {
+    await _close();
+    final dropped = error.error == ElmError.disconnected;
+    ref
+        .read(adapterLogProvider)
+        .note(
+          dropped
+              ? 'The adapter disconnected'
+              : 'Adapter error: ${error.error.name} on ${error.command}',
+          warning: true,
+        );
+    state = SessionState(
+      problem: dropped
+          ? SessionProblem.disconnected
+          : SessionProblem.adapterError,
+    );
+  }
+
+  Future<void> _close() async {
+    final transport = _transport;
+    final elm = _elm;
+    _transport = null;
+    _elm = null;
+    await elm?.dispose();
+    try {
+      await transport?.close();
+    } on PlatformException {
+      // Already gone.
+    }
+  }
+}
