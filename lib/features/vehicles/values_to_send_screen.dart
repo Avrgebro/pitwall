@@ -18,7 +18,6 @@ class ValuesToSendScreen extends ConsumerStatefulWidget {
 }
 
 class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
-  String _search = '';
   bool _showOthers = false;
 
   @override
@@ -37,39 +36,43 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final others = options
         .where((o) => o.fromProfile && !o.recommended)
         .toList();
-    final query = _search.trim().toLowerCase();
-    final matches = query.isEmpty
-        ? others
-        : others
-              .where(
-                (o) =>
-                    o.name.toLowerCase().contains(query) ||
-                    o.key.contains(query),
-              )
-              .toList();
-
-    void toggle(String key, bool on) => ref
-        .read(appSettingsProvider.notifier)
-        .saveVehicle(
-          vehicle.copyWith(
-            selectedKeys: on
-                ? {...selected, key}
-                : ({...selected}..remove(key)),
-          ),
-        );
-
-    Widget row(ValueOption option) => ToggleRow(
-      title: option.unit.isEmpty
-          ? option.name
-          : '${option.name} (${option.unit})',
-      caption: option.key,
-      value: selected.contains(option.key),
-      onChanged: (on) => toggle(option.key, on),
+    final defaults = defaultKeys(options);
+    Widget row(ValueOption option) => _SignalToggle(
+      vehicleId: vehicle.id,
+      option: option,
+      defaults: defaults,
     );
 
     return AppPage(
       title: 'Values to send',
       subtitle: '${vehicle.name} · ${selected.length} selected',
+      actions: [
+        // Material 3 search: the icon opens a full-screen search view over
+        // every value, standard and profile alike.
+        SearchAnchor(
+          viewHintText: 'Search values',
+          builder: (context, controller) => IconButton(
+            icon: const Icon(Symbols.search_rounded),
+            tooltip: 'Search values',
+            onPressed: controller.openView,
+          ),
+          suggestionsBuilder: (context, controller) {
+            final matches = _matching(options, controller.text);
+            if (matches.isEmpty) {
+              return [
+                InfoNote(
+                  padding: Insets.card,
+                  text: TextSpan(
+                    text: 'No values match "${controller.text.trim()}".',
+                  ),
+                ),
+              ];
+            }
+            return [for (final option in matches) row(option)];
+          },
+        ),
+        const SizedBox(width: Insets.s),
+      ],
       children: [
         _IntroPanel(
           canReset: vehicle.selectedKeys != null,
@@ -108,32 +111,23 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
           ),
           if (_showOthers) ...[
             const SizedBox(height: Insets.m),
-            SearchBar(
-              hintText: 'Search signals',
-              leading: const Icon(Symbols.search_rounded),
-              elevation: const WidgetStatePropertyAll(0),
-              onChanged: (text) => setState(() => _search = text),
-            ),
-            if (query.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  Insets.l,
-                  Insets.s,
-                  Insets.l,
-                  0,
-                ),
-                child: Text(
-                  '${matches.length} of ${others.length} match',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            const SizedBox(height: Insets.m),
-            if (matches.isNotEmpty)
-              RowGroup(children: [for (final option in matches) row(option)]),
+            RowGroup(children: [for (final option in others) row(option)]),
           ],
         ],
       ],
     );
+  }
+
+  /// Values whose name or payload key contains [text], ignoring case.
+  static List<ValueOption> _matching(List<ValueOption> options, String text) {
+    final query = text.trim().toLowerCase();
+    if (query.isEmpty) return options;
+    return [
+      for (final option in options)
+        if (option.name.toLowerCase().contains(query) ||
+            option.key.contains(query))
+          option,
+    ];
   }
 
   static String _profileLabel(Vehicle vehicle) => switch (vehicle.modelYear) {
@@ -179,4 +173,43 @@ class _IntroPanel extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// One value with its on/off switch. Reads the vehicle's selection itself,
+/// so it stays current wherever it's shown, the search view included.
+class _SignalToggle extends ConsumerWidget {
+  const _SignalToggle({
+    required this.vehicleId,
+    required this.option,
+    required this.defaults,
+  });
+
+  final String vehicleId;
+  final ValueOption option;
+
+  /// The selection while the vehicle still uses the recommended values.
+  final Set<String> defaults;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vehicle = ref.watch(vehicleProvider(vehicleId));
+    if (vehicle == null) return const SizedBox.shrink();
+    final selected = vehicle.selectedKeys ?? defaults;
+    return ToggleRow(
+      title: option.unit.isEmpty
+          ? option.name
+          : '${option.name} (${option.unit})',
+      caption: option.key,
+      value: selected.contains(option.key),
+      onChanged: (on) => ref
+          .read(appSettingsProvider.notifier)
+          .saveVehicle(
+            vehicle.copyWith(
+              selectedKeys: on
+                  ? {...selected, option.key}
+                  : ({...selected}..remove(option.key)),
+            ),
+          ),
+    );
+  }
 }
