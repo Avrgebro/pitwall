@@ -67,7 +67,12 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         if (!adapter.isEnabled) return result.error("disabled", "Bluetooth is off", null)
         try {
             result.success(adapter.bondedDevices.map {
-                mapOf("name" to (it.name ?: it.address), "address" to it.address)
+                mapOf(
+                    "name" to (it.name ?: it.address),
+                    "address" to it.address,
+                    // Major and minor class; uncategorized when not given.
+                    "deviceClass" to (it.bluetoothClass?.deviceClass ?: 0x1F00),
+                )
             })
         } catch (e: SecurityException) {
             result.error("permission", e.message, null)

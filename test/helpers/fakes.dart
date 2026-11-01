@@ -121,6 +121,7 @@ List<Override> testOverrides({
   SessionState session = const SessionState(),
   Map<AppPermission, bool>? permissions,
   FakeSettingsStore? store,
+  FakeBluetoothGateway? bluetooth,
 }) {
   final sender = WebhookSender(
     storage: FakeDeliveryStorage(),
@@ -135,7 +136,9 @@ List<Override> testOverrides({
     permissionGatewayProvider.overrideWithValue(
       FakePermissionGateway(permissions),
     ),
-    bluetoothGatewayProvider.overrideWithValue(FakeBluetoothGateway()),
+    bluetoothGatewayProvider.overrideWithValue(
+      bluetooth ?? FakeBluetoothGateway(),
+    ),
     tripServiceGatewayProvider.overrideWithValue(FakeTripServiceGateway()),
     packageInfoProvider.overrideWith(
       (ref) async => PackageInfo(

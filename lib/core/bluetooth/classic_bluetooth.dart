@@ -1,13 +1,19 @@
 import 'package:flutter/services.dart';
 
 import 'bluetooth_gateway.dart';
+import 'device_kind.dart';
 
 /// A device paired with the phone in Android's Bluetooth settings.
 class BondedDevice {
-  const BondedDevice({required this.name, required this.address});
+  const BondedDevice({
+    required this.name,
+    required this.address,
+    this.kind = DeviceKind.uncategorized,
+  });
 
   final String name;
   final String address;
+  final DeviceKind kind;
 }
 
 /// Classic Bluetooth (serial) adapters, Android only. Backed by
@@ -26,6 +32,7 @@ abstract final class ClassicBluetooth {
         BondedDevice(
           name: device['name'] as String,
           address: device['address'] as String,
+          kind: DeviceKind.fromClass(device['deviceClass'] as int),
         ),
     ];
   }

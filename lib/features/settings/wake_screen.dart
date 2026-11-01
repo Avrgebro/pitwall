@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/bluetooth/device_kind.dart';
 import '../../core/bluetooth/classic_bluetooth.dart';
 import '../../core/settings/settings.dart';
 import '../../state/settings_state.dart';
@@ -81,14 +82,21 @@ class WakeScreen extends ConsumerWidget {
   ) async {
     final device = await showModalBottomSheet<BondedDevice>(
       context: context,
+      // Grows with the list, up to just below the status bar; a longer
+      // list scrolls.
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: Insets.page.add(const EdgeInsets.only(bottom: Insets.xl)),
-        child: AdapterPicker(
-          title: 'Paired devices',
-          selectedAddress: settings.headUnitAddress,
-          onSelected: (device) => Navigator.pop(context, device),
+      builder: (context) => SingleChildScrollView(
+        padding: Insets.page.copyWith(bottom: Insets.xl),
+        child: SafeArea(
+          top: false,
+          child: AdapterPicker(
+            title: 'Paired devices',
+            role: DeviceRole.headUnit,
+            selectedAddress: settings.headUnitAddress,
+            onSelected: (device) => Navigator.pop(context, device),
+          ),
         ),
       ),
     );
