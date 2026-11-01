@@ -185,6 +185,10 @@ class ProfileSignal {
   /// Unit conversion applied after decoding, e.g. miles to km.
   final double factor;
 
+  /// Whether this signal maps to one of Pitwall's own payload keys, such as
+  /// `fuel_level_l`, rather than to its raw OBDb id.
+  bool get hasKnownMeaning => key != id.toLowerCase();
+
   /// Decodes this signal from a reply's data, or returns null if the reply
   /// is too short or the value means "not available".
   double? decode(List<int> data) {

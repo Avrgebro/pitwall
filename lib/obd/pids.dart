@@ -6,6 +6,7 @@ class PidDefinition {
   const PidDefinition({
     required this.pid,
     required this.key,
+    required this.name,
     required this.unit,
     required this.length,
     required this.decode,
@@ -15,6 +16,9 @@ class PidDefinition {
 
   /// Field name in the webhook payload, e.g. `fuel_level_pct`.
   final String key;
+
+  /// Human-readable name, e.g. "Fuel level".
+  final String name;
 
   final String unit;
 
@@ -28,6 +32,7 @@ final List<PidDefinition> standardPids = [
   PidDefinition(
     pid: 0x05,
     key: 'coolant_temp_c',
+    name: 'Coolant temperature',
     unit: '°C',
     length: 1,
     decode: (d) => d[0] - 40.0,
@@ -35,6 +40,7 @@ final List<PidDefinition> standardPids = [
   PidDefinition(
     pid: 0x0C,
     key: 'rpm',
+    name: 'Engine speed',
     unit: 'rpm',
     length: 2,
     decode: (d) => (d[0] * 256 + d[1]) / 4,
@@ -42,6 +48,7 @@ final List<PidDefinition> standardPids = [
   PidDefinition(
     pid: 0x0D,
     key: 'speed_kmh',
+    name: 'Vehicle speed',
     unit: 'km/h',
     length: 1,
     decode: (d) => d[0].toDouble(),
@@ -49,6 +56,7 @@ final List<PidDefinition> standardPids = [
   PidDefinition(
     pid: 0x2F,
     key: 'fuel_level_pct',
+    name: 'Fuel level',
     unit: '%',
     length: 1,
     decode: (d) => d[0] * 100 / 255,
@@ -56,6 +64,7 @@ final List<PidDefinition> standardPids = [
   PidDefinition(
     pid: 0xA6,
     key: 'odometer_km',
+    name: 'Odometer',
     unit: 'km',
     length: 4,
     decode: (d) => ((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) / 10,
