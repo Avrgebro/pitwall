@@ -16,6 +16,7 @@ class StepScaffold extends StatelessWidget {
     this.message,
     this.onBack,
     this.footnote,
+    this.onSkip,
   });
 
   /// 1-based.
@@ -32,6 +33,9 @@ class StepScaffold extends StatelessWidget {
   /// Null hides the Back button; the primary button then spans the width.
   final VoidCallback? onBack;
   final String? footnote;
+
+  /// Offers "Set up later" for a step that can be done afterwards.
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +114,14 @@ class StepScaffold extends StatelessWidget {
                           child: const Text('Back'),
                         ),
                         const Spacer(),
+                        // Always in view, however long the step is.
+                        if (onSkip != null) ...[
+                          TextButton(
+                            onPressed: onSkip,
+                            child: const Text('Set up later'),
+                          ),
+                          const SizedBox(width: Insets.s),
+                        ],
                         FilledButton(
                           onPressed: onPrimary,
                           child: Text(primaryLabel),

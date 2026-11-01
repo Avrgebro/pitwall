@@ -65,23 +65,20 @@ class AdapterPicker extends ConsumerWidget {
                   'Bluetooth settings, then refresh.',
             ),
           ),
-          AsyncData(:final value) => GroupCard(
-            children: [
-              RadioGroup<String>(
-                groupValue: selectedAddress,
-                onChanged: (address) =>
-                    onSelected(value.firstWhere((d) => d.address == address)),
-                child: Column(
-                  children: [
-                    for (final device in value)
-                      _DeviceTile(
-                        device: device,
-                        selected: device.address == selectedAddress,
-                      ),
-                  ],
-                ),
-              ),
-            ],
+          AsyncData(:final value) => RadioGroup<String>(
+            groupValue: selectedAddress,
+            onChanged: (address) =>
+                onSelected(value.firstWhere((d) => d.address == address)),
+            child: RowGroup(
+              children: [
+                for (final device in value)
+                  ChoiceRow<String>(
+                    value: device.address,
+                    title: device.name,
+                    subtitle: 'Classic · ${device.address}',
+                  ),
+              ],
+            ),
           ),
           AsyncError(:final error) => InfoNote(
             icon: Icons.error_outline,
@@ -127,34 +124,4 @@ class AdapterPicker extends ConsumerWidget {
       ],
     ),
   );
-}
-
-class _DeviceTile extends StatelessWidget {
-  const _DeviceTile({required this.device, required this.selected});
-
-  final BondedDevice device;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return RadioListTile<String>(
-      value: device.address,
-      selected: selected,
-      selectedTileColor: theme.colorScheme.secondaryContainer,
-      title: Row(
-        children: [
-          Flexible(child: Text(device.name, overflow: TextOverflow.ellipsis)),
-          const SizedBox(width: Insets.s),
-          const TagLabel('Classic'),
-        ],
-      ),
-      subtitle: Text(
-        '${device.address} · paired',
-        style: theme.textTheme.mono.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
 }

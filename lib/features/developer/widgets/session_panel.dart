@@ -5,10 +5,11 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/session/car_state.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../state/session_state.dart';
+import '../../../state/trip_state.dart';
 import '../../../ui/ui.dart';
 
-/// Connects to a vehicle's adapter by hand and reads and sends on demand,
-/// until the background service does it on its own.
+/// Connects to a vehicle's adapter by hand, or starts a background trip as
+/// if the car's head unit had connected.
 class SessionPanel extends ConsumerWidget {
   const SessionPanel({super.key, required this.vehicle});
 
@@ -18,6 +19,8 @@ class SessionPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
+    final trip = ref.watch(tripProvider);
+    final tripController = ref.read(tripProvider.notifier);
     final controller = ref.read(sessionProvider.notifier);
     final vehicle = this.vehicle;
 
@@ -56,53 +59,96 @@ class SessionPanel extends ConsumerWidget {
       ),
     };
 
-    return GroupCard(
+    return ContentCard(
       padding: Insets.card,
-      children: [
-        Row(
-          children: [
-            chip,
-            const Spacer(),
-            if (session.busy)
-              const SizedBox.square(
-                dimension: Sizes.iconSmall,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              chip,
+              const Spacer(),
+              if (session.busy)
+                const SizedBox.square(
+                  dimension: Sizes.iconSmall,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: Insets.s),
+          Text(detail, style: Theme.of(context).textTheme.bodyMedium),
+          if (_tripLine(trip) case final line?) ...[
+            const SizedBox(height: Insets.xs),
+            Text(line, style: Theme.of(context).textTheme.bodySmall),
           ],
-        ),
-        const SizedBox(height: Insets.s),
-        Text(detail, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: Insets.m),
-        Wrap(
-          spacing: Insets.s,
-          runSpacing: Insets.s,
-          children: switch (session.phase) {
-            SessionPhase.connected => [
-              FilledButton.icon(
-                onPressed: session.busy ? null : controller.readAndSend,
-                icon: const Icon(Symbols.send_rounded),
-                label: const Text('Read and send'),
-              ),
-              OutlinedButton(
-                onPressed: controller.disconnect,
-                child: const Text('Disconnect'),
-              ),
-            ],
-            SessionPhase.connecting => const [],
-            SessionPhase.idle => [
-              FilledButton.icon(
-                onPressed: vehicle == null
-                    ? null
-                    : () => controller.connect(vehicle),
-                icon: const Icon(Symbols.bluetooth_connected_rounded),
-                label: const Text('Connect'),
-              ),
-            ],
-          },
-        ),
-      ],
+          const SizedBox(height: Insets.m),
+          Wrap(
+            spacing: Insets.s,
+            runSpacing: Insets.s,
+            children: switch (session.phase) {
+              // The trip drives the session; manual controls would fight it.
+              _ when trip.isActive => [
+                OutlinedButton.icon(
+                  onPressed: trip.phase == TripPhase.ending
+                      ? null
+                      : tripController.stop,
+                  icon: const Icon(Symbols.stop_circle_rounded),
+                  label: const Text('Stop trip'),
+                ),
+              ],
+              SessionPhase.connected => [
+                FilledButton.icon(
+                  onPressed: session.busy ? null : controller.readAndSend,
+                  icon: const Icon(Symbols.send_rounded),
+                  label: const Text('Read and send'),
+                ),
+                OutlinedButton(
+                  onPressed: controller.disconnect,
+                  child: const Text('Disconnect'),
+                ),
+              ],
+              SessionPhase.connecting => const [],
+              SessionPhase.idle => [
+                FilledButton.icon(
+                  onPressed: vehicle == null
+                      ? null
+                      : () => controller.connect(vehicle),
+                  icon: const Icon(Symbols.bluetooth_connected_rounded),
+                  label: const Text('Connect'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: vehicle == null
+                      ? null
+                      : tripController.startManually,
+                  icon: const Icon(Symbols.play_circle_rounded),
+                  label: const Text('Start trip'),
+                ),
+              ],
+            },
+          ),
+        ],
+      ),
     );
   }
+
+  static String? _tripLine(TripState trip) => switch (trip.phase) {
+    TripPhase.connecting => 'Background trip: looking for the adapter',
+    TripPhase.running => 'Background trip: running',
+    TripPhase.ending => 'Background trip: sending the last reading',
+    TripPhase.idle => switch (trip.lastEnd) {
+      null => null,
+      final end => 'Last trip ended: ${_tripEnd(end)}',
+    },
+  };
+
+  static String _tripEnd(TripEnd end) => switch (end) {
+    TripEnd.stopped => 'stopped',
+    TripEnd.noVehicle => 'no vehicle has an adapter',
+    TripEnd.permissionMissing => 'Bluetooth permission missing',
+    TripEnd.adapterNotFound => 'the adapter didn\'t answer',
+    TripEnd.carOff => 'the car stopped answering',
+    TripEnd.adapterLost => 'the adapter dropped',
+  };
 
   static String _carState(CarState state) => switch (state) {
     CarState.engineRunning => 'engine running',

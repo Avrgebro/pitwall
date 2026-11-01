@@ -12,11 +12,16 @@ class DoneStep extends StatelessWidget {
     required this.vehicle,
     required this.settings,
     required this.testPassed,
+    required this.hasWebhook,
   });
 
   final Vehicle? vehicle;
   final AppSettings settings;
   final bool testPassed;
+  final bool hasWebhook;
+
+  /// Both are needed before Pitwall can start on its own.
+  bool get _complete => vehicle != null && hasWebhook;
 
   @override
   Widget build(BuildContext context) {
@@ -31,50 +36,63 @@ class DoneStep extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         const SizedBox(height: Insets.xl),
-        Text('You\'re all set', style: theme.textTheme.headlineLarge),
+        Text(
+          _complete ? 'You\'re all set' : 'Almost there',
+          style: theme.textTheme.headlineLarge,
+        ),
         const SizedBox(height: Insets.m),
         Text(
-          'Pitwall will start on its own when you drive. You can close the '
-          'app.',
+          _complete
+              ? 'Pitwall will start on its own when you drive. You can close '
+                    'the app.'
+              : 'Pitwall starts on its own once it has a vehicle and a '
+                    'webhook. Add what\'s missing from Vehicles and Settings.',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: Insets.xl),
-        GroupCard(
+        ContentCard(
           padding: const EdgeInsets.symmetric(
             horizontal: Insets.l,
             vertical: Insets.s,
           ),
-          children: [
-            SummaryRow(
-              icon: Symbols.directions_car_rounded,
-              label: 'Vehicle',
-              value: vehicle?.name ?? '—',
-            ),
-            SummaryRow(
-              icon: Symbols.bluetooth_rounded,
-              label: 'Adapter',
-              value: vehicle?.adapterName ?? '—',
-            ),
-            SummaryRow(
-              icon: Symbols.webhook_rounded,
-              label: 'Webhook',
-              value: testPassed ? 'Test passed' : 'Not tested yet',
-              valueColor: testPassed ? healthy : null,
-            ),
-            SummaryRow(
-              icon: Symbols.motion_sensor_active_rounded,
-              label: 'Wakes up',
-              value: switch (settings.wakeTrigger) {
-                WakeTrigger.carBluetooth =>
-                  'When the car\'s Bluetooth connects',
-                WakeTrigger.drivingDetection => 'When driving is detected',
-              },
-              caption: 'Change in Settings',
-              stacked: true,
-            ),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SummaryRow(
+                icon: Symbols.directions_car_rounded,
+                label: 'Vehicle',
+                value: vehicle?.name ?? 'Not added yet',
+              ),
+              SummaryRow(
+                icon: Symbols.bluetooth_rounded,
+                label: 'Adapter',
+                value: vehicle?.adapterName ?? 'Not chosen yet',
+              ),
+              SummaryRow(
+                icon: Symbols.webhook_rounded,
+                label: 'Webhook',
+                value: switch ((hasWebhook, testPassed)) {
+                  (false, _) => 'Not set yet',
+                  (true, true) => 'Test passed',
+                  (true, false) => 'Not tested yet',
+                },
+                valueColor: testPassed ? healthy : null,
+              ),
+              SummaryRow(
+                icon: Symbols.motion_sensor_active_rounded,
+                label: 'Wakes up',
+                value: switch (settings.wakeTrigger) {
+                  WakeTrigger.carBluetooth =>
+                    'When the car\'s Bluetooth connects',
+                  WakeTrigger.drivingDetection => 'When driving is detected',
+                },
+                caption: 'Change in Settings',
+                stacked: true,
+              ),
+            ],
+          ),
         ),
       ],
     );

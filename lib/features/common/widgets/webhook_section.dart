@@ -91,86 +91,89 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
     final insecure = _url.text.trim().startsWith('http://');
     final mono = Theme.of(context).textTheme.mono;
 
-    return GroupCard(
+    return ContentCard(
       padding: Insets.card,
-      children: [
-        SecretTextField(
-          controller: _url,
-          label: 'Webhook URL',
-          keyboardType: TextInputType.url,
-          helperText: 'Stored securely on this phone',
-          errorText: _urlProblem,
-          multilineWhenShown: true,
-          onChanged: _urlChanged,
-          warning: insecure
-              ? TextSpan(
-                  children: [
-                    TextSpan(
-                      text: _auth.type == WebhookAuthType.none
-                          ? 'Not encrypted. Anyone on the same network can '
-                                'read your car\'s data. Use '
-                          : 'Not encrypted. Anyone on the same network can '
-                                'read your car\'s data and credentials. Use ',
-                    ),
-                    TextSpan(
-                      text: 'https://',
-                      style: mono.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const TextSpan(text: ' if your server supports it.'),
-                  ],
-                )
-              : null,
-        ),
-        const SizedBox(height: Insets.s),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Symbols.key_rounded),
-          title: const Text('Authentication'),
-          subtitle: Text(DeliveryText.authType(_auth.type)),
-          trailing: Icon(_authOpen ? Icons.expand_less : Icons.expand_more),
-          onTap: () => setState(() => _authOpen = !_authOpen),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          alignment: Alignment.topCenter,
-          child: _authOpen
-              ? AuthEditor(
-                  auth: _auth,
-                  problem: _authProblem,
-                  onChanged: _authChanged,
-                )
-              : const SizedBox(width: double.infinity),
-        ),
-        const SizedBox(height: Insets.m),
-        FilledButton.icon(
-          onPressed: _canTest ? _sendTest : null,
-          icon: _testing
-              ? const SizedBox.square(
-                  dimension: Sizes.iconSmall,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Symbols.send_rounded),
-          label: const Text('Send test'),
-        ),
-        if (_test case (:final result, :final at)) ...[
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SecretTextField(
+            controller: _url,
+            label: 'Webhook URL',
+            keyboardType: TextInputType.url,
+            helperText: 'Stored securely on this phone',
+            errorText: _urlProblem,
+            multilineWhenShown: true,
+            onChanged: _urlChanged,
+            warning: insecure
+                ? TextSpan(
+                    children: [
+                      TextSpan(
+                        text: _auth.type == WebhookAuthType.none
+                            ? 'Not encrypted. Anyone on the same network can '
+                                  'read your car\'s data. Use '
+                            : 'Not encrypted. Anyone on the same network can '
+                                  'read your car\'s data and credentials. Use ',
+                      ),
+                      TextSpan(
+                        text: 'https://',
+                        style: mono.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const TextSpan(text: ' if your server supports it.'),
+                    ],
+                  )
+                : null,
+          ),
+          const SizedBox(height: Insets.s),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Symbols.key_rounded),
+            title: const Text('Authentication'),
+            subtitle: Text(DeliveryText.authType(_auth.type)),
+            trailing: Icon(_authOpen ? Icons.expand_less : Icons.expand_more),
+            onTap: () => setState(() => _authOpen = !_authOpen),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            alignment: Alignment.topCenter,
+            child: _authOpen
+                ? AuthEditor(
+                    auth: _auth,
+                    problem: _authProblem,
+                    onChanged: _authChanged,
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           const SizedBox(height: Insets.m),
-          if (result.error case final error?)
-            ResultBanner(
-              tone: StatusTone.error,
-              title: DeliveryText.error(error).title,
-              message: DeliveryText.error(error).message,
-            )
-          else
-            ResultBanner(
-              tone: StatusTone.healthy,
-              title: 'Test reading delivered',
-              message:
-                  'The server accepted it in '
-                  '${Formatters.elapsed(result.elapsed)} · '
-                  '${Formatters.clock(at)}',
-            ),
+          FilledButton.icon(
+            onPressed: _canTest ? _sendTest : null,
+            icon: _testing
+                ? const SizedBox.square(
+                    dimension: Sizes.iconSmall,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Symbols.send_rounded),
+            label: const Text('Send test'),
+          ),
+          if (_test case (:final result, :final at)) ...[
+            const SizedBox(height: Insets.m),
+            if (result.error case final error?)
+              ResultBanner(
+                tone: StatusTone.error,
+                title: DeliveryText.error(error).title,
+                message: DeliveryText.error(error).message,
+              )
+            else
+              ResultBanner(
+                tone: StatusTone.healthy,
+                title: 'Test reading delivered',
+                message:
+                    'The server accepted it in '
+                    '${Formatters.elapsed(result.elapsed)} · '
+                    '${Formatters.clock(at)}',
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

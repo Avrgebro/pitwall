@@ -1,23 +1,17 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
-import '../../core/bluetooth/classic_bluetooth.dart';
-import '../../core/platform/file_gateway.dart';
+import '../../core/profiles/signal_set.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
-import '../../state/infrastructure.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
-import '../common/widgets/adapter_picker.dart';
-import '../common/widgets/vehicle_name_field.dart';
-import 'widgets/adapter_card.dart';
-import 'widgets/profile_card.dart';
 
-/// One vehicle's settings: name, adapter, profile and values to send.
+/// One vehicle's overview: a row per setting, each opening its own page.
 class VehicleDetailScreen extends ConsumerWidget {
   const VehicleDetailScreen({super.key, required this.vehicleId});
 
@@ -33,48 +27,45 @@ class VehicleDetailScreen extends ConsumerWidget {
       );
     }
     final profile = ref.watch(vehicleProfileProvider(vehicleId)).value;
-    final notifier = ref.read(appSettingsProvider.notifier);
     final options = valueOptions(profile, vehicle.modelYear);
     final selected = vehicle.selectedKeys ?? defaultKeys(options);
 
     return AppPage(
       title: vehicle.name,
       children: [
-        const SectionHeader('Name', padding: EdgeInsets.all(Insets.xs)),
-        const SizedBox(height: Insets.s),
-        VehicleNameField(
-          key: ValueKey(vehicle.id),
-          initialName: vehicle.name,
-          onChanged: (name) {
-            if (name.trim().isEmpty) return;
-            notifier.saveVehicle(vehicle.copyWith(name: name.trim()));
-          },
+        const SectionHeader(
+          'Vehicle',
+          icon: Symbols.directions_car_rounded,
+          padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.m),
         ),
-        const SectionHeader('Adapter'),
-        AdapterCard(
-          vehicle: vehicle,
-          onChange: () => _changeAdapter(context, ref, vehicle),
-        ),
-        const SectionHeader('Vehicle profile', trailing: 'Optional'),
-        ProfileCard(
-          vehicle: vehicle,
-          profile: profile,
-          onImport: () => _importProfile(context, ref, vehicle),
-          onRemove: () => notifier.removeProfile(vehicle.id),
-          onModelYear: (year) =>
-              notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
-        ),
-        const InfoNote(
-          icon: Icons.help_outline,
-          text: TextSpan(
-            text:
-                'Download your car\'s signalsets/v3/default.json from '
-                'github.com/OBDb, then import it here.',
-          ),
-        ),
-        const SectionHeader('Data'),
-        GroupCard(
+        RowGroup(
           children: [
+            GroupTile(
+              icon: Symbols.badge_rounded,
+              title: 'Name',
+              subtitle: 'Sent as ${vehicle.deviceId}',
+              onTap: () => context.push(Routes.vehicleName(vehicle.id)),
+            ),
+            GroupTile(
+              icon: Symbols.bluetooth_rounded,
+              title: 'Adapter',
+              subtitle: _adapterSummary(vehicle),
+              subtitleTone: vehicle.adapterAddress == null
+                  ? StatusTone.error
+                  : null,
+              onTap: () => context.push(Routes.vehicleAdapter(vehicle.id)),
+            ),
+          ],
+        ),
+        const SectionHeader('Data', icon: Symbols.database_rounded),
+        RowGroup(
+          children: [
+            GroupTile(
+              icon: Symbols.data_object_rounded,
+              title: 'Vehicle profile',
+              subtitle: _profileSummary(vehicle, profile),
+              onTap: () => context.push(Routes.vehicleProfile(vehicle.id)),
+            ),
             GroupTile(
               icon: Symbols.checklist_rounded,
               title: 'Values to send',
@@ -84,79 +75,35 @@ class VehicleDetailScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: Insets.xl),
-        const Divider(),
-        const SizedBox(height: Insets.s),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => _delete(context, ref, vehicle),
-            style: TextButton.styleFrom(
-              foregroundColor: context.tone(StatusTone.error).accent,
+        const SizedBox(height: Insets.xxl),
+        RowGroup(
+          children: [
+            GroupTile(
+              icon: Symbols.delete_rounded,
+              title: 'Delete vehicle',
+              destructive: true,
+              onTap: () => _delete(context, ref, vehicle),
             ),
-            icon: const Icon(Symbols.delete_rounded),
-            label: const Text('Delete vehicle'),
-          ),
+          ],
         ),
       ],
     );
   }
 
-  Future<void> _changeAdapter(
-    BuildContext context,
-    WidgetRef ref,
-    Vehicle vehicle,
-  ) async {
-    final device = await showModalBottomSheet<BondedDevice>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: Insets.page.add(const EdgeInsets.only(bottom: Insets.xl)),
-        child: AdapterPicker(
-          selectedAddress: vehicle.adapterAddress,
-          onSelected: (device) => Navigator.pop(context, device),
-        ),
-      ),
-    );
-    if (device == null) return;
-    await ref
-        .read(appSettingsProvider.notifier)
-        .saveVehicle(
-          vehicle.copyWith(
-            adapterAddress: device.address,
-            adapterName: device.name,
-            adapterType: AdapterType.classic,
-          ),
-        );
-  }
+  static String _adapterSummary(Vehicle vehicle) =>
+      switch ((vehicle.adapterName, vehicle.adapterType)) {
+        (null, _) => 'Not chosen yet',
+        (final name?, AdapterType.classic) => '$name · Classic',
+        (final name?, AdapterType.ble) => '$name · Bluetooth LE',
+      };
 
-  Future<void> _importProfile(
-    BuildContext context,
-    WidgetRef ref,
-    Vehicle vehicle,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    String message;
-    try {
-      final file = await ref.read(fileGatewayProvider).pickJson();
-      if (file == null) return;
-      final profile = await ref
-          .read(appSettingsProvider.notifier)
-          .importProfile(vehicle.id, file);
-      final year = vehicle.modelYear;
-      message = year == null
-          ? 'Profile imported · choose the model year'
-          : 'Profile imported · ${ProfileText.applies(profile, year)}';
-    } on UnreadableFileException catch (e) {
-      message = e.tooLarge
-          ? 'That file is too large to be a profile.'
-          : 'That file isn\'t text.';
-    } on FormatException catch (e) {
-      message = 'That isn\'t an OBDb profile: ${e.message}';
-    }
-    messenger.showSnackBar(SnackBar(content: Text(message)));
-  }
+  static String _profileSummary(Vehicle vehicle, SignalSet? profile) =>
+      switch ((profile, vehicle.modelYear)) {
+        (null, _) => 'Standard values only',
+        (_, null) => 'OBDb profile · choose the model year',
+        (final profile?, final year?) =>
+          'OBDb profile · ${ProfileText.applies(profile, year)}',
+      };
 
   Future<void> _delete(
     BuildContext context,

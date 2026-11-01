@@ -84,6 +84,8 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             ? _saveVehicle
             : null,
         onBack: () => _go(_Step.welcome),
+        // The vehicle can be added later from the Vehicles tab.
+        onSkip: () => _go(_Step.permissions),
         children: [
           AdapterPicker(
             selectedAddress: _adapter?.address,
@@ -127,6 +129,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             ? () => _go(_Step.done)
             : null,
         onBack: () => _go(_Step.permissions),
+        // The webhook can be set later in Settings; readings wait on the
+        // phone until then.
+        onSkip: () => _go(_Step.done),
         children: [
           WebhookStep(
             vehicleName: _name.trim(),
@@ -146,6 +151,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                 : ref.watch(vehicleProvider(_vehicleId!)),
             settings: ref.watch(appSettingsProvider).requireValue,
             testPassed: _testPassed,
+            hasWebhook: ref.watch(webhookConfigProvider).value?.hasUrl ?? false,
           ),
         ],
       ),

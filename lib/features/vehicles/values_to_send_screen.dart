@@ -19,6 +19,7 @@ class ValuesToSendScreen extends ConsumerStatefulWidget {
 
 class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   String _search = '';
+  bool _showOthers = false;
 
   @override
   Widget build(BuildContext context) {
@@ -77,56 +78,59 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
               .saveVehicle(vehicle.copyWith(selectedKeys: null)),
         ),
         const SectionHeader('Standard', trailing: 'Works on most cars'),
-        GroupCard(children: [for (final option in standard) row(option)]),
+        RowGroup(children: [for (final option in standard) row(option)]),
         if (recognised.isNotEmpty) ...[
           SectionHeader(
             'From vehicle profile',
             trailing: _profileLabel(vehicle),
           ),
-          GroupCard(children: [for (final option in recognised) row(option)]),
+          RowGroup(children: [for (final option in recognised) row(option)]),
         ],
         if (others.isNotEmpty) ...[
-          const SizedBox(height: Insets.l),
-          GroupCard(
+          const SectionHeader('Other profile signals'),
+          RowGroup(
             children: [
-              ExpansionTile(
-                title: Text('Other profile signals (${others.length})'),
-                subtitle: const Text(
-                  'Mostly diagnostic. Each one costs an extra request every '
-                  'reading.',
+              GroupTile(
+                icon: Symbols.manage_search_rounded,
+                title: _showOthers
+                    ? 'Hide ${others.length} signals'
+                    : 'Show ${others.length} signals',
+                subtitle:
+                    'Mostly diagnostic. Each one costs an extra request every '
+                    'reading.',
+                trailing: Icon(
+                  _showOthers ? Icons.expand_less : Icons.expand_more,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                childrenPadding: const EdgeInsets.only(bottom: Insets.s),
-                children: [
-                  Padding(
-                    padding: Insets.page,
-                    child: SearchBar(
-                      hintText: 'Search signals',
-                      leading: const Icon(Symbols.search_rounded),
-                      elevation: const WidgetStatePropertyAll(0),
-                      onChanged: (text) => setState(() => _search = text),
-                    ),
-                  ),
-                  if (query.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        Insets.xl,
-                        Insets.s,
-                        Insets.xl,
-                        0,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '${matches.length} of ${others.length} match',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ),
-                  for (final option in matches) row(option),
-                ],
+                onTap: () => setState(() => _showOthers = !_showOthers),
               ),
             ],
           ),
+          if (_showOthers) ...[
+            const SizedBox(height: Insets.m),
+            SearchBar(
+              hintText: 'Search signals',
+              leading: const Icon(Symbols.search_rounded),
+              elevation: const WidgetStatePropertyAll(0),
+              onChanged: (text) => setState(() => _search = text),
+            ),
+            if (query.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Insets.l,
+                  Insets.s,
+                  Insets.l,
+                  0,
+                ),
+                child: Text(
+                  '${matches.length} of ${others.length} match',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            const SizedBox(height: Insets.m),
+            if (matches.isNotEmpty)
+              RowGroup(children: [for (final option in matches) row(option)]),
+          ],
         ],
       ],
     );

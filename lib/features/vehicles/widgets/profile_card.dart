@@ -40,8 +40,7 @@ class ProfileCard extends StatelessWidget {
     final imported = vehicle.profileImportedAt;
     final healthy = context.tone(StatusTone.healthy);
 
-    return GroupCard(
-      dividers: true,
+    return RowGroup(
       children: [
         Padding(
           padding: Insets.card,
@@ -173,48 +172,51 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GroupCard(
+    return ContentCard(
       dashed: true,
       padding: Insets.card,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const IconBadge(
-              icon: Symbols.data_object_rounded,
-              tone: StatusTone.neutral,
-            ),
-            const SizedBox(width: Insets.l),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Standard values only',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  Text(
-                    'Import a profile for extras like fuel in litres and the '
-                    'real odometer.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const IconBadge(
+                icon: Symbols.data_object_rounded,
+                tone: StatusTone.neutral,
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Insets.l),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            onPressed: onImport,
-            icon: const Icon(Symbols.upload_file_rounded),
-            label: const Text('Import profile'),
+              const SizedBox(width: Insets.l),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Standard values only',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text(
+                      'Import a profile for extras like fuel in litres and the '
+                      'real odometer.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: Insets.l),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: onImport,
+              icon: const Icon(Symbols.upload_file_rounded),
+              label: const Text('Import profile'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

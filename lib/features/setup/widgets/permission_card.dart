@@ -24,65 +24,70 @@ class PermissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final healthy = context.tone(StatusTone.healthy);
-    return GroupCard(
+    return ContentCard(
       padding: Insets.card,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            IconBadge(
-              icon: icon,
-              tone: granted ? StatusTone.active : StatusTone.neutral,
-              shape: BoxShape.circle,
-            ),
-            const SizedBox(width: Insets.l),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    purpose,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconBadge(
+                icon: icon,
+                tone: granted ? StatusTone.active : StatusTone.neutral,
+                shape: BoxShape.circle,
               ),
-            ),
-            const SizedBox(width: Insets.s),
-            if (granted)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: Sizes.iconSmall,
-                    color: healthy.accent,
-                  ),
-                  const SizedBox(width: Insets.xs),
-                  Text(
-                    'Allowed',
-                    style: theme.textTheme.labelLarge?.copyWith(
+              const SizedBox(width: Insets.l),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      purpose,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: Insets.s),
+              if (granted)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: Sizes.iconSmall,
                       color: healthy.accent,
                     ),
+                    const SizedBox(width: Insets.xs),
+                    Text(
+                      'Allowed',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: healthy.accent,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                FilledButton(
+                  onPressed: onAllow,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(64, 36),
                   ),
-                ],
-              )
-            else
-              FilledButton(
-                onPressed: onAllow,
-                style: FilledButton.styleFrom(minimumSize: const Size(64, 36)),
-                child: const Text('Allow'),
-              ),
-          ],
-        ),
-      ],
+                  child: const Text('Allow'),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

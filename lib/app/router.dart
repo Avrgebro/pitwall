@@ -4,12 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import '../features/developer/developer_screen.dart';
 import '../features/home/home_screen.dart';
-import '../features/settings/credits_screen.dart';
+import '../features/settings/about_screen.dart';
+import '../features/settings/background_checks_screen.dart';
+import '../features/settings/interval_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/settings/wake_screen.dart';
+import '../features/settings/webhook_screen.dart';
 import '../features/setup/setup_screen.dart';
 import '../features/vehicles/add_vehicle_screen.dart';
 import '../features/vehicles/values_to_send_screen.dart';
+import '../features/vehicles/vehicle_adapter_screen.dart';
 import '../features/vehicles/vehicle_detail_screen.dart';
+import '../features/vehicles/vehicle_name_screen.dart';
+import '../features/vehicles/vehicle_profile_screen.dart';
 import '../features/vehicles/vehicles_screen.dart';
 import '../state/settings_state.dart';
 import 'app_shell.dart';
@@ -49,12 +56,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.setup, builder: (_, _) => const SetupScreen()),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => AppShell(navigationShell: shell),
+        // Tab order: Vehicles, Home (in the middle, opened first), Settings.
         branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(path: Routes.home, builder: (_, _) => const HomeScreen()),
-            ],
-          ),
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -70,12 +73,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                       vehicleId: state.pathParameters['id']!,
                     ),
                     routes: [
-                      subScreen(
-                        'values',
-                        (state) => ValuesToSendScreen(
-                          vehicleId: state.pathParameters['id']!,
+                      for (final (path, screen) in [
+                        ('name', VehicleNameScreen.new),
+                        ('adapter', VehicleAdapterScreen.new),
+                        ('profile', VehicleProfileScreen.new),
+                        ('values', ValuesToSendScreen.new),
+                      ])
+                        subScreen(
+                          path,
+                          (state) =>
+                              screen(vehicleId: state.pathParameters['id']!),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -84,11 +92,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
+              GoRoute(path: Routes.home, builder: (_, _) => const HomeScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
               GoRoute(
                 path: Routes.settings,
                 builder: (_, _) => const SettingsScreen(),
                 routes: [
-                  subScreen('credits', (_) => const CreditsScreen()),
+                  subScreen('webhook', (_) => const WebhookScreen()),
+                  subScreen('interval', (_) => const IntervalScreen()),
+                  subScreen('wake', (_) => const WakeScreen()),
+                  subScreen('checks', (_) => const BackgroundChecksScreen()),
+                  subScreen('about', (_) => const AboutScreen()),
                   subScreen('developer', (_) => const DeveloperScreen()),
                 ],
               ),

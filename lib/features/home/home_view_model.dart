@@ -177,6 +177,9 @@ class HomeViewModel {
       state: HeroState.waiting,
       title: vehicle.name,
       subtitle: switch (settings.wakeTrigger) {
+        WakeTrigger.carBluetooth when settings.headUnitAddress == null =>
+          'Choose your car\'s Bluetooth in Settings so Pitwall can start on '
+              'its own',
         WakeTrigger.carBluetooth =>
           'Starts on its own when the car\'s Bluetooth connects',
         WakeTrigger.drivingDetection =>
