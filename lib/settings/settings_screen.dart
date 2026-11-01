@@ -8,14 +8,19 @@ import 'package:permission_handler/permission_handler.dart';
 import '../bluetooth/classic_bluetooth.dart';
 import '../profiles/signal_set.dart';
 import '../readings/readings.dart';
+import '../vehicles/vehicle.dart';
+import '../webhook/webhook_sender.dart';
 import 'settings.dart';
 import 'settings_store.dart';
 
-/// Where the user sets up Pitwall. Every change is saved right away.
+/// Temporary settings screen until the designed UI lands: the webhook, the
+/// reading interval, and the first vehicle. Every change is saved right
+/// away.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.store});
+  const SettingsScreen({super.key, required this.store, required this.sender});
 
   final SettingsStore store;
+  final WebhookSender sender;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -26,15 +31,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _maxProfileBytes = 5 * 1024 * 1024;
 
   final _webhookController = TextEditingController();
-  final _deviceController = TextEditingController();
+  final _intervalController = TextEditingController();
+  final _nameController = TextEditingController();
   final _yearController = TextEditingController();
 
-  Settings _settings = const Settings();
+  AppSettings _settings = const AppSettings();
+  late Vehicle _vehicle;
   SignalSet? _profile;
-  String? _profileName;
   bool _loading = true;
   bool _showWebhookUrl = false;
+  bool _testing = false;
   String? _webhookProblem;
+  String? _testResult;
   String? _message;
 
   SettingsStore get _store => widget.store;
@@ -48,7 +56,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _webhookController.dispose();
-    _deviceController.dispose();
+    _intervalController.dispose();
+    _nameController.dispose();
     _yearController.dispose();
     super.dispose();
   }
@@ -56,43 +65,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     final settings = await _store.load();
     final webhookUrl = await _store.loadWebhookUrl();
-    final profile = await _store.loadProfile();
+    final vehicle = settings.vehicles.firstOrNull ?? Vehicle.create();
+    final profile = await _store.loadProfile(vehicle);
     if (!mounted) return;
     setState(() {
       _settings = settings;
+      _vehicle = vehicle;
+      _profile = profile;
       _webhookController.text = webhookUrl ?? '';
-      _deviceController.text = settings.deviceName;
-      _yearController.text = settings.modelYear?.toString() ?? '';
-      _profile = profile?.$1;
-      _profileName = profile?.$2;
+      _intervalController.text = settings.interval.inSeconds.toString();
+      _nameController.text = vehicle.name;
+      _yearController.text = vehicle.modelYear?.toString() ?? '';
       _loading = false;
     });
   }
 
-  Future<void> _update(Settings settings) async {
+  Future<void> _updateSettings(AppSettings settings) async {
     setState(() => _settings = settings);
     await _store.save(settings);
+  }
+
+  Future<void> _updateVehicle(Vehicle vehicle) async {
+    setState(() => _vehicle = vehicle);
+    await _updateSettings(_settings.withVehicle(vehicle));
   }
 
   Future<void> _webhookChanged(String text) async {
     final url = text.trim();
     final problem = url.isEmpty ? null : webhookUrlProblem(url);
-    setState(() => _webhookProblem = problem);
+    setState(() {
+      _webhookProblem = problem;
+      _testResult = null;
+    });
     if (problem == null) await _store.saveWebhookUrl(url);
   }
 
-  Future<void> _deviceNameChanged(String text) => _update(
-    _settings.copyWith(
-      deviceName: text.trim().isEmpty
-          ? Settings.defaultDeviceName
-          : text.trim(),
+  Future<void> _sendTest() async {
+    final url = _webhookController.text.trim();
+    if (url.isEmpty || _webhookProblem != null) return;
+    setState(() => _testing = true);
+    final error = await widget.sender.sendTest(url);
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testResult = error ?? 'Test sent. Check the receiving side.';
+    });
+  }
+
+  Future<void> _intervalChanged(String text) async {
+    final seconds = int.tryParse(text);
+    if (seconds == null || seconds < AppSettings.minInterval.inSeconds) return;
+    await _updateSettings(
+      _settings.copyWith(interval: Duration(seconds: seconds)),
+    );
+  }
+
+  Future<void> _nameChanged(String text) => _updateVehicle(
+    _vehicle.copyWith(
+      name: text.trim().isEmpty ? Vehicle.defaultName : text.trim(),
     ),
   );
 
   Future<void> _yearChanged(String text) {
     final year = int.tryParse(text);
     final valid = year != null && year >= 1996 && year <= 2100;
-    return _update(_settings.copyWith(modelYear: valid ? year : null));
+    return _updateVehicle(_vehicle.copyWith(modelYear: valid ? year : null));
   }
 
   Future<void> _chooseAdapter() async {
@@ -133,8 +170,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (device == null) return;
-    await _update(
-      _settings.copyWith(
+    await _updateVehicle(
+      _vehicle.copyWith(
         adapterAddress: device.address,
         adapterName: device.name,
       ),
@@ -153,10 +190,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       final source = utf8.decode(await file.readAsBytes());
       final profile = SignalSet.parse(source);
-      await _store.saveProfile(source, file.name);
+      final vehicle = await _store.saveProfile(_vehicle, source, file.name);
+      await _updateVehicle(vehicle);
       setState(() {
         _profile = profile;
-        _profileName = file.name;
         _message = 'Imported ${file.name}.';
       });
     } on FormatException catch (e) {
@@ -165,17 +202,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _removeProfile() async {
-    await _store.deleteProfile();
+    await _updateVehicle(await _store.deleteProfile(_vehicle));
     setState(() {
       _profile = null;
-      _profileName = null;
       _message = 'Vehicle profile removed.';
     });
   }
 
   Future<void> _toggleValue(String key, bool on, Set<String> selected) =>
-      _update(
-        _settings.copyWith(
+      _updateVehicle(
+        _vehicle.copyWith(
           selectedKeys: on ? {...selected, key} : ({...selected}..remove(key)),
         ),
       );
@@ -195,8 +231,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(message, style: theme.textTheme.bodyLarge),
                   ),
-                ..._buildAdapter(theme),
                 ..._buildWebhook(theme),
+                const SizedBox(height: 24),
+                Text('Vehicle', style: theme.textTheme.titleLarge),
+                ..._buildAdapter(theme),
                 ..._buildProfile(theme),
                 ..._buildValues(theme),
               ],
@@ -204,23 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  List<Widget> _buildAdapter(ThemeData theme) => [
-    Text('OBD adapter', style: theme.textTheme.titleMedium),
-    ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(_settings.adapterName ?? 'None chosen'),
-      subtitle: _settings.adapterAddress == null
-          ? null
-          : Text(_settings.adapterAddress!),
-      trailing: OutlinedButton(
-        onPressed: _chooseAdapter,
-        child: const Text('Choose'),
-      ),
-    ),
-  ];
-
   List<Widget> _buildWebhook(ThemeData theme) => [
-    const SizedBox(height: 16),
     Text('Webhook', style: theme.textTheme.titleMedium),
     TextField(
       controller: _webhookController,
@@ -248,21 +270,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     const SizedBox(height: 8),
+    Row(
+      children: [
+        FilledButton.tonal(
+          onPressed: _testing ? null : _sendTest,
+          child: const Text('Send test'),
+        ),
+        const SizedBox(width: 12),
+        if (_testing)
+          const SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (_testResult case final result?)
+          Expanded(child: Text(result)),
+      ],
+    ),
+    const SizedBox(height: 8),
     TextField(
-      controller: _deviceController,
+      controller: _intervalController,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: 'Send every (seconds)',
+        helperText:
+            'While driving. At least ${AppSettings.minInterval.inSeconds}.',
+      ),
+      onChanged: _intervalChanged,
+    ),
+  ];
+
+  List<Widget> _buildAdapter(ThemeData theme) => [
+    TextField(
+      controller: _nameController,
       decoration: const InputDecoration(
-        labelText: 'Device name',
+        labelText: 'Name',
         helperText: 'Sent as "device", to tell cars apart.',
       ),
-      onChanged: _deviceNameChanged,
+      onChanged: _nameChanged,
+    ),
+    const SizedBox(height: 8),
+    ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(_vehicle.adapterName ?? 'No adapter chosen'),
+      subtitle: _vehicle.adapterAddress == null
+          ? null
+          : Text(_vehicle.adapterAddress!),
+      trailing: OutlinedButton(
+        onPressed: _chooseAdapter,
+        child: const Text('Choose'),
+      ),
     ),
   ];
 
   List<Widget> _buildProfile(ThemeData theme) {
     final profile = _profile;
-    final year = _settings.modelYear;
+    final year = _vehicle.modelYear;
     return [
-      const SizedBox(height: 24),
+      const SizedBox(height: 16),
       Text('Vehicle profile', style: theme.textTheme.titleMedium),
       const Text(
         'Optional. Adds values your car only reports through manufacturer '
@@ -295,7 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (profile != null) ...[
         const SizedBox(height: 8),
         Text(
-          '$_profileName: ${profile.commands.length} requests, '
+          '${_vehicle.profileName}: ${profile.commands.length} requests, '
           '${profile.signalCount} signals.',
         ),
         Text(
@@ -321,8 +385,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   List<Widget> _buildValues(ThemeData theme) {
-    final options = valueOptions(_profile, _settings.modelYear);
-    final selected = _settings.selectedKeys ?? defaultKeys(options);
+    final options = valueOptions(_profile, _vehicle.modelYear);
+    final selected = _vehicle.selectedKeys ?? defaultKeys(options);
 
     Widget tile(ValueOption option) => CheckboxListTile(
       contentPadding: EdgeInsets.zero,
@@ -343,9 +407,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Expanded(
             child: Text('Values to send', style: theme.textTheme.titleMedium),
           ),
-          if (_settings.selectedKeys != null)
+          if (_vehicle.selectedKeys != null)
             TextButton(
-              onPressed: () => _update(_settings.copyWith(selectedKeys: null)),
+              onPressed: () =>
+                  _updateVehicle(_vehicle.copyWith(selectedKeys: null)),
               child: const Text('Reset'),
             ),
         ],

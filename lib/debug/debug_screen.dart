@@ -8,18 +8,20 @@ import '../bluetooth/classic_bluetooth.dart';
 import '../obd/elm327.dart';
 import '../profiles/signal_set.dart';
 import '../readings/readings.dart';
-import '../settings/settings.dart';
 import '../settings/settings_screen.dart';
 import '../settings/settings_store.dart';
+import '../vehicles/vehicle.dart';
+import '../webhook/webhook_sender.dart';
 
-/// Temporary screen for trying the adapter by hand: connect to the adapter
-/// chosen in settings, see what the car supports and read the chosen
-/// values. The log shows every raw exchange, so real replies can be copied
-/// into tests.
+/// Temporary screen for trying the adapter by hand: connect to the first
+/// vehicle's adapter, see what the car supports, read the chosen values and
+/// send them to the webhook. The log shows every raw exchange, so real
+/// replies can be copied into tests.
 class DebugScreen extends StatefulWidget {
-  const DebugScreen({super.key, required this.store});
+  const DebugScreen({super.key, required this.store, required this.sender});
 
   final SettingsStore store;
+  final WebhookSender sender;
 
   @override
   State<DebugScreen> createState() => _DebugScreenState();
@@ -30,8 +32,9 @@ class _DebugScreenState extends State<DebugScreen> {
 
   final _commandController = TextEditingController();
 
-  Settings _settings = const Settings();
+  Vehicle? _vehicle;
   SignalSet? _profile;
+  Map<String, double> _lastValues = {};
   ClassicTransport? _transport;
   Elm327? _elm;
   String? _status;
@@ -60,11 +63,14 @@ class _DebugScreenState extends State<DebugScreen> {
 
   Future<void> _loadSettings() async {
     final settings = await widget.store.load();
-    final profile = await widget.store.loadProfile();
+    final vehicle = settings.vehicles.firstOrNull;
+    final profile = vehicle == null
+        ? null
+        : await widget.store.loadProfile(vehicle);
     if (!mounted) return;
     setState(() {
-      _settings = settings;
-      _profile = profile?.$1;
+      _vehicle = vehicle;
+      _profile = profile;
     });
   }
 
@@ -72,21 +78,23 @@ class _DebugScreenState extends State<DebugScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(store: widget.store),
+        builder: (_) =>
+            SettingsScreen(store: widget.store, sender: widget.sender),
       ),
     );
     await _loadSettings();
   }
 
   Future<void> _connect() async {
-    final address = _settings.adapterAddress;
-    if (address == null) return;
+    final vehicle = _vehicle;
+    final address = vehicle?.adapterAddress;
+    if (vehicle == null || address == null) return;
     final permission = await Permission.bluetoothConnect.request();
     if (!permission.isGranted) {
       _setStatus('Bluetooth permission was not granted.');
       return;
     }
-    await _run('Connecting to ${_settings.adapterName}...', () async {
+    await _run('Connecting to ${vehicle.adapterName}...', () async {
       final transport = await ClassicBluetooth.connect(address);
       final elm = Elm327(transport, log: _addLog);
       _transport = transport;
@@ -102,18 +110,20 @@ class _DebugScreenState extends State<DebugScreen> {
 
   Future<void> _readValues() async {
     final elm = _elm;
-    if (elm == null || _busy) return;
-    final options = valueOptions(_profile, _settings.modelYear);
+    final vehicle = _vehicle;
+    if (elm == null || vehicle == null || _busy) return;
+    final options = valueOptions(_profile, vehicle.modelYear);
     final units = {for (final option in options) option.key: option.unit};
     await _run(null, () async {
       final values = await readValues(
         elm,
-        keys: _settings.selectedKeys ?? defaultKeys(options),
+        keys: vehicle.selectedKeys ?? defaultKeys(options),
         supportedPids: _supported,
         profile: _profile,
-        modelYear: _settings.modelYear,
+        modelYear: vehicle.modelYear,
       );
       setState(() {
+        _lastValues = values;
         _values
           ..clear()
           ..addAll({
@@ -122,6 +132,19 @@ class _DebugScreenState extends State<DebugScreen> {
           });
       });
     });
+  }
+
+  /// Reads the chosen values and sends them to the webhook.
+  Future<void> _sendNow() async {
+    final vehicle = _vehicle;
+    if (vehicle == null) return;
+    await _readValues();
+    if (_lastValues.isEmpty) return;
+    await widget.sender.send(
+      device: vehicle.name,
+      values: _lastValues,
+      connected: true,
+    );
   }
 
   void _toggleAutoRead(bool on) {
@@ -214,6 +237,16 @@ class _DebugScreenState extends State<DebugScreen> {
     });
   }
 
+  String _describe(DeliveryStatus status) {
+    final parts = [
+      if (status.lastSuccess case final time?)
+        'Last sent ${TimeOfDay.fromDateTime(time).format(context)}.',
+      ?status.lastError,
+      if (status.queued > 0) '${status.queued} queued.',
+    ];
+    return parts.isEmpty ? 'Webhook: nothing sent yet.' : parts.join(' ');
+  }
+
   static String _format(double value) => value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
@@ -268,7 +301,7 @@ class _DebugScreenState extends State<DebugScreen> {
   }
 
   List<Widget> _buildDisconnected() => [
-    if (_settings.adapterName case final name?)
+    if (_vehicle?.adapterName case final name?)
       FilledButton(
         onPressed: _busy ? null : _connect,
         child: Text('Connect to $name'),
@@ -293,6 +326,10 @@ class _DebugScreenState extends State<DebugScreen> {
           onPressed: _busy ? null : _readValues,
           child: const Text('Read values'),
         ),
+        FilledButton.tonal(
+          onPressed: _busy ? null : _sendNow,
+          child: const Text('Send now'),
+        ),
         OutlinedButton(onPressed: _disconnect, child: const Text('Disconnect')),
       ],
     ),
@@ -309,6 +346,11 @@ class _DebugScreenState extends State<DebugScreen> {
         title: Text(entry.key),
         trailing: Text(entry.value, style: theme.textTheme.titleMedium),
       ),
+    const SizedBox(height: 8),
+    ValueListenableBuilder(
+      valueListenable: widget.sender.status,
+      builder: (context, status, _) => Text(_describe(status)),
+    ),
     const SizedBox(height: 16),
     Text('Raw commands', style: theme.textTheme.titleMedium),
     Row(
