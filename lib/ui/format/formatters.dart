@@ -25,11 +25,11 @@ abstract final class Formatters {
     return 'every ${interval.inMinutes} minutes';
   }
 
-  /// "Every 30 s", "Every 1 minute", "Every 5 minutes", for pickers.
+  /// "Every 30 s", "Every minute", "Every 5 minutes", for pickers.
   static String interval(Duration interval) {
     if (interval.inSeconds < 60) return 'Every ${interval.inSeconds} s';
     final minutes = interval.inMinutes;
-    return 'Every $minutes minute${minutes == 1 ? '' : 's'}';
+    return minutes == 1 ? 'Every minute' : 'Every $minutes minutes';
   }
 
   /// "just now", "40 s ago", "3 min ago", "2 h ago", "yesterday", "12 Oct".

@@ -34,7 +34,10 @@ abstract final class AppTheme {
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: text.headlineSmall?.copyWith(color: scheme.onSurface),
+        titleTextStyle: text.headlineSmall?.copyWith(
+          color: scheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -84,6 +87,13 @@ abstract final class AppTheme {
         color: scheme.outlineVariant,
         space: 1,
         thickness: 1,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbIcon: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Icon(Icons.check)
+              : null,
+        ),
       ),
       expansionTileTheme: const ExpansionTileThemeData(
         shape: Border(),

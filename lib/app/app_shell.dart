@@ -5,16 +5,42 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../state/permissions_state.dart';
 import '../state/webhook_state.dart';
+import '../ui/ui.dart';
 
 /// The three tabs and their navigation bar. Each tab keeps its own
 /// navigation stack; sub-screens open above the bar.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  // Permissions can change in Android settings while Pitwall is away, and
+  // the Settings badge depends on them.
+  late final _lifecycle = AppLifecycleListener(
+    onResume: () => ref.read(permissionsProvider.notifier).refresh(),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  StatefulNavigationShell get navigationShell => widget.navigationShell;
+
+  @override
+  Widget build(BuildContext context) {
     final deliveryError = ref.watch(
       deliveryStatusProvider.select((status) => status.lastError),
     );
@@ -23,34 +49,28 @@ class AppShell extends ConsumerWidget {
         ref.watch(missingPermissionsProvider) > 0;
 
     return Scaffold(
+      // Content scrolls behind the floating bar.
+      extendBody: true,
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: FloatingNavBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => navigationShell.goBranch(
+        onSelected: (index) => navigationShell.goBranch(
           index,
           initialLocation: index == navigationShell.currentIndex,
         ),
         destinations: [
-          const NavigationDestination(
-            icon: Icon(Symbols.home_rounded),
-            selectedIcon: Icon(Symbols.home_rounded, fill: 1),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Symbols.directions_car_rounded),
-            selectedIcon: Icon(Symbols.directions_car_rounded, fill: 1),
+          const FloatingNavDestination(
+            icon: Symbols.directions_car_rounded,
             label: 'Vehicles',
           ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: settingsNeedAttention,
-              child: const Icon(Symbols.settings_rounded),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: settingsNeedAttention,
-              child: const Icon(Symbols.settings_rounded, fill: 1),
-            ),
+          const FloatingNavDestination(
+            icon: Symbols.home_rounded,
+            label: 'Home',
+          ),
+          FloatingNavDestination(
+            icon: Symbols.settings_rounded,
             label: 'Settings',
+            showBadge: settingsNeedAttention,
           ),
         ],
       ),

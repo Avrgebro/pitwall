@@ -15,4 +15,15 @@ extension AppTextStyles on TextTheme {
   /// The unit next to a value, deliberately stepped back.
   TextStyle get valueUnit =>
       (titleSmall ?? const TextStyle()).copyWith(fontWeight: FontWeight.w400);
+
+  /// The title of a row in a list.
+  TextStyle get rowTitle => (titleMedium ?? const TextStyle()).copyWith(
+    fontSize: 17,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
+  );
+
+  /// The line under a row's title.
+  TextStyle get rowSubtitle =>
+      (bodyMedium ?? const TextStyle()).copyWith(fontSize: 15, height: 1.35);
 }

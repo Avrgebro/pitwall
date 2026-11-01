@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/text_styles.dart';
+import 'row_layout.dart';
 
 /// An item that's either done or needs fixing, with a fix action.
 class ChecklistRow extends StatelessWidget {
@@ -23,12 +24,12 @@ class ChecklistRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tone(done ? StatusTone.healthy : StatusTone.error);
-    return ListTile(
+    return RowLayout(
+      title: title,
       leading: Icon(
         done ? Icons.check_circle : Icons.error,
         color: colors.accent,
       ),
-      title: Text(title),
       subtitle: Text(subtitle),
       trailing: done || onFix == null
           ? null
@@ -59,20 +60,52 @@ class ToggleRow extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return CheckboxListTile(
+  Widget build(BuildContext context) => RowLayout(
+    title: title,
+    subtitle: caption == null
+        ? null
+        : Text(caption!, style: Theme.of(context).textTheme.mono),
+    trailing: Checkbox(
       value: value,
       onChanged: (checked) => onChanged(checked ?? false),
-      title: Text(title),
-      subtitle: caption == null
-          ? null
-          : Text(
-              caption!,
-              style: theme.textTheme.mono.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+    ),
+    onTap: () => onChanged(!value),
+  );
+}
+
+/// One option of several, inside a `RadioGroup<T>`. Tapping anywhere on
+/// the row selects it. [child] shows extra content under the selected
+/// option, such as a follow-up choice.
+class ChoiceRow<T> extends StatelessWidget {
+  const ChoiceRow({
+    super.key,
+    required this.value,
+    required this.title,
+    this.subtitle,
+    this.enabled = true,
+    this.child,
+  });
+
+  final T value;
+  final String title;
+  final String? subtitle;
+  final bool enabled;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final group = RadioGroup.maybeOf<T>(context);
+    final row = RowLayout(
+      title: title,
+      enabled: enabled,
+      leading: Radio<T>(value: value, enabled: enabled),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      onTap: () => group?.onChanged(value),
+    );
+    if (child == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [row, child!],
     );
   }
 }
