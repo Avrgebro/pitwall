@@ -91,13 +91,18 @@ class SessionController extends Notifier<SessionState> {
     return const SessionState();
   }
 
-  Future<void> connect(Vehicle vehicle) async {
+  /// Connects to the vehicle's adapter and checks whether the car answers.
+  ///
+  /// With [askPermission] false (during a trip, with no screen to ask on),
+  /// a missing Bluetooth permission fails instead of prompting.
+  Future<void> connect(Vehicle vehicle, {bool askPermission = true}) async {
     final address = vehicle.adapterAddress;
     if (address == null || state.phase != SessionPhase.idle) return;
     final log = ref.read(adapterLogProvider);
-    final granted = await ref
-        .read(permissionGatewayProvider)
-        .request(AppPermission.bluetooth);
+    final permissions = ref.read(permissionGatewayProvider);
+    final granted = askPermission
+        ? await permissions.request(AppPermission.bluetooth)
+        : await permissions.isGranted(AppPermission.bluetooth);
     if (!granted) {
       state = const SessionState(problem: SessionProblem.permissionDenied);
       return;
@@ -120,19 +125,7 @@ class SessionController extends Notifier<SessionState> {
         busy: true,
       );
       await ref.read(appSettingsProvider.notifier).markSeen(vehicle.id, now);
-      try {
-        final supported = await elm.supportedPids();
-        log.note('Car answered, ${supported.length} values supported');
-        state = state.copyWith(
-          carState: CarState.ignitionOn,
-          supportedPids: supported,
-          busy: false,
-        );
-      } on ElmException catch (e) {
-        if (e.error != ElmError.unableToConnect) rethrow;
-        log.note('Car didn\'t answer: ignition off?', warning: true);
-        state = state.copyWith(carState: CarState.off, busy: false);
-      }
+      await _checkCar(elm);
     } on PlatformException {
       await _close();
       log.note('Couldn\'t connect to the adapter', warning: true);
@@ -142,13 +135,44 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
+  /// Asks the car again whether it answers, e.g. after the ignition was off.
+  Future<void> checkCar() async {
+    final elm = _elm;
+    if (elm == null || state.busy) return;
+    state = state.copyWith(busy: true);
+    try {
+      await _checkCar(elm);
+    } on ElmException catch (e) {
+      await _fail(e);
+    }
+  }
+
+  Future<void> _checkCar(Elm327 elm) async {
+    final log = ref.read(adapterLogProvider);
+    try {
+      final supported = await elm.supportedPids();
+      log.note('Car answered, ${supported.length} values supported');
+      state = state.copyWith(
+        carState: CarState.ignitionOn,
+        supportedPids: supported,
+        busy: false,
+      );
+    } on ElmException catch (e) {
+      if (e.error != ElmError.unableToConnect) rethrow;
+      log.note('Car didn\'t answer: ignition off?', warning: true);
+      state = state.copyWith(carState: CarState.off, busy: false);
+    }
+  }
+
   /// Reads the vehicle's chosen values and sends them to the webhook.
-  Future<void> readAndSend() async {
+  /// Returns what was read: empty if the car reported nothing or stopped
+  /// answering, null if the session couldn't read at all.
+  Future<Map<String, double>?> readAndSend() async {
     final elm = _elm;
     final vehicleId = state.vehicleId;
-    if (elm == null || vehicleId == null || state.busy) return;
+    if (elm == null || vehicleId == null || state.busy) return null;
     final vehicle = ref.read(vehicleProvider(vehicleId));
-    if (vehicle == null) return;
+    if (vehicle == null) return null;
     final log = ref.read(adapterLogProvider);
     state = state.copyWith(busy: true, clearProblem: true);
     try {
@@ -166,13 +190,22 @@ class SessionController extends Notifier<SessionState> {
       state = state.copyWith(carState: carStateFrom(values), busy: false);
       if (values.isEmpty) {
         log.note('Nothing to send: the car reported none of the values');
-        return;
+        return values;
       }
       await ref
           .read(webhookSenderProvider)
           .send(device: vehicle.deviceId, values: values, connected: true);
+      return values;
     } on ElmException catch (e) {
+      // The car going quiet mid-read means the ignition went off; the
+      // adapter is still there.
+      if (e.error == ElmError.unableToConnect) {
+        log.note('Car stopped answering', warning: true);
+        state = state.copyWith(carState: CarState.off, busy: false);
+        return const {};
+      }
       await _fail(e);
+      return null;
     }
   }
 

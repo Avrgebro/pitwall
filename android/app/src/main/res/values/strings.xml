@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pitwall</string>
+    <string name="trip_starting">Starting…</string>
+    <string name="trip_channel">Trips</string>
+    <string name="trip_channel_description">Shown while Pitwall reads your car during a drive.</string>
+</resources>

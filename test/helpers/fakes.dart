@@ -4,7 +4,13 @@ import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/bluetooth/classic_bluetooth.dart';
+
+import 'dart:async';
+
+import 'package:flutter/services.dart';
+
 import 'package:pitwall/core/platform/permission_gateway.dart';
+import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
@@ -37,16 +43,66 @@ class FakePermissionGateway implements PermissionGateway {
 }
 
 class FakeBluetoothGateway implements BluetoothGateway {
-  FakeBluetoothGateway([this.devices = const []]);
+  FakeBluetoothGateway({this.devices = const [], this.adapter});
 
   final List<BondedDevice> devices;
+
+  /// Hands out a connection per attempt; null means the adapter can't be
+  /// reached.
+  final ClosableTransport? Function(String address)? adapter;
+  int attempts = 0;
 
   @override
   Future<List<BondedDevice>> bondedDevices() async => devices;
 
   @override
-  Future<ClosableTransport> connect(String address) =>
-      throw UnimplementedError('Not used in widget tests');
+  Future<ClosableTransport> connect(String address) async {
+    attempts++;
+    final transport = adapter?.call(address);
+    if (transport == null) {
+      throw PlatformException(code: 'connect_failed');
+    }
+    return transport;
+  }
+}
+
+/// Records what Dart asks of the Android trip service.
+class FakeTripServiceGateway implements TripServiceGateway {
+  FakeTripServiceGateway({this.pendingRequest = false});
+
+  bool pendingRequest;
+  final calls = <String>[];
+  final notifications = <String>[];
+  String? headUnitAddress;
+  final _commands = StreamController<TripCommand>.broadcast();
+
+  void send(TripCommand command) => _commands.add(command);
+
+  @override
+  Stream<TripCommand> get commands => _commands.stream;
+
+  @override
+  Future<bool> takeTripRequest() async {
+    final pending = pendingRequest;
+    pendingRequest = false;
+    return pending;
+  }
+
+  @override
+  Future<void> configure({String? headUnitAddress}) async =>
+      this.headUnitAddress = headUnitAddress;
+
+  @override
+  Future<void> startService() async {
+    calls.add('startService');
+    send(TripCommand.start);
+  }
+
+  @override
+  Future<void> stopService() async => calls.add('stopService');
+
+  @override
+  Future<void> updateNotification(String text) async => notifications.add(text);
 }
 
 /// A session that stays in the given state.
@@ -80,6 +136,7 @@ List<Override> testOverrides({
       FakePermissionGateway(permissions),
     ),
     bluetoothGatewayProvider.overrideWithValue(FakeBluetoothGateway()),
+    tripServiceGatewayProvider.overrideWithValue(FakeTripServiceGateway()),
     packageInfoProvider.overrideWith(
       (ref) async => PackageInfo(
         appName: 'Pitwall',

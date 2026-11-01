@@ -7,6 +7,7 @@ import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/logging/adapter_log.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/platform/permission_gateway.dart';
+import '../core/platform/trip_service_gateway.dart';
 import '../core/settings/settings_store.dart';
 import '../core/webhook/delivery_status.dart';
 import '../core/webhook/delivery_storage.dart';
@@ -26,6 +27,10 @@ final permissionGatewayProvider = Provider<PermissionGateway>(
 
 final fileGatewayProvider = Provider<FileGateway>(
   (ref) => const FilePickerGateway(),
+);
+
+final tripServiceGatewayProvider = Provider<TripServiceGateway>(
+  (ref) => AndroidTripServiceGateway(),
 );
 
 final deliveryStorageProvider = Provider<DeliveryStorage>(
