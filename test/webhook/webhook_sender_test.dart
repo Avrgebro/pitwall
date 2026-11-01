@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pitwall/webhook/webhook_auth.dart';
 import 'package:pitwall/webhook/webhook_sender.dart';
 
 import 'fake_delivery_storage.dart';
 
 const _url = 'https://example.com/api/webhook/secret-id';
+const _target = WebhookTarget(_url);
 
 void main() {
   late FakeDeliveryStorage storage;
@@ -24,14 +26,17 @@ void main() {
     return http.Response('', 200);
   });
 
-  WebhookSender sender({http.Client? client, String? url = _url}) =>
-      WebhookSender(
-        storage: storage,
-        webhookUrl: () async => url,
-        client: client ?? server(),
-        clock: () => DateTime.utc(2026, 10, 31, 19, 40),
-        backoff: (_) => const Duration(milliseconds: 10),
-      );
+  WebhookSender sender({
+    http.Client? client,
+    String? url = _url,
+    WebhookAuth auth = WebhookAuth.none,
+  }) => WebhookSender(
+    storage: storage,
+    webhookTarget: () async => url == null ? null : WebhookTarget(url, auth),
+    client: client ?? server(),
+    clock: () => DateTime.utc(2026, 10, 31, 19, 40),
+    backoff: (_) => const Duration(milliseconds: 10),
+  );
 
   Future<void> sendFuel(WebhookSender sender, double litres) => sender.send(
     device: 'tucson',
@@ -118,7 +123,7 @@ void main() {
       ),
     );
 
-    final error = await pitwall.sendTest(_url);
+    final error = await pitwall.sendTest(_target);
 
     expect(error, isNotNull);
     expect(error, isNot(contains('secret-id')));
@@ -129,7 +134,7 @@ void main() {
     final pitwall = sender();
     await pitwall.init();
 
-    expect(await pitwall.sendTest(_url), isNull);
+    expect(await pitwall.sendTest(_target), isNull);
 
     expect(received.single['test'], isTrue);
     expect(pitwall.status.value.queued, 0);
@@ -141,7 +146,39 @@ void main() {
     failNext = 1;
     final pitwall = sender(client: server(status: 401));
 
-    expect(await pitwall.sendTest(_url), contains('Check the webhook URL'));
+    expect(await pitwall.sendTest(_target), contains('Check the URL'));
+    pitwall.dispose();
+  });
+
+  test('credentials are sent as headers on every request', () async {
+    final headers = <Map<String, String>>[];
+    final pitwall = sender(
+      auth: const WebhookAuth(type: WebhookAuthType.bearer, token: 'abc123'),
+      client: MockClient((request) async {
+        headers.add(request.headers);
+        return http.Response('', 200);
+      }),
+    );
+    await pitwall.init();
+
+    await sendFuel(pitwall, 47.5);
+
+    expect(headers.single['Authorization'], 'Bearer abc123');
+    expect(headers.single['Content-Type'], startsWith('application/json'));
+    pitwall.dispose();
+  });
+
+  test('unusable credentials keep readings queued', () async {
+    final pitwall = sender(
+      auth: const WebhookAuth(type: WebhookAuthType.bearer),
+    );
+    await pitwall.init();
+
+    await sendFuel(pitwall, 47.5);
+
+    expect(received, isEmpty);
+    expect(pitwall.status.value.queued, 1);
+    expect(pitwall.status.value.lastError, contains('Enter the token'));
     pitwall.dispose();
   });
 }

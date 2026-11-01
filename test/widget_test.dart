@@ -15,7 +15,7 @@ void main() {
   setUp(() {
     sender = WebhookSender(
       storage: FakeDeliveryStorage(),
-      webhookUrl: () async => null,
+      webhookTarget: () async => null,
       client: MockClient((_) async => http.Response('', 200)),
     );
   });

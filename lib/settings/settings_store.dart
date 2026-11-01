@@ -7,10 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../profiles/signal_set.dart';
 import '../vehicles/vehicle.dart';
+import '../webhook/webhook_auth.dart';
 import 'settings.dart';
 
 /// Saves settings on the device: plain settings in shared preferences, the
-/// webhook URL in secure storage (Android Keystore / iOS Keychain), and each
+/// webhook URL and credentials in secure storage (Android Keystore / iOS
+/// Keychain), and each
 /// vehicle's imported profile as a file in the app's private storage.
 class SettingsStore {
   SettingsStore({
@@ -21,6 +23,7 @@ class SettingsStore {
 
   static const _settingsKey = 'settings';
   static const _webhookUrlKey = 'webhook_url';
+  static const _webhookAuthKey = 'webhook_auth';
 
   // Single-car format, before vehicles: one profile file and its name.
   static const _legacyProfileFile = 'vehicle_profile.json';
@@ -52,6 +55,28 @@ class SettingsStore {
   Future<void> saveWebhookUrl(String? url) => url == null || url.isEmpty
       ? _secrets.delete(key: _webhookUrlKey)
       : _secrets.write(key: _webhookUrlKey, value: url);
+
+  Future<WebhookAuth> loadWebhookAuth() async {
+    final saved = await _secrets.read(key: _webhookAuthKey);
+    if (saved == null) return WebhookAuth.none;
+    try {
+      return WebhookAuth.fromJson(jsonDecode(saved) as Map<String, Object?>);
+    } on Object {
+      return WebhookAuth.none;
+    }
+  }
+
+  Future<void> saveWebhookAuth(WebhookAuth auth) =>
+      auth.type == WebhookAuthType.none
+      ? _secrets.delete(key: _webhookAuthKey)
+      : _secrets.write(key: _webhookAuthKey, value: jsonEncode(auth.toJson()));
+
+  /// The URL and credentials to send to, or null without a URL.
+  Future<WebhookTarget?> loadWebhookTarget() async {
+    final url = await loadWebhookUrl();
+    if (url == null || url.isEmpty) return null;
+    return WebhookTarget(url, await loadWebhookAuth());
+  }
 
   /// The vehicle's imported profile, or null if it has none.
   Future<SignalSet?> loadProfile(Vehicle vehicle) async {

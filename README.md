@@ -21,7 +21,8 @@ Vgate iCar Pro.
   only sends values your car actually reports.
 - **POSTs them as JSON** to a URL you choose. Home Assistant is the main
   target, but anything that accepts a POST works: Node-RED, n8n or your own
-  server.
+  server. Optional authentication: bearer token, username and password, or
+  a custom header.
 - **Keeps readings while offline** and sends them, in order, once the phone
   has signal again.
 

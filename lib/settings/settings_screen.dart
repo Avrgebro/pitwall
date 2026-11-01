@@ -9,6 +9,7 @@ import '../bluetooth/classic_bluetooth.dart';
 import '../profiles/signal_set.dart';
 import '../readings/readings.dart';
 import '../vehicles/vehicle.dart';
+import '../webhook/webhook_auth.dart';
 import '../webhook/webhook_sender.dart';
 import 'settings.dart';
 import 'settings_store.dart';
@@ -31,6 +32,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const _maxProfileBytes = 5 * 1024 * 1024;
 
   final _webhookController = TextEditingController();
+  final _tokenController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _headerNameController = TextEditingController();
+  final _headerValueController = TextEditingController();
   final _intervalController = TextEditingController();
   final _nameController = TextEditingController();
   final _yearController = TextEditingController();
@@ -40,6 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   SignalSet? _profile;
   bool _loading = true;
   bool _showWebhookUrl = false;
+  bool _showSecret = false;
+  WebhookAuth _auth = WebhookAuth.none;
   bool _testing = false;
   String? _webhookProblem;
   String? _testResult;
@@ -56,6 +64,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _webhookController.dispose();
+    _tokenController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _headerNameController.dispose();
+    _headerValueController.dispose();
     _intervalController.dispose();
     _nameController.dispose();
     _yearController.dispose();
@@ -65,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     final settings = await _store.load();
     final webhookUrl = await _store.loadWebhookUrl();
+    final auth = await _store.loadWebhookAuth();
     final vehicle = settings.vehicles.firstOrNull ?? Vehicle.create();
     final profile = await _store.loadProfile(vehicle);
     if (!mounted) return;
@@ -73,6 +87,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _vehicle = vehicle;
       _profile = profile;
       _webhookController.text = webhookUrl ?? '';
+      _auth = auth;
+      _tokenController.text = auth.token;
+      _usernameController.text = auth.username;
+      _passwordController.text = auth.password;
+      _headerNameController.text = auth.headerName;
+      _headerValueController.text = auth.headerValue;
       _intervalController.text = settings.interval.inSeconds.toString();
       _nameController.text = vehicle.name;
       _yearController.text = vehicle.modelYear?.toString() ?? '';
@@ -100,11 +120,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (problem == null) await _store.saveWebhookUrl(url);
   }
 
+  /// Saves the credentials once they're usable, so a half-typed token never
+  /// replaces a working one.
+  Future<void> _authChanged(WebhookAuth auth) async {
+    setState(() {
+      _auth = auth;
+      _testResult = null;
+    });
+    if (auth.problem == null) await _store.saveWebhookAuth(auth);
+  }
+
   Future<void> _sendTest() async {
     final url = _webhookController.text.trim();
     if (url.isEmpty || _webhookProblem != null) return;
+    if (_auth.problem case final problem?) {
+      setState(() => _testResult = problem);
+      return;
+    }
     setState(() => _testing = true);
-    final error = await widget.sender.sendTest(url);
+    final error = await widget.sender.sendTest(WebhookTarget(url, _auth));
     if (!mounted) return;
     setState(() {
       _testing = false;
@@ -265,10 +299,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          'Without https, readings travel unencrypted.',
+          _auth.type == WebhookAuthType.none
+              ? 'Without https, readings travel unencrypted.'
+              : 'Without https, readings and credentials travel unencrypted.',
           style: TextStyle(color: theme.colorScheme.error),
         ),
       ),
+    const SizedBox(height: 8),
+    ..._buildAuth(theme),
     const SizedBox(height: 8),
     Row(
       children: [
@@ -298,6 +336,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onChanged: _intervalChanged,
     ),
   ];
+
+  List<Widget> _buildAuth(ThemeData theme) {
+    Widget secretField(
+      TextEditingController controller,
+      String label,
+      WebhookAuth Function(String) update,
+    ) => TextField(
+      controller: controller,
+      obscureText: !_showSecret,
+      autocorrect: false,
+      enableSuggestions: false,
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: IconButton(
+          icon: Icon(_showSecret ? Icons.visibility_off : Icons.visibility),
+          tooltip: _showSecret ? 'Hide' : 'Show',
+          onPressed: () => setState(() => _showSecret = !_showSecret),
+        ),
+      ),
+      onChanged: (text) => _authChanged(update(text)),
+    );
+
+    Widget plainField(
+      TextEditingController controller,
+      String label,
+      WebhookAuth Function(String) update,
+    ) => TextField(
+      controller: controller,
+      autocorrect: false,
+      decoration: InputDecoration(labelText: label),
+      onChanged: (text) => _authChanged(update(text)),
+    );
+
+    return [
+      DropdownButtonFormField<WebhookAuthType>(
+        initialValue: _auth.type,
+        decoration: const InputDecoration(labelText: 'Authentication'),
+        items: const [
+          DropdownMenuItem(value: WebhookAuthType.none, child: Text('None')),
+          DropdownMenuItem(
+            value: WebhookAuthType.bearer,
+            child: Text('Bearer token'),
+          ),
+          DropdownMenuItem(
+            value: WebhookAuthType.basic,
+            child: Text('Username and password'),
+          ),
+          DropdownMenuItem(
+            value: WebhookAuthType.header,
+            child: Text('Custom header'),
+          ),
+        ],
+        onChanged: (type) => _authChanged(_auth.copyWith(type: type)),
+      ),
+      if (_auth.type == WebhookAuthType.none)
+        const Padding(
+          padding: EdgeInsets.only(top: 4),
+          child: Text(
+            'Home Assistant webhooks don\'t need it: the URL is the secret.',
+          ),
+        ),
+      if (_auth.type == WebhookAuthType.bearer)
+        secretField(
+          _tokenController,
+          'Token',
+          (text) => _auth.copyWith(token: text.trim()),
+        ),
+      if (_auth.type == WebhookAuthType.basic) ...[
+        plainField(
+          _usernameController,
+          'Username',
+          (text) => _auth.copyWith(username: text),
+        ),
+        secretField(
+          _passwordController,
+          'Password',
+          (text) => _auth.copyWith(password: text),
+        ),
+      ],
+      if (_auth.type == WebhookAuthType.header) ...[
+        plainField(
+          _headerNameController,
+          'Header name, e.g. X-API-Key',
+          (text) => _auth.copyWith(headerName: text.trim()),
+        ),
+        secretField(
+          _headerValueController,
+          'Header value',
+          (text) => _auth.copyWith(headerValue: text),
+        ),
+      ],
+      if (_auth.type != WebhookAuthType.none && _auth.problem != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            _auth.problem!,
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+        ),
+    ];
+  }
 
   List<Widget> _buildAdapter(ThemeData theme) => [
     TextField(

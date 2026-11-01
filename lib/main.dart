@@ -10,7 +10,7 @@ Future<void> main() async {
   final store = SettingsStore();
   final sender = WebhookSender(
     storage: FileDeliveryStorage(),
-    webhookUrl: store.loadWebhookUrl,
+    webhookTarget: store.loadWebhookTarget,
   );
   await sender.init();
   runApp(PitwallApp(store: store, sender: sender));

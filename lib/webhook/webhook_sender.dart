@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'delivery_storage.dart';
 import 'payload.dart';
+import 'webhook_auth.dart';
 
 /// How delivery is going, for the status shown to the user.
 @immutable
@@ -31,11 +32,12 @@ class DeliveryStatus {
 /// queued on the device first, so nothing is lost without signal; failed
 /// sends are retried with backoff.
 ///
-/// Error messages never include the URL, which works like a password.
+/// Error messages never include the URL or credentials, which work like
+/// passwords.
 class WebhookSender {
   WebhookSender({
     required this._storage,
-    required this._webhookUrl,
+    required this._webhookTarget,
     http.Client? client,
     DateTime Function()? clock,
     Duration Function(int attempt)? backoff,
@@ -53,7 +55,9 @@ class WebhookSender {
       Duration(seconds: min(5 * pow(2, attempt).toInt(), 300));
 
   final DeliveryStorage _storage;
-  final Future<String?> Function() _webhookUrl;
+
+  /// The URL and credentials to send to, or null if none is set.
+  final Future<WebhookTarget?> Function() _webhookTarget;
   final http.Client _client;
   final DateTime Function() _clock;
   final Duration Function(int attempt) _backoff;
@@ -109,12 +113,16 @@ class WebhookSender {
     _retry?.cancel();
     try {
       while (_queue.isNotEmpty) {
-        final url = await _webhookUrl();
-        if (url == null || url.isEmpty) {
+        final target = await _webhookTarget();
+        if (target == null || target.url.isEmpty) {
           _fail('No webhook URL is set.', retry: false);
           return;
         }
-        final error = await _post(url, _queue.first);
+        if (target.auth.problem case final problem?) {
+          _fail('Authentication isn\'t set up: $problem', retry: false);
+          return;
+        }
+        final error = await _post(target, _queue.first);
         if (error != null) {
           _fail(error, retry: true);
           return;
@@ -129,10 +137,10 @@ class WebhookSender {
     }
   }
 
-  /// Sends a test payload straight to [url], without queueing it. Returns
-  /// null on success, or what went wrong in plain words.
-  Future<String?> sendTest(String url) => _post(
-    url,
+  /// Sends a test payload straight to [target], without queueing it.
+  /// Returns null on success, or what went wrong in plain words.
+  Future<String?> sendTest(WebhookTarget target) => _post(
+    target,
     jsonEncode({
       ...buildPayload(
         device: 'pitwall-test',
@@ -151,12 +159,15 @@ class WebhookSender {
     status.dispose();
   }
 
-  Future<String?> _post(String url, String body) async {
+  Future<String?> _post(WebhookTarget target, String body) async {
     try {
       final response = await _client
           .post(
-            Uri.parse(url),
-            headers: const {'Content-Type': 'application/json'},
+            Uri.parse(target.url),
+            headers: {
+              ...target.auth.headers,
+              'Content-Type': 'application/json',
+            },
             body: body,
           )
           .timeout(timeout);
@@ -164,7 +175,7 @@ class WebhookSender {
       return switch (response.statusCode) {
         401 || 403 =>
           'The server refused the request (HTTP '
-              '${response.statusCode}). Check the webhook URL.',
+              '${response.statusCode}). Check the URL and authentication.',
         404 =>
           'The server doesn\'t know this webhook (HTTP 404). '
               'Check the webhook URL.',

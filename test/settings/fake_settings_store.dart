@@ -2,6 +2,7 @@ import 'package:pitwall/profiles/signal_set.dart';
 import 'package:pitwall/settings/settings.dart';
 import 'package:pitwall/settings/settings_store.dart';
 import 'package:pitwall/vehicles/vehicle.dart';
+import 'package:pitwall/webhook/webhook_auth.dart';
 
 /// Keeps settings in memory instead of on the device.
 class FakeSettingsStore implements SettingsStore {
@@ -9,6 +10,7 @@ class FakeSettingsStore implements SettingsStore {
 
   AppSettings settings;
   String? webhookUrl;
+  WebhookAuth webhookAuth = WebhookAuth.none;
   final Map<String, String> profiles = {};
 
   @override
@@ -22,6 +24,18 @@ class FakeSettingsStore implements SettingsStore {
 
   @override
   Future<void> saveWebhookUrl(String? url) async => webhookUrl = url;
+
+  @override
+  Future<WebhookAuth> loadWebhookAuth() async => webhookAuth;
+
+  @override
+  Future<void> saveWebhookAuth(WebhookAuth auth) async => webhookAuth = auth;
+
+  @override
+  Future<WebhookTarget?> loadWebhookTarget() async => switch (webhookUrl) {
+    final url? when url.isNotEmpty => WebhookTarget(url, webhookAuth),
+    _ => null,
+  };
 
   @override
   Future<SignalSet?> loadProfile(Vehicle vehicle) async =>
