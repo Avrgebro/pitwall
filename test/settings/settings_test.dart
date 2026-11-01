@@ -1,44 +1,91 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/settings/settings.dart';
+import 'package:pitwall/vehicles/vehicle.dart';
 
 void main() {
+  const tucson = Vehicle(
+    id: 'a1',
+    name: 'tucson',
+    adapterAddress: '00:11:22:33:44:55',
+    adapterName: 'OBDII',
+    modelYear: 2023,
+    selectedKeys: {'fuel_level_l', 'battery_v'},
+    profileName: 'default.json',
+  );
+
   test('settings survive a round trip through JSON', () {
-    const settings = Settings(
-      adapterAddress: '00:11:22:33:44:55',
-      adapterName: 'OBDII',
-      deviceName: 'tucson',
-      modelYear: 2023,
-      selectedKeys: {'fuel_level_l', 'battery_v'},
+    const settings = AppSettings(
+      vehicles: [tucson],
+      interval: Duration(seconds: 30),
     );
 
-    final restored = Settings.fromJson(settings.toJson());
+    final restored = AppSettings.fromJson(settings.toJson());
 
-    expect(restored.adapterAddress, settings.adapterAddress);
-    expect(restored.adapterName, settings.adapterName);
-    expect(restored.deviceName, 'tucson');
-    expect(restored.modelYear, 2023);
-    expect(restored.selectedKeys, {'fuel_level_l', 'battery_v'});
+    expect(restored.interval, const Duration(seconds: 30));
+    final vehicle = restored.vehicles.single;
+    expect(vehicle.id, 'a1');
+    expect(vehicle.name, 'tucson');
+    expect(vehicle.adapterAddress, '00:11:22:33:44:55');
+    expect(vehicle.adapterName, 'OBDII');
+    expect(vehicle.modelYear, 2023);
+    expect(vehicle.selectedKeys, {'fuel_level_l', 'battery_v'});
+    expect(vehicle.profileName, 'default.json');
+  });
+
+  test('the earlier single-car format becomes one vehicle', () {
+    final settings = AppSettings.fromJson({
+      'adapterAddress': '00:11:22:33:44:55',
+      'adapterName': 'OBDII',
+      'deviceName': 'tucson',
+      'modelYear': 2023,
+      'selectedKeys': ['fuel_level_l'],
+    });
+
+    final vehicle = settings.vehicles.single;
+    expect(vehicle.name, 'tucson');
+    expect(vehicle.adapterAddress, '00:11:22:33:44:55');
+    expect(vehicle.selectedKeys, {'fuel_level_l'});
+    expect(vehicle.id, isNotEmpty);
   });
 
   test('missing or broken fields fall back to defaults', () {
-    final restored = Settings.fromJson({
-      'deviceName': '',
-      'modelYear': 'soon',
-      'selectedKeys': 'all',
+    final settings = AppSettings.fromJson({
+      'vehicles': [
+        {'name': '', 'modelYear': 'soon', 'selectedKeys': 'all'},
+        'not a vehicle',
+      ],
+      'intervalSeconds': 1,
     });
 
-    expect(restored.deviceName, Settings.defaultDeviceName);
-    expect(restored.modelYear, isNull);
-    expect(restored.selectedKeys, isNull);
+    expect(settings.interval, AppSettings.defaultInterval);
+    final vehicle = settings.vehicles.single;
+    expect(vehicle.name, Vehicle.defaultName);
+    expect(vehicle.modelYear, isNull);
+    expect(vehicle.selectedKeys, isNull);
+  });
+
+  test('vehicles are found by adapter, added and replaced by id', () {
+    var settings = const AppSettings(vehicles: [tucson]);
+
+    expect(settings.vehicleForAdapter('00:11:22:33:44:55')?.id, 'a1');
+    expect(settings.vehicleForAdapter('AA:BB:CC:DD:EE:FF'), isNull);
+
+    settings = settings.withVehicle(tucson.copyWith(name: 'family car'));
+    expect(settings.vehicles.single.name, 'family car');
+
+    settings = settings.withVehicle(Vehicle.create(name: 'second'));
+    expect(settings.vehicles.map((v) => v.name), ['family car', 'second']);
+
+    settings = settings.withoutVehicle('a1');
+    expect(settings.vehicles.map((v) => v.name), ['second']);
   });
 
   test('copyWith can clear a value', () {
-    const settings = Settings(modelYear: 2023, selectedKeys: {'rpm'});
-
-    final cleared = settings.copyWith(modelYear: null, selectedKeys: null);
+    final cleared = tucson.copyWith(modelYear: null, selectedKeys: null);
 
     expect(cleared.modelYear, isNull);
     expect(cleared.selectedKeys, isNull);
+    expect(cleared.adapterName, 'OBDII');
   });
 
   group('webhook URL', () {

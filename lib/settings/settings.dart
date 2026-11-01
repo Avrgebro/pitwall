@@ -1,81 +1,75 @@
+import '../vehicles/vehicle.dart';
+
 /// The user's settings, except the webhook URL. That one works like a
 /// password, so it's kept apart in secure storage (see `SettingsStore`).
-class Settings {
-  const Settings({
-    this.adapterAddress,
-    this.adapterName,
-    this.deviceName = defaultDeviceName,
-    this.modelYear,
-    this.selectedKeys,
+class AppSettings {
+  const AppSettings({
+    this.vehicles = const [],
+    this.interval = defaultInterval,
   });
 
-  static const defaultDeviceName = 'my-car';
+  static const defaultInterval = Duration(minutes: 1);
+  static const minInterval = Duration(seconds: 10);
 
-  /// Bluetooth address of the paired OBD adapter.
-  final String? adapterAddress;
-  final String? adapterName;
+  final List<Vehicle> vehicles;
 
-  /// Sent as `device` in every payload, so one receiver can tell several
-  /// cars apart.
-  final String deviceName;
+  /// How often a reading is sent while driving.
+  final Duration interval;
 
-  /// Picks which of the vehicle profile's signals apply.
-  final int? modelYear;
+  /// The vehicle whose adapter has [address], if any.
+  Vehicle? vehicleForAdapter(String address) =>
+      vehicles.where((v) => v.adapterAddress == address).firstOrNull;
 
-  /// Payload keys to send. Null means the default set.
-  final Set<String>? selectedKeys;
+  /// Adds [vehicle], or replaces the one with the same id.
+  AppSettings withVehicle(Vehicle vehicle) {
+    final index = vehicles.indexWhere((v) => v.id == vehicle.id);
+    return copyWith(
+      vehicles: index == -1
+          ? [...vehicles, vehicle]
+          : ([...vehicles]..[index] = vehicle),
+    );
+  }
 
-  Settings copyWith({
-    Object? adapterAddress = _keep,
-    Object? adapterName = _keep,
-    String? deviceName,
-    Object? modelYear = _keep,
-    Object? selectedKeys = _keep,
-  }) => Settings(
-    adapterAddress: adapterAddress == _keep
-        ? this.adapterAddress
-        : adapterAddress as String?,
-    adapterName: adapterName == _keep
-        ? this.adapterName
-        : adapterName as String?,
-    deviceName: deviceName ?? this.deviceName,
-    modelYear: modelYear == _keep ? this.modelYear : modelYear as int?,
-    selectedKeys: selectedKeys == _keep
-        ? this.selectedKeys
-        : selectedKeys as Set<String>?,
-  );
+  AppSettings withoutVehicle(String id) =>
+      copyWith(vehicles: vehicles.where((v) => v.id != id).toList());
+
+  AppSettings copyWith({List<Vehicle>? vehicles, Duration? interval}) =>
+      AppSettings(
+        vehicles: vehicles ?? this.vehicles,
+        interval: interval ?? this.interval,
+      );
 
   Map<String, Object?> toJson() => {
-    'adapterAddress': adapterAddress,
-    'adapterName': adapterName,
-    'deviceName': deviceName,
-    'modelYear': modelYear,
-    'selectedKeys': selectedKeys?.toList()?..sort(),
+    'vehicles': [for (final vehicle in vehicles) vehicle.toJson()],
+    'intervalSeconds': interval.inSeconds,
   };
 
-  /// Tolerates missing or wrongly typed fields, falling back to defaults,
-  /// so older saved settings keep loading.
-  factory Settings.fromJson(Map<String, Object?> json) => Settings(
-    adapterAddress: _string(json['adapterAddress']),
-    adapterName: _string(json['adapterName']),
-    deviceName: switch (json['deviceName']) {
-      final String name when name.isNotEmpty => name,
-      _ => defaultDeviceName,
-    },
-    modelYear: switch (json['modelYear']) {
-      final num year => year.toInt(),
-      _ => null,
-    },
-    selectedKeys: switch (json['selectedKeys']) {
-      final List<Object?> keys => {...keys.whereType<String>()},
-      _ => null,
-    },
-  );
+  /// Tolerates missing or wrongly typed fields. Also reads the earlier
+  /// single-car format, where the car's settings sat at the top level.
+  factory AppSettings.fromJson(Map<String, Object?> json) {
+    if (isLegacy(json)) {
+      return AppSettings(vehicles: [Vehicle.fromJson(json)]);
+    }
+    final seconds = json['intervalSeconds'];
+    return AppSettings(
+      vehicles: switch (json['vehicles']) {
+        final List<Object?> list => [
+          for (final item in list)
+            if (item is Map<String, Object?>) Vehicle.fromJson(item),
+        ],
+        _ => const [],
+      },
+      interval: seconds is num && seconds >= minInterval.inSeconds
+          ? Duration(seconds: seconds.toInt())
+          : defaultInterval,
+    );
+  }
+
+  /// Whether [json] is the earlier single-car format.
+  static bool isLegacy(Map<String, Object?> json) =>
+      !json.containsKey('vehicles') &&
+      (json.containsKey('adapterAddress') || json.containsKey('deviceName'));
 }
-
-const _keep = Object();
-
-String? _string(Object? value) => value is String ? value : null;
 
 /// Returns why [url] can't be used as a webhook, or null if it can.
 String? webhookUrlProblem(String url) {
