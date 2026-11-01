@@ -1,0 +1,367 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../bluetooth/classic_bluetooth.dart';
+import '../profiles/signal_set.dart';
+import '../readings/readings.dart';
+import 'settings.dart';
+import 'settings_store.dart';
+
+/// Where the user sets up Pitwall. Every change is saved right away.
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key, required this.store});
+
+  final SettingsStore store;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  /// OBDb files are around 100 KB; anything far larger isn't one.
+  static const _maxProfileBytes = 5 * 1024 * 1024;
+
+  final _webhookController = TextEditingController();
+  final _deviceController = TextEditingController();
+  final _yearController = TextEditingController();
+
+  Settings _settings = const Settings();
+  SignalSet? _profile;
+  String? _profileName;
+  bool _loading = true;
+  bool _showWebhookUrl = false;
+  String? _webhookProblem;
+  String? _message;
+
+  SettingsStore get _store => widget.store;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _webhookController.dispose();
+    _deviceController.dispose();
+    _yearController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final settings = await _store.load();
+    final webhookUrl = await _store.loadWebhookUrl();
+    final profile = await _store.loadProfile();
+    if (!mounted) return;
+    setState(() {
+      _settings = settings;
+      _webhookController.text = webhookUrl ?? '';
+      _deviceController.text = settings.deviceName;
+      _yearController.text = settings.modelYear?.toString() ?? '';
+      _profile = profile?.$1;
+      _profileName = profile?.$2;
+      _loading = false;
+    });
+  }
+
+  Future<void> _update(Settings settings) async {
+    setState(() => _settings = settings);
+    await _store.save(settings);
+  }
+
+  Future<void> _webhookChanged(String text) async {
+    final url = text.trim();
+    final problem = url.isEmpty ? null : webhookUrlProblem(url);
+    setState(() => _webhookProblem = problem);
+    if (problem == null) await _store.saveWebhookUrl(url);
+  }
+
+  Future<void> _deviceNameChanged(String text) => _update(
+    _settings.copyWith(
+      deviceName: text.trim().isEmpty
+          ? Settings.defaultDeviceName
+          : text.trim(),
+    ),
+  );
+
+  Future<void> _yearChanged(String text) {
+    final year = int.tryParse(text);
+    final valid = year != null && year >= 1996 && year <= 2100;
+    return _update(_settings.copyWith(modelYear: valid ? year : null));
+  }
+
+  Future<void> _chooseAdapter() async {
+    final permission = await Permission.bluetoothConnect.request();
+    if (!permission.isGranted) {
+      setState(() => _message = 'Bluetooth permission was not granted.');
+      return;
+    }
+    final List<BondedDevice> devices;
+    try {
+      devices = await ClassicBluetooth.bondedDevices();
+    } on PlatformException catch (e) {
+      setState(() => _message = 'Could not list devices: ${e.message}');
+      return;
+    }
+    if (!mounted) return;
+    final device = await showDialog<BondedDevice>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Paired devices'),
+        children: [
+          if (devices.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'No paired devices. Pair the adapter in Android settings first.',
+              ),
+            ),
+          for (final device in devices)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, device),
+              child: ListTile(
+                title: Text(device.name),
+                subtitle: Text(device.address),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (device == null) return;
+    await _update(
+      _settings.copyWith(
+        adapterAddress: device.address,
+        adapterName: device.name,
+      ),
+    );
+  }
+
+  Future<void> _importProfile() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (file == null) return;
+    try {
+      if ((await file.length() ?? 0) > _maxProfileBytes) {
+        throw const FormatException('The file is too large.');
+      }
+      final source = utf8.decode(await file.readAsBytes());
+      final profile = SignalSet.parse(source);
+      await _store.saveProfile(source, file.name);
+      setState(() {
+        _profile = profile;
+        _profileName = file.name;
+        _message = 'Imported ${file.name}.';
+      });
+    } on FormatException catch (e) {
+      setState(() => _message = 'Could not import ${file.name}: ${e.message}');
+    }
+  }
+
+  Future<void> _removeProfile() async {
+    await _store.deleteProfile();
+    setState(() {
+      _profile = null;
+      _profileName = null;
+      _message = 'Vehicle profile removed.';
+    });
+  }
+
+  Future<void> _toggleValue(String key, bool on, Set<String> selected) =>
+      _update(
+        _settings.copyWith(
+          selectedKeys: on ? {...selected, key} : ({...selected}..remove(key)),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (_message case final message?)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(message, style: theme.textTheme.bodyLarge),
+                  ),
+                ..._buildAdapter(theme),
+                ..._buildWebhook(theme),
+                ..._buildProfile(theme),
+                ..._buildValues(theme),
+              ],
+            ),
+    );
+  }
+
+  List<Widget> _buildAdapter(ThemeData theme) => [
+    Text('OBD adapter', style: theme.textTheme.titleMedium),
+    ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(_settings.adapterName ?? 'None chosen'),
+      subtitle: _settings.adapterAddress == null
+          ? null
+          : Text(_settings.adapterAddress!),
+      trailing: OutlinedButton(
+        onPressed: _chooseAdapter,
+        child: const Text('Choose'),
+      ),
+    ),
+  ];
+
+  List<Widget> _buildWebhook(ThemeData theme) => [
+    const SizedBox(height: 16),
+    Text('Webhook', style: theme.textTheme.titleMedium),
+    TextField(
+      controller: _webhookController,
+      obscureText: !_showWebhookUrl,
+      keyboardType: TextInputType.url,
+      autocorrect: false,
+      decoration: InputDecoration(
+        labelText: 'Webhook URL',
+        helperText: 'Stored securely on this phone only.',
+        errorText: _webhookProblem,
+        suffixIcon: IconButton(
+          icon: Icon(_showWebhookUrl ? Icons.visibility_off : Icons.visibility),
+          tooltip: _showWebhookUrl ? 'Hide' : 'Show',
+          onPressed: () => setState(() => _showWebhookUrl = !_showWebhookUrl),
+        ),
+      ),
+      onChanged: _webhookChanged,
+    ),
+    if (_webhookController.text.trim().startsWith('http://'))
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          'Without https, readings travel unencrypted.',
+          style: TextStyle(color: theme.colorScheme.error),
+        ),
+      ),
+    const SizedBox(height: 8),
+    TextField(
+      controller: _deviceController,
+      decoration: const InputDecoration(
+        labelText: 'Device name',
+        helperText: 'Sent as "device", to tell cars apart.',
+      ),
+      onChanged: _deviceNameChanged,
+    ),
+  ];
+
+  List<Widget> _buildProfile(ThemeData theme) {
+    final profile = _profile;
+    final year = _settings.modelYear;
+    return [
+      const SizedBox(height: 24),
+      Text('Vehicle profile', style: theme.textTheme.titleMedium),
+      const Text(
+        'Optional. Adds values your car only reports through manufacturer '
+        'requests. Download your car\'s signalsets/v3/default.json from '
+        'github.com/OBDb and import it here.',
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          OutlinedButton(
+            onPressed: _importProfile,
+            child: Text(profile == null ? 'Import JSON' : 'Replace'),
+          ),
+          if (profile != null) ...[
+            const SizedBox(width: 8),
+            TextButton(onPressed: _removeProfile, child: const Text('Remove')),
+          ],
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _yearController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Model year'),
+              onChanged: _yearChanged,
+            ),
+          ),
+        ],
+      ),
+      if (profile != null) ...[
+        const SizedBox(height: 8),
+        Text(
+          '$_profileName: ${profile.commands.length} requests, '
+          '${profile.signalCount} signals.',
+        ),
+        Text(
+          year == null
+              ? 'Enter the model year to use it.'
+              : '${profile.commandsFor(year).length} requests apply to $year.',
+        ),
+        if (profile.skipped.isNotEmpty)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text('Skipped: ${profile.skipped.length}'),
+            children: [
+              for (final skipped in profile.skipped)
+                ListTile(
+                  dense: true,
+                  title: Text(skipped.description),
+                  subtitle: Text(skipped.reason),
+                ),
+            ],
+          ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildValues(ThemeData theme) {
+    final options = valueOptions(_profile, _settings.modelYear);
+    final selected = _settings.selectedKeys ?? defaultKeys(options);
+
+    Widget tile(ValueOption option) => CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      value: selected.contains(option.key),
+      title: Text(option.name),
+      subtitle: Text(
+        option.unit.isEmpty ? option.key : '${option.key} (${option.unit})',
+      ),
+      onChanged: (on) => _toggleValue(option.key, on ?? false, selected),
+    );
+
+    final others = options.where((o) => !o.recommended).toList();
+    return [
+      const SizedBox(height: 24),
+      Row(
+        children: [
+          Expanded(
+            child: Text('Values to send', style: theme.textTheme.titleMedium),
+          ),
+          if (_settings.selectedKeys != null)
+            TextButton(
+              onPressed: () => _update(_settings.copyWith(selectedKeys: null)),
+              child: const Text('Reset'),
+            ),
+        ],
+      ),
+      const Text(
+        'Only values your car actually reports are sent. Fewer values '
+        'means fewer requests to the car.',
+      ),
+      for (final option in options.where((o) => o.recommended)) tile(option),
+      if (others.isNotEmpty)
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: Text('Other profile signals (${others.length})'),
+          subtitle: const Text('Mostly diagnostic. Each adds requests.'),
+          children: [for (final option in others) tile(option)],
+        ),
+    ];
+  }
+}
