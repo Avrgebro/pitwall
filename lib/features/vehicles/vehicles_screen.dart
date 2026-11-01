@@ -8,7 +8,7 @@ import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
-import '../common/widgets/no_vehicles_card.dart';
+import 'widgets/no_vehicles_card.dart';
 import 'widgets/vehicle_card.dart';
 
 class VehiclesScreen extends ConsumerWidget {

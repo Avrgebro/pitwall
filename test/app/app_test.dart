@@ -5,6 +5,7 @@ import 'package:pitwall/app/app.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
+import 'package:pitwall/features/home/widgets/vehicle_hero_card.dart';
 import 'package:pitwall/ui/ui.dart';
 
 import '../helpers/fakes.dart';
@@ -49,10 +50,25 @@ void main() {
       settings: const AppSettings(vehicles: [_tucson], setupDone: true),
     );
 
-    expect(find.text('Tucson'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(VehicleHeroCard),
+        matching: find.text('Tucson'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Waiting for the car'), findsOneWidget);
-    expect(find.text('Ready to send'), findsOneWidget);
+    // The webhook and head unit aren't set yet.
+    expect(find.text('Finish setting up'), findsOneWidget);
     expect(find.byType(FloatingNavBar), findsOneWidget);
+
+    // Below the checklist and the vehicle, on the small test screen.
+    await tester.scrollUntilVisible(
+      find.text('Ready to send'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Ready to send'), findsOneWidget);
   });
 
   testWidgets('tabs switch between Home, Vehicles and Settings', (
@@ -190,7 +206,8 @@ void main() {
 
     await tester.tap(find.text('Go to Home'));
     await tester.pumpAndSettle();
-    expect(find.text('No vehicles yet'), findsOneWidget);
+    expect(find.text('Finish setting up'), findsOneWidget);
+    expect(find.text('Add a vehicle'), findsOneWidget);
   });
 
   testWidgets('a tab page scrolls its last item clear of the nav bar', (

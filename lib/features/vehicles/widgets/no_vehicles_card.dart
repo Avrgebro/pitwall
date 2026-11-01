@@ -3,8 +3,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../ui/ui.dart';
 
-/// What Home and Vehicles show before any vehicle is added: what Pitwall
-/// needs, the steps to get there, and the way in.
+/// What Vehicles shows before any vehicle is added: what Pitwall needs,
+/// the steps to get there, and the way in.
 class NoVehiclesCard extends StatelessWidget {
   const NoVehiclesCard({super.key, required this.onAdd});
 
