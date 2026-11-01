@@ -8,18 +8,6 @@ class WebhookScreen extends StatelessWidget {
   const WebhookScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const AppPage(
-    title: 'Webhook',
-    children: [
-      WebhookSection(),
-      InfoNote(
-        text: TextSpan(
-          text:
-              'In Home Assistant, create an automation with a Webhook '
-              'trigger and paste its URL here. Every reading is sent to it as '
-              'JSON.',
-        ),
-      ),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      const AppPage(title: 'Webhook', children: [WebhookSection()]);
 }

@@ -25,8 +25,6 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
   final _url = TextEditingController();
   WebhookAuth _auth = WebhookAuth.none;
   String? _urlProblem;
-  AuthProblem? _authProblem;
-  bool _authOpen = false;
   bool _testing = false;
   ({TestResult result, DateTime at})? _test;
   bool _loaded = false;
@@ -42,7 +40,6 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
     _loaded = true;
     _url.text = config.url;
     _auth = config.auth;
-    _authOpen = config.auth.type != WebhookAuthType.none;
   }
 
   Future<void> _urlChanged(String text) async {
@@ -59,10 +56,8 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
       _auth = auth;
       _test = null;
     });
-    final problem = await ref
-        .read(webhookConfigProvider.notifier)
-        .setAuth(auth);
-    if (mounted) setState(() => _authProblem = problem);
+    // Saved once valid; the editor shows the problem on its field meanwhile.
+    await ref.read(webhookConfigProvider.notifier).setAuth(auth);
   }
 
   Future<void> _sendTest() async {
@@ -91,12 +86,11 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
     final insecure = _url.text.trim().startsWith('http://');
     final mono = Theme.of(context).textTheme.mono;
 
-    return ContentCard(
-      padding: Insets.card,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SecretTextField(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ContentCard(
+          child: SecretTextField(
             controller: _url,
             label: 'Webhook URL',
             keyboardType: TextInputType.url,
@@ -123,57 +117,39 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
                   )
                 : null,
           ),
-          const SizedBox(height: Insets.s),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Symbols.key_rounded),
-            title: const Text('Authentication'),
-            subtitle: Text(DeliveryText.authType(_auth.type)),
-            trailing: Icon(_authOpen ? Icons.expand_less : Icons.expand_more),
-            onTap: () => setState(() => _authOpen = !_authOpen),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            alignment: Alignment.topCenter,
-            child: _authOpen
-                ? AuthEditor(
-                    auth: _auth,
-                    problem: _authProblem,
-                    onChanged: _authChanged,
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
+        ),
+        const SectionHeader('Authentication', icon: Symbols.key_rounded),
+        AuthEditor(auth: _auth, onChanged: _authChanged),
+        const SizedBox(height: Insets.xl),
+        GlassButton(
+          onPressed: _canTest ? _sendTest : null,
+          icon: _testing
+              ? const SizedBox.square(
+                  dimension: Sizes.iconSmall,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Symbols.send_rounded),
+          child: const Text('Send test'),
+        ),
+        if (_test case (:final result, :final at)) ...[
           const SizedBox(height: Insets.m),
-          FilledButton.icon(
-            onPressed: _canTest ? _sendTest : null,
-            icon: _testing
-                ? const SizedBox.square(
-                    dimension: Sizes.iconSmall,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Symbols.send_rounded),
-            label: const Text('Send test'),
-          ),
-          if (_test case (:final result, :final at)) ...[
-            const SizedBox(height: Insets.m),
-            if (result.error case final error?)
-              ResultBanner(
-                tone: StatusTone.error,
-                title: DeliveryText.error(error).title,
-                message: DeliveryText.error(error).message,
-              )
-            else
-              ResultBanner(
-                tone: StatusTone.healthy,
-                title: 'Test reading delivered',
-                message:
-                    'The server accepted it in '
-                    '${Formatters.elapsed(result.elapsed)} · '
-                    '${Formatters.clock(at)}',
-              ),
-          ],
+          if (result.error case final error?)
+            ResultBanner(
+              tone: StatusTone.error,
+              title: DeliveryText.error(error).title,
+              message: DeliveryText.error(error).message,
+            )
+          else
+            ResultBanner(
+              tone: StatusTone.healthy,
+              title: 'Test reading delivered',
+              message:
+                  'The server accepted it in '
+                  '${Formatters.elapsed(result.elapsed)} · '
+                  '${Formatters.clock(at)}',
+            ),
         ],
-      ),
+      ],
     );
   }
 }
