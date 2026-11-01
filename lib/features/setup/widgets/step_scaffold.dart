@@ -41,62 +41,61 @@ class StepScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Insets.xl,
-                Insets.l,
-                Insets.xl,
-                0,
-              ),
-              child: _Progress(step: step, steps: steps),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  Insets.xl,
-                  Insets.xl,
-                  Insets.xl,
-                  Insets.xl,
-                ),
-                children: [
-                  if (title != null)
-                    Text(title!, style: theme.textTheme.headlineMedium),
-                  if (message != null) ...[
-                    const SizedBox(height: Insets.s),
-                    Text(
-                      message!,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                  if (title != null || message != null)
-                    const SizedBox(height: Insets.xl),
-                  ...children,
-                ],
-              ),
-            ),
-            Padding(
+      body: PageBackdrop(
+        child: PinnedBottom(
+          bottom: SafeArea(
+            top: false,
+            child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 Insets.xl,
                 Insets.s,
                 Insets.xl,
                 Insets.l,
               ),
-              child: onBack == null
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: _buttons(),
+            ),
+          ),
+          // The bottom padding is the pinned buttons', for the list.
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    Insets.xl,
+                    Insets.l,
+                    Insets.xl,
+                    0,
+                  ),
+                  child: _Progress(step: step, steps: steps),
+                ),
+                Expanded(
+                  child: Builder(
+                    builder: (context) => ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        Insets.xl,
+                        Insets.xl,
+                        Insets.xl,
+                        MediaQuery.paddingOf(context).bottom + Insets.xl,
+                      ),
                       children: [
-                        FilledButton(
-                          onPressed: onPrimary,
-                          child: Text(primaryLabel),
-                        ),
+                        if (title != null)
+                          Text(title!, style: theme.textTheme.headlineMedium),
+                        if (message != null) ...[
+                          const SizedBox(height: Insets.s),
+                          Text(
+                            message!,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        if (title != null || message != null)
+                          const SizedBox(height: Insets.xl),
+                        ...children,
                         if (footnote != null) ...[
-                          const SizedBox(height: Insets.m),
+                          const SizedBox(height: Insets.xl),
                           Text(
                             footnote!,
                             textAlign: TextAlign.center,
@@ -106,32 +105,38 @@ class StepScaffold extends StatelessWidget {
                           ),
                         ],
                       ],
-                    )
-                  : Row(
-                      children: [
-                        TextButton(
-                          onPressed: onBack,
-                          child: const Text('Back'),
-                        ),
-                        const Spacer(),
-                        // Always in view, however long the step is.
-                        if (onSkip != null) ...[
-                          TextButton(
-                            onPressed: onSkip,
-                            child: const Text('Set up later'),
-                          ),
-                          const SizedBox(width: Insets.s),
-                        ],
-                        FilledButton(
-                          onPressed: onPrimary,
-                          child: Text(primaryLabel),
-                        ),
-                      ],
                     ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Glass, as they float over the step's content.
+  Widget _buttons() {
+    final primary = GlassButton(
+      onPressed: onPrimary,
+      child: Text(primaryLabel),
+    );
+    if (onBack == null) return SizedBox(width: double.infinity, child: primary);
+    return Row(
+      children: [
+        GlassButton.neutral(onPressed: onBack, child: const Text('Back')),
+        const Spacer(),
+        // Always in view, however long the step is.
+        if (onSkip != null) ...[
+          GlassButton.neutral(
+            onPressed: onSkip,
+            child: const Text('Set up later'),
+          ),
+          const SizedBox(width: Insets.s),
+        ],
+        primary,
+      ],
     );
   }
 }

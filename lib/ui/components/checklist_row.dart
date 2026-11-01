@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/text_styles.dart';
+import '../theme/tokens.dart';
+import 'row_group.dart';
 import 'row_layout.dart';
 
 /// An item that's either done or needs fixing, with a fix action.
@@ -74,8 +76,9 @@ class ToggleRow extends StatelessWidget {
 }
 
 /// One option of several, inside a `RadioGroup<T>`. Tapping anywhere on
-/// the row selects it. [child] shows extra content under the selected
-/// option, such as a follow-up choice.
+/// the row selects it. [child] opens under the option while it's selected,
+/// across the full width of the card: fields or a follow-up choice for
+/// that option.
 class ChoiceRow<T> extends StatelessWidget {
   const ChoiceRow({
     super.key,
@@ -95,17 +98,55 @@ class ChoiceRow<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final group = RadioGroup.maybeOf<T>(context);
+    final selected = group?.groupValue == value;
+    // The selected option outlines its segment in the accent colour.
+    final primary = Theme.of(context).colorScheme.primary;
+    Widget outlined(Widget option) => AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      foregroundDecoration: ShapeDecoration(
+        shape: RoundedRectangleBorder(
+          borderRadius: RowSegment.borderRadiusOf(context),
+          side: BorderSide(
+            color: selected ? primary : primary.withValues(alpha: 0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: option,
+    );
     final row = RowLayout(
       title: title,
       enabled: enabled,
       leading: Radio<T>(value: value, enabled: enabled),
       subtitle: subtitle == null ? null : Text(subtitle!),
-      onTap: () => group?.onChanged(value),
+      onTap: child == null ? () => group?.onChanged(value) : null,
     );
-    if (child == null) return row;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [row, child!],
+    if (child == null) return outlined(row);
+    // The whole option is one tap target, so its ripple fills the card
+    // including the opened part. Fields inside take their own taps.
+    return outlined(
+      InkWell(
+        onTap: enabled ? () => group?.onChanged(value) : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            row,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: selected
+                  ? Padding(
+                      // The same padding as a content card, so fields line up
+                      // with fields in cards around it.
+                      padding: Insets.card.copyWith(top: 0),
+                      child: child,
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -26,15 +26,7 @@ class VehicleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final highlighted = badge != VehicleBadge.none;
     final lastSeen = vehicle.lastSeen;
-    return Material(
-      color: highlighted
-          ? theme.colorScheme.surfaceContainerLow
-          : theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: Corners.extraLargeRadius,
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
+    return GlassSurface(
       child: InkWell(
         onTap: onTap,
         child: Padding(

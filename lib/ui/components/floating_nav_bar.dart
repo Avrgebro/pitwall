@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/glass_colors.dart';
+import '../theme/glass_filters.dart';
 import '../theme/tokens.dart';
 
 @immutable
@@ -19,13 +21,15 @@ class FloatingNavDestination {
   final bool showBadge;
 }
 
-/// A pill-shaped navigation bar floating above the content. One accent
+/// A frosted, pill-shaped navigation bar floating above the content: what
+/// scrolls underneath shows through, blurred. One accent
 /// pill sits behind the items and slides to the selected one. Built from
 /// Material 3 colours and shapes, since Material's floating toolbar isn't
 /// in Flutter yet.
 ///
 /// Place it in a `Scaffold` with `extendBody: true`, so content scrolls
-/// behind it, and leave [clearance] at the bottom of scrolling content.
+/// behind it. The scaffold then includes the bar's height in the body's
+/// bottom padding, for scrolling content to keep clear of it.
 class FloatingNavBar extends StatelessWidget {
   const FloatingNavBar({
     super.key,
@@ -38,9 +42,6 @@ class FloatingNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  /// Height of the bar plus its margin, for padding scrolling content.
-  static const clearance = 84.0;
-
   static const _itemWidth = 100.0;
   static const _inset = 4.0;
   static const _slide = Duration(milliseconds: 380);
@@ -51,66 +52,80 @@ class FloatingNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final glass = context.glass;
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.only(bottom: Insets.m),
       child: Center(
         heightFactor: 1,
-        child: Container(
-          padding: const EdgeInsets.all(_inset),
+        // The shadow sits outside the clip; the blur and fill inside it.
+        child: DecoratedBox(
           decoration: ShapeDecoration(
-            color: scheme.surfaceContainerHigh,
+            shape: const StadiumBorder(),
             shadows: [
               BoxShadow(
-                color: scheme.shadow.withValues(alpha: 0.18),
+                color: scheme.shadow.withValues(alpha: 0.12),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ],
-            shape: StadiumBorder(
-              side: BorderSide(color: scheme.outlineVariant),
-            ),
           ),
-          child: SizedBox(
-            width: _itemWidth * destinations.length,
-            child: Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: _slide,
-                  curve: _curve,
-                  left: _itemWidth * selectedIndex,
-                  top: 0,
-                  bottom: 0,
-                  width: _itemWidth,
-                  child: DecoratedBox(
-                    decoration: ShapeDecoration(
-                      color: scheme.primaryContainer,
-                      shape: StadiumBorder(
-                        side: BorderSide(
-                          color: scheme.primary.withValues(alpha: 0.6),
+          child: ClipPath(
+            clipper: const ShapeBorderClipper(shape: StadiumBorder()),
+            child: BackdropFilter(
+              filter: GlassFilters.bar,
+              child: Container(
+                constraints: const BoxConstraints(
+                  minHeight: Sizes.floatingControl,
+                ),
+                padding: const EdgeInsets.all(_inset),
+                decoration: ShapeDecoration(
+                  color: glass.barFill,
+                  shape: StadiumBorder(side: BorderSide(color: glass.edge)),
+                ),
+                child: SizedBox(
+                  width: _itemWidth * destinations.length,
+                  child: Stack(
+                    children: [
+                      AnimatedPositioned(
+                        duration: _slide,
+                        curve: _curve,
+                        left: _itemWidth * selectedIndex,
+                        top: 0,
+                        bottom: 0,
+                        width: _itemWidth,
+                        child: DecoratedBox(
+                          decoration: ShapeDecoration(
+                            color: scheme.primaryContainer,
+                            shape: StadiumBorder(
+                              side: BorderSide(
+                                color: scheme.primary.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      Row(
+                        children: [
+                          for (var i = 0; i < destinations.length; i++)
+                            _Item(
+                              destination: destinations[i],
+                              selected: i == selectedIndex,
+                              onTap: () {
+                                // A light tick when the selection changes; the
+                                // current tab stays silent.
+                                if (i != selectedIndex) {
+                                  HapticFeedback.selectionClick();
+                                }
+                                onSelected(i);
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                Row(
-                  children: [
-                    for (var i = 0; i < destinations.length; i++)
-                      _Item(
-                        destination: destinations[i],
-                        selected: i == selectedIndex,
-                        onTap: () {
-                          // A light tick when the selection changes; the
-                          // current tab stays silent.
-                          if (i != selectedIndex) {
-                            HapticFeedback.selectionClick();
-                          }
-                          onSelected(i);
-                        },
-                      ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         ),

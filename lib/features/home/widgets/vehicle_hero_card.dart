@@ -16,58 +16,56 @@ class VehicleHeroCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final running = model.state == HeroState.running;
-    final background = running
-        ? context.tone(StatusTone.active).container
-        : scheme.surfaceContainerHigh;
+    // Running tints the glass in the accent; otherwise it's neutral glass.
+    final tint = running
+        ? context.tone(StatusTone.active).container.withValues(alpha: 0.7)
+        : null;
     final foreground = running
         ? context.tone(StatusTone.active).onContainer
         : scheme.onSurface;
-    final tileBackground = Color.alphaBlend(
-      scheme.surface.withValues(alpha: running ? 0.55 : 0.7),
-      background,
-    );
+    final tileBackground = scheme.surface.withValues(alpha: 0.4);
 
-    return Container(
-      padding: const EdgeInsets.all(Insets.l + 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: Corners.heroRadius,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _chip(),
-          const SizedBox(height: Insets.l),
-          Text(
-            model.title,
-            style: theme.textTheme.displaySmall?.copyWith(color: foreground),
-          ),
-          const SizedBox(height: Insets.xs),
-          Text(
-            model.subtitle,
-            style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
-          ),
-          const SizedBox(height: Insets.l),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < model.stats.length; i++) ...[
-                  if (i > 0) const SizedBox(width: Insets.s),
-                  Expanded(
-                    child: StatTile(
-                      icon: _icon(model.stats[i].kind),
-                      label: model.stats[i].label,
-                      value: model.stats[i].value,
-                      background: tileBackground,
-                      foreground: foreground,
-                    ),
-                  ),
-                ],
-              ],
+    return GlassSurface(
+      borderRadius: Corners.heroRadius,
+      color: tint,
+      child: Padding(
+        padding: const EdgeInsets.all(Insets.l + 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _chip(),
+            const SizedBox(height: Insets.l),
+            Text(
+              model.title,
+              style: theme.textTheme.displaySmall?.copyWith(color: foreground),
             ),
-          ),
-        ],
+            const SizedBox(height: Insets.xs),
+            Text(
+              model.subtitle,
+              style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
+            ),
+            const SizedBox(height: Insets.l),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < model.stats.length; i++) ...[
+                    if (i > 0) const SizedBox(width: Insets.s),
+                    Expanded(
+                      child: StatTile(
+                        icon: _icon(model.stats[i].kind),
+                        label: model.stats[i].label,
+                        value: model.stats[i].value,
+                        background: tileBackground,
+                        foreground: foreground,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

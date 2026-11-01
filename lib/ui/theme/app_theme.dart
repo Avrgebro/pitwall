@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'glass_colors.dart';
 import 'status_colors.dart';
 import 'tokens.dart';
 
@@ -28,7 +29,7 @@ abstract final class AppTheme {
     // Theme. Styles set here need both, so the 2021 geometry is merged in.
     final text = Typography.englishLike2021.merge(base.textTheme);
     return base.copyWith(
-      extensions: [StatusColors.from(scheme)],
+      extensions: [StatusColors.from(scheme), GlassColors.from(scheme)],
       scaffoldBackgroundColor: scheme.surface,
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
@@ -54,6 +55,20 @@ abstract final class AppTheme {
         titleTextStyle: text.bodyLarge?.copyWith(color: scheme.onSurface),
         subtitleTextStyle: text.bodyMedium?.copyWith(
           color: scheme.onSurfaceVariant,
+        ),
+      ),
+      // Flat, on the strongest surface and outlined, so a search bar stands
+      // out from the frosted cards around it; the outline turns to the
+      // accent while typing.
+      searchBarTheme: SearchBarThemeData(
+        elevation: const WidgetStatePropertyAll(0),
+        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
+        side: WidgetStateProperty.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.focused)
+                ? scheme.primary
+                : scheme.outline,
+          ),
         ),
       ),
       inputDecorationTheme: const InputDecorationTheme(

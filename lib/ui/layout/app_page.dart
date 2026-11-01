@@ -1,9 +1,10 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:material_ui/material_ui.dart';
 
-import '../components/floating_nav_bar.dart';
+import '../theme/glass_colors.dart';
+import '../theme/glass_filters.dart';
 import '../theme/tokens.dart';
+import 'page_backdrop.dart';
+import 'pinned_bottom.dart';
 
 /// The frame of every screen: a title (with a back button on sub-screens),
 /// an optional subtitle, and scrolling content with page padding.
@@ -11,7 +12,7 @@ import '../theme/tokens.dart';
 /// Content scrolls under the top bar. The bar is transparent at the top of
 /// the page and fills in, frosted and with rounded bottom corners, once
 /// content passes beneath it.
-class AppPage extends StatefulWidget {
+class AppPage extends StatelessWidget {
   const AppPage({
     super.key,
     required this.title,
@@ -28,85 +29,73 @@ class AppPage extends StatefulWidget {
   final List<Widget>? actions;
   final Widget? floatingActionButton;
 
-  /// Pinned below the content, such as an input bar or a main button.
-  /// Kept clear of the system navigation bar; no `SafeArea` needed.
+  /// Pinned over the bottom of the content, such as a main button or an
+  /// input bar; see [PinnedBottom].
   final Widget? bottom;
 
-  @override
-  State<AppPage> createState() => _AppPageState();
-}
-
-class _AppPageState extends State<AppPage> {
+  /// Taller than Material's 64, so the large title has room to breathe.
   static const _barHeight = 72.0;
-  static const _barRadius = BorderRadius.vertical(
-    bottom: Radius.circular(Corners.extraLarge),
+
+  /// Room for the back button, inset from the screen edge.
+  static const _leadingWidth = 64.0;
+
+  /// Without a back button, the title lines up with section headers.
+  static const _titleInset = Insets.l + Insets.xs;
+
+  static const _barShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(
+      bottom: Radius.circular(Corners.extraLarge),
+    ),
   );
-
-  /// Whether content has scrolled under the top bar. The blur only runs
-  /// then: at rest it would smudge the page edge just below the bar.
-  bool _scrolledUnder = false;
-
-  bool _onScroll(ScrollNotification notification) {
-    if (notification.depth != 0) return false;
-    final scrolled = notification.metrics.extentBefore > 0;
-    if (scrolled != _scrolledUnder) setState(() => _scrolledUnder = scrolled);
-    return false;
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // The same test AppBar uses to imply a back button.
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
-    final topInset = MediaQuery.paddingOf(context).top;
-    final subtitle = widget.subtitle;
-    final bottom = widget.bottom;
+    final subtitle = this.subtitle;
+    final bottom = this.bottom;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         toolbarHeight: _barHeight,
         automaticallyImplyLeading: false,
-        leadingWidth: canPop ? 64 : null,
+        leadingWidth: canPop ? _leadingWidth : null,
         leading: canPop
             ? Padding(
                 padding: const EdgeInsets.only(left: Insets.s),
                 child: Center(
-                  child: IconButton.filledTonal(
-                    onPressed: () => Navigator.maybePop(context),
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: MaterialLocalizations.of(context)
-                        .backButtonTooltip,
+                  child: BackButton(
+                    // Material 3's filled tonal icon button colours.
+                    style: IconButton.styleFrom(
+                      backgroundColor: scheme.secondaryContainer,
+                      foregroundColor: scheme.onSecondaryContainer,
+                    ),
                   ),
                 ),
               )
             : null,
-        titleSpacing: canPop ? Insets.s : Insets.l + 4,
+        titleSpacing: canPop ? Insets.s : _titleInset,
         // Transparent at rest; a translucent surface once content scrolls
-        // underneath.
+        // underneath. The surface colour at zero opacity, rather than plain
+        // transparent, keeps the status bar icons' contrast right.
         backgroundColor: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.scrolledUnder)
-              ? scheme.surfaceContainer.withValues(alpha: 0.82)
+              ? context.glass.barFill
               : scheme.surface.withValues(alpha: 0),
         ),
         scrolledUnderElevation: 0,
-        shape: const RoundedRectangleBorder(borderRadius: _barRadius),
+        shape: _barShape,
         clipBehavior: Clip.antiAlias,
-        // Frosts whatever scrolls behind the bar.
-        flexibleSpace: ClipRRect(
-          borderRadius: _barRadius,
-          child: BackdropFilter(
-            enabled: _scrolledUnder,
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: const SizedBox.expand(),
-          ),
-        ),
+        flexibleSpace: const _Frost(shape: _barShape),
         title: subtitle == null
-            ? Text(widget.title)
+            ? Text(title)
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.title),
+                  Text(title),
                   Text(
                     subtitle,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -115,34 +104,95 @@ class _AppPageState extends State<AppPage> {
                   ),
                 ],
               ),
-        actions: widget.actions,
+        actions: actions,
       ),
-      floatingActionButton: widget.floatingActionButton,
-      body: Column(
-        children: [
-          Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _onScroll,
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                  Insets.l,
-                  topInset + _barHeight + Insets.s,
-                  Insets.l,
-                  // Room for the floating navigation bar on tab pages;
-                  // pages with their own bottom area don't have one.
-                  bottom == null
-                      ? FloatingNavBar.clearance + Insets.l
-                      : Insets.l,
-                ),
-                children: widget.children,
-              ),
-            ),
-          ),
-          // Bottom only: the top inset includes the top bar, which content
-          // already scrolls under.
-          if (bottom != null) SafeArea(top: false, child: bottom),
-        ],
+      floatingActionButton: floatingActionButton,
+      body: PageBackdrop(
+        child: bottom == null
+            ? _content()
+            : PinnedBottom(bottom: bottom, child: _content()),
       ),
     );
   }
+
+  /// The scrolling content. Inside the body, the scaffolds report what
+  /// overlaps it: the top bar above, and below either the floating
+  /// navigation bar on tab pages or the pinned [bottom].
+  Widget _content() => Builder(
+    builder: (context) {
+      final overlap = MediaQuery.paddingOf(context);
+      return ListView(
+        padding: EdgeInsets.fromLTRB(
+          Insets.l,
+          overlap.top + Insets.s,
+          Insets.l,
+          overlap.bottom + Insets.l,
+        ),
+        children: children,
+      );
+    },
+  );
+}
+
+/// Frosts whatever scrolls behind the top bar. Follows the same scroll
+/// signal the bar uses for its scrolled-under colour, and only blurs then:
+/// at rest there's nothing to frost, and the blur would soften the page
+/// background along the bar's lower edge.
+class _Frost extends StatefulWidget {
+  const _Frost({required this.shape});
+
+  /// The bar's shape. A backdrop filter blurs everything up to its nearest
+  /// clip, and the bar's own clip doesn't bound it, so the frost clips
+  /// itself.
+  final ShapeBorder shape;
+
+  @override
+  State<_Frost> createState() => _FrostState();
+}
+
+class _FrostState extends State<_Frost> {
+  ScrollNotificationObserverState? _observer;
+  bool _scrolledUnder = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _observer?.removeListener(_onScroll);
+    _observer = ScrollNotificationObserver.maybeOf(context)
+      ?..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _observer?.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  // As AppBar decides it: the page's own vertical scroll view, with
+  // content before the visible part.
+  void _onScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification ||
+        !defaultScrollNotificationPredicate(notification)) {
+      return;
+    }
+    final metrics = notification.metrics;
+    final scrolledUnder = switch (metrics.axisDirection) {
+      AxisDirection.down => metrics.extentBefore > 0,
+      AxisDirection.up => metrics.extentAfter > 0,
+      _ => _scrolledUnder,
+    };
+    if (scrolledUnder != _scrolledUnder) {
+      setState(() => _scrolledUnder = scrolledUnder);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: ShapeBorderClipper(shape: widget.shape),
+    child: BackdropFilter(
+      enabled: _scrolledUnder,
+      filter: GlassFilters.bar,
+      child: const SizedBox.expand(),
+    ),
+  );
 }

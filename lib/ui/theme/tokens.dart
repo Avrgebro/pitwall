@@ -39,4 +39,9 @@ abstract final class Sizes {
   static const double badge = 40;
   static const double badgeLarge = 56;
   static const double illustration = 88;
+
+  /// Minimum height of controls floating over content, the navigation bar
+  /// and buttons pinned over a page, so they match. Material 3's floating
+  /// toolbar height.
+  static const double floatingControl = 64;
 }

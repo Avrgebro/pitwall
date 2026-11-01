@@ -126,57 +126,60 @@ class _CommandBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Insets.l,
-        Insets.s,
-        Insets.l,
-        Insets.s,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  enabled: enabled,
-                  autocorrect: false,
-                  textCapitalization: TextCapitalization.characters,
-                  style: theme.textTheme.mono.copyWith(
-                    fontSize: theme.textTheme.bodyLarge?.fontSize,
+    return GlassBar(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          Insets.l,
+          Insets.l,
+          Insets.l,
+          Insets.s,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    enabled: enabled,
+                    autocorrect: false,
+                    textCapitalization: TextCapitalization.characters,
+                    style: theme.textTheme.mono.copyWith(
+                      fontSize: theme.textTheme.bodyLarge?.fontSize,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Raw command',
+                      hintText: 'e.g. 010C',
+                    ),
+                    onSubmitted: (_) => onSend(),
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Raw command',
-                    hintText: 'e.g. 010C',
-                  ),
-                  onSubmitted: (_) => onSend(),
+                ),
+                const SizedBox(width: Insets.s),
+                IconButton.filled(
+                  onPressed: enabled ? onSend : null,
+                  icon: const Icon(Symbols.send_rounded),
+                  tooltip: 'Send',
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Insets.l,
+                Insets.xs,
+                Insets.l,
+                0,
+              ),
+              child: Text(
+                'Sent straight to the adapter. Only while connected.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: Insets.s),
-              IconButton.filled(
-                onPressed: enabled ? onSend : null,
-                icon: const Icon(Symbols.send_rounded),
-                tooltip: 'Send',
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Insets.l,
-              Insets.xs,
-              Insets.l,
-              0,
             ),
-            child: Text(
-              'Sent straight to the adapter. Only while connected.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

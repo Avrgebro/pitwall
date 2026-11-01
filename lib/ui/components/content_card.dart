@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
+import 'glass_surface.dart';
 
 /// One block of content on the card surface: a form, a status, a summary.
 /// For lists of rows, use `RowGroup`.
@@ -10,6 +11,7 @@ class ContentCard extends StatelessWidget {
     required this.child,
     this.padding = Insets.card,
     this.dashed = false,
+    this.onTap,
   });
 
   final Widget child;
@@ -18,25 +20,32 @@ class ContentCard extends StatelessWidget {
   /// A dashed border, for an empty slot inviting an action.
   final bool dashed;
 
+  /// Makes the whole card one tap target, such as an "Add" slot.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final content = Padding(padding: padding, child: child);
+    final padded = Padding(padding: padding, child: child);
+    final content = onTap == null
+        ? padded
+        : InkWell(onTap: onTap, child: padded);
     if (dashed) {
       return CustomPaint(
-        foregroundPainter: _DashedBorderPainter(color: scheme.outline),
-        child: content,
+        foregroundPainter: _DashedBorderPainter(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+        // No fill of its own; a surface only for the tap ripple to show on.
+        child: Material(
+          type: MaterialType.transparency,
+          shape: const RoundedRectangleBorder(
+            borderRadius: Corners.extraLargeRadius,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: content,
+        ),
       );
     }
-    return Material(
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: Corners.extraLargeRadius,
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: content,
-    );
+    return GlassSurface(child: content);
   }
 }
 

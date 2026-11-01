@@ -10,7 +10,7 @@ import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
 import '../common/widgets/vehicle_name_field.dart';
 
-/// Chooses an adapter and names a new vehicle.
+/// Names a new vehicle and chooses its adapter.
 class AddVehicleScreen extends ConsumerStatefulWidget {
   const AddVehicleScreen({super.key});
 
@@ -38,26 +38,33 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   @override
   Widget build(BuildContext context) => AppPage(
     title: 'Add vehicle',
-    bottom: Padding(
-      padding: Insets.card,
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: _canSave ? _save : null,
-          child: const Text('Add vehicle'),
+    bottom: SafeArea(
+      top: false,
+      child: Padding(
+        padding: Insets.card,
+        child: SizedBox(
+          width: double.infinity,
+          child: GlassButton(
+            onPressed: _canSave ? _save : null,
+            child: const Text('Add vehicle'),
+          ),
         ),
       ),
     ),
     children: [
-      AdapterPicker(
-        selectedAddress: _adapter?.address,
-        onSelected: (device) => setState(() => _adapter = device),
+      const SectionHeader(
+        'Name this vehicle',
+        padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
       ),
-      const SectionHeader('Name this vehicle'),
       VehicleNameField(
         initialName: _name,
         onChanged: (name) => setState(() => _name = name),
         note: 'You can change it later.',
+      ),
+      const SizedBox(height: Insets.xl),
+      AdapterPicker(
+        selectedAddress: _adapter?.address,
+        onSelected: (device) => setState(() => _adapter = device),
       ),
     ],
   );
