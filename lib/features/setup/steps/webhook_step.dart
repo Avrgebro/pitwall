@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/vehicles/device_id.dart';
 import '../../../core/webhook/payload.dart';
 import '../../../ui/ui.dart';
 import '../../common/widgets/webhook_section.dart';
@@ -21,7 +22,7 @@ class WebhookStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final sample = const JsonEncoder.withIndent('  ').convert(
       buildPayload(
-        device: vehicleName,
+        device: deviceIdFor(vehicleName),
         seq: 1,
         timestamp: DateTime.now(),
         values: const {

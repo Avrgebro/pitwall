@@ -92,7 +92,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
           const SizedBox(height: 8),
           VehicleNameField(
             initialName: _name,
-            helper: 'Sent as device. You can change it later.',
+            note: 'You can change it later.',
             onChanged: (name) => setState(() => _name = name),
           ),
         ],

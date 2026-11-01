@@ -44,6 +44,10 @@ Example payload (not final yet):
 }
 ```
 
+`device` comes from the vehicle's name, made API-friendly: lower case,
+accents removed, everything else turned into dashes. A car named
+"Hyundai Tucson" sends `hyundai-tucson`.
+
 ## Principles
 
 - **No accounts, no cloud, no tracking.** Pitwall talks only to your adapter

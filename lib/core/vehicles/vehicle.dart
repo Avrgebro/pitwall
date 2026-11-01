@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'device_id.dart';
+
 /// How the phone talks to the adapter.
 enum AdapterType {
   /// Bluetooth serial (RFCOMM). Android only.
@@ -35,9 +37,12 @@ class Vehicle {
   /// Stable id, used to name the vehicle's profile file.
   final String id;
 
-  /// Sent as `device` in every payload, so one receiver can tell several
-  /// cars apart.
+  /// The name the user gave the vehicle, shown in the app.
   final String name;
+
+  /// Sent as `device` in every payload, so one receiver can tell several
+  /// cars apart. Derived from [name]; renaming the vehicle changes it.
+  String get deviceId => deviceIdFor(name);
 
   /// Bluetooth address of the vehicle's OBD adapter.
   final String? adapterAddress;

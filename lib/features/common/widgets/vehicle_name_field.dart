@@ -1,20 +1,24 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/vehicles/device_id.dart';
 import '../../../ui/ui.dart';
 
-/// The vehicle's name, which is sent as `device` in every reading.
+/// The vehicle's name, with the `device` id it becomes in every reading
+/// shown live underneath.
 class VehicleNameField extends StatefulWidget {
   const VehicleNameField({
     super.key,
     required this.initialName,
     required this.onChanged,
-    this.helper = 'Sent as device in every reading',
+    this.note,
     this.autofocus = false,
   });
 
   final String initialName;
   final ValueChanged<String> onChanged;
-  final String helper;
+
+  /// An extra sentence after the id, like "You can change it later."
+  final String? note;
   final bool autofocus;
 
   @override
@@ -36,7 +40,8 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    final parts = widget.helper.split('device');
+    final mono = theme.textTheme.mono.copyWith(fontWeight: FontWeight.w600);
+    final name = _controller.text.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -45,26 +50,27 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
           autofocus: widget.autofocus,
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(labelText: 'Vehicle name'),
-          onChanged: widget.onChanged,
+          onChanged: (text) {
+            setState(() {});
+            widget.onChanged(text);
+          },
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Insets.l, Insets.xs, Insets.l, 0),
           child: Text.rich(
             TextSpan(
               children: [
-                TextSpan(text: parts.first),
-                if (parts.length > 1) ...[
-                  TextSpan(
-                    text: 'device',
-                    style: theme.textTheme.mono.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  TextSpan(text: parts.sublist(1).join('device')),
+                TextSpan(text: 'Sent as ', style: muted),
+                TextSpan(text: 'device', style: mono),
+                if (name.isNotEmpty) ...[
+                  TextSpan(text: ': ', style: muted),
+                  TextSpan(text: deviceIdFor(name), style: mono),
                 ],
+                TextSpan(text: ' in every reading.', style: muted),
+                if (widget.note != null)
+                  TextSpan(text: ' ${widget.note}', style: muted),
               ],
             ),
-            style: muted,
           ),
         ),
       ],

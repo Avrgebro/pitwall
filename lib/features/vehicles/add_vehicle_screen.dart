@@ -59,7 +59,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       VehicleNameField(
         initialName: _name,
         onChanged: (name) => setState(() => _name = name),
-        helper: 'Sent as device. You can change it later.',
+        note: 'You can change it later.',
       ),
     ],
   );

@@ -25,7 +25,7 @@ void main() {
     carState: CarState.engineRunning,
   );
   Reading reading({required bool delivered, DateTime? at}) => Reading(
-    device: 'Tucson',
+    device: 'tucson',
     timestamp: at ?? now.subtract(const Duration(seconds: 40)),
     values: const {
       'fuel_level_pct': 46.27,
@@ -165,7 +165,7 @@ void main() {
     final model = build(
       delivery: DeliveryStatus(
         latest: Reading(
-          device: 'Work van',
+          device: 'work-van',
           timestamp: now,
           values: const {'rpm': 800},
           delivered: true,

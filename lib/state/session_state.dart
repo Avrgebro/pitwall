@@ -170,7 +170,7 @@ class SessionController extends Notifier<SessionState> {
       }
       await ref
           .read(webhookSenderProvider)
-          .send(device: vehicle.name, values: values, connected: true);
+          .send(device: vehicle.deviceId, values: values, connected: true);
     } on ElmException catch (e) {
       await _fail(e);
     }

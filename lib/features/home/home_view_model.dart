@@ -288,7 +288,7 @@ class HomeViewModel {
     DateTime now,
   ) {
     final reading = status.latest;
-    if (reading == null || reading.device != vehicle.name) return null;
+    if (reading == null || reading.device != vehicle.deviceId) return null;
     final ago = Formatters.ago(reading.timestamp, now);
     return ValuesModel(
       title: reading.delivered ? 'Last values sent' : 'Latest readings',
