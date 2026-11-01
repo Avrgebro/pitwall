@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
+import '../../state/home_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
@@ -23,7 +24,7 @@ class VehiclesScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final now = ref.watch(nowProvider);
     final vehicles = settings.vehicles;
-    final homeVehicle = settings.mostRecentVehicle;
+    final homeVehicle = ref.watch(homeVehicleProvider);
 
     if (vehicles.isEmpty) {
       return AppPage(
@@ -62,7 +63,8 @@ class VehiclesScreen extends ConsumerWidget {
             text: TextSpan(
               text:
                   'Use Pitwall in more than one car? Add each one with its own '
-                  'adapter. Home follows whichever car connected last.',
+                  'adapter. Home follows whichever car connected last, and '
+                  'you can switch between them there.',
             ),
           ),
       ],

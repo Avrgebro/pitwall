@@ -294,4 +294,41 @@ void main() {
     final button = tester.getRect(find.byType(GlassButton));
     expect(button.bottom, lessThanOrEqualTo(screen.height - keyboard));
   });
+
+  testWidgets(
+    'with several vehicles, the vehicle name on Home switches between them',
+    (tester) async {
+      await _pumpApp(
+        tester,
+        settings: AppSettings(
+          vehicles: [
+            _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+            const Vehicle(id: 'mazda', name: 'Mazda', adapterAddress: 'BB'),
+          ],
+          setupDone: true,
+        ),
+      );
+      expect(find.text('Tucson'), findsWidgets);
+
+      // Below the setup checklist on the small test screen.
+      final arrow = find.byIcon(Icons.arrow_drop_down);
+      await Scrollable.ensureVisible(tester.element(arrow), alignment: 0.5);
+      await tester.pumpAndSettle();
+      await tester.tap(arrow);
+      await tester.pumpAndSettle();
+      expect(find.text('Show on Home'), findsOneWidget);
+      expect(find.text('Never connected'), findsOneWidget);
+
+      await tester.tap(find.text('Mazda'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show on Home'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(VehicleHeroCard),
+          matching: find.text('Mazda'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }

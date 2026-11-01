@@ -7,9 +7,13 @@ import '../home_view_model.dart';
 /// The vehicle's status at the top of Home: state chip, name, what Pitwall
 /// is doing, and adapter / car / trip.
 class VehicleHeroCard extends StatelessWidget {
-  const VehicleHeroCard({super.key, required this.model});
+  const VehicleHeroCard({super.key, required this.model, this.onSwitch});
 
   final HeroModel model;
+
+  /// Makes the name switch to another vehicle, marked with a dropdown
+  /// arrow. For when there's more than one.
+  final VoidCallback? onSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +39,7 @@ class VehicleHeroCard extends StatelessWidget {
           children: [
             _chip(),
             const SizedBox(height: Insets.l),
-            Text(
-              model.title,
-              style: theme.textTheme.displaySmall?.copyWith(color: foreground),
-            ),
+            _title(theme.textTheme.displaySmall?.copyWith(color: foreground)),
             const SizedBox(height: Insets.xs),
             Text(
               model.subtitle,
@@ -63,6 +64,31 @@ class VehicleHeroCard extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _title(TextStyle? style) {
+    final name = Text(model.title, style: style);
+    final onSwitch = this.onSwitch;
+    if (onSwitch == null) return name;
+    return Semantics(
+      button: true,
+      hint: 'Switch vehicle',
+      child: InkWell(
+        onTap: onSwitch,
+        borderRadius: Corners.mediumRadius,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: name),
+            Icon(
+              Icons.arrow_drop_down,
+              size: style?.fontSize,
+              color: style?.color,
             ),
           ],
         ),

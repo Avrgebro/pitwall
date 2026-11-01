@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../core/readings/readings.dart';
+import '../../state/home_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/permissions_state.dart';
 import '../../state/session_state.dart';
@@ -14,6 +15,7 @@ import 'home_view_model.dart';
 import 'setup_checklist.dart';
 import 'widgets/delivery_status_card.dart';
 import 'widgets/setup_checklist_card.dart';
+import 'widgets/vehicle_switcher.dart';
 import 'widgets/vehicle_hero_card.dart';
 
 /// Status at a glance: what's left to set up, the vehicle seen most
@@ -37,11 +39,7 @@ class HomeScreen extends ConsumerWidget {
         ? null
         : SetupChecklistCard(checklist: checklist);
     final session = ref.watch(sessionProvider);
-    final vehicle =
-        (session.vehicleId == null
-            ? null
-            : settings.vehicleById(session.vehicleId!)) ??
-        settings.mostRecentVehicle;
+    final vehicle = ref.watch(homeVehicleProvider);
 
     if (vehicle == null) {
       // Adding a vehicle is one of the steps, so setup is never complete.
@@ -67,7 +65,13 @@ class HomeScreen extends ConsumerWidget {
       title: 'Pitwall',
       children: [
         if (setup != null) ...[setup, const SizedBox(height: Insets.xl)],
-        VehicleHeroCard(model: model.hero),
+        VehicleHeroCard(
+          model: model.hero,
+          // With more than one vehicle, its name switches between them.
+          onSwitch: settings.vehicles.length > 1
+              ? () => VehicleSwitcher.show(context)
+              : null,
+        ),
         if (model.delivery.isProblem) ...[
           const SizedBox(height: Insets.l),
           delivery,
