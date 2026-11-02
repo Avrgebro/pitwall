@@ -24,11 +24,11 @@ void main() {
       final (container, store) = await start();
       final webhook = container.read(webhookProvider.notifier);
 
-      webhook.editUrl('https://exa');
+      await webhook.editUrl('https://exa');
       expect(store.webhook, working);
       expect(container.read(webhookProvider).requireValue.saved, working);
 
-      webhook.editUrl('example.com/half');
+      await webhook.editUrl('example.com/half');
       await webhook.save();
       // Not a usable URL, so the working one stays.
       final state = container.read(webhookProvider).requireValue;
@@ -36,7 +36,7 @@ void main() {
       expect(state.saved, working);
       expect(store.webhook, working);
 
-      webhook.editUrl('https://example.com/api/webhook/new');
+      await webhook.editUrl('https://example.com/api/webhook/new');
       await webhook.save();
       expect(store.webhook.url, 'https://example.com/api/webhook/new');
     },
@@ -64,13 +64,31 @@ void main() {
     final (container, store) = await start();
     final webhook = container.read(webhookProvider.notifier);
 
-    webhook.editUrl('https://example.com/api/webhook/typed');
+    await webhook.editUrl('https://example.com/api/webhook/typed');
     expect(container.read(webhookProvider).requireValue.canTest, isTrue);
     await webhook.sendTest();
     expect(store.webhook.url, 'https://example.com/api/webhook/typed');
     expect(container.read(webhookProvider).requireValue.lastTest, isNotNull);
 
-    webhook.editUrl('https://example.com/api/webhook/other');
+    await webhook.editUrl('https://example.com/api/webhook/other');
     expect(container.read(webhookProvider).requireValue.lastTest, isNull);
+  });
+
+  test('an edit before the saved webhook loads doesn\'t erase it', () async {
+    final store = FakeSettingsStore()
+      ..webhook = const WebhookTarget(
+        'https://example.com/api/webhook/abc',
+        WebhookAuth(type: WebhookAuthType.bearer, token: 'secret'),
+      );
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    final webhook = container.read(webhookProvider.notifier);
+
+    // Straight away, before loading has finished.
+    await webhook.editUrl('https://example.com/api/webhook/new');
+    await webhook.save();
+
+    expect(store.webhook.url, 'https://example.com/api/webhook/new');
+    expect(store.webhook.auth.token, 'secret');
   });
 }

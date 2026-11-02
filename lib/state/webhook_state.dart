@@ -49,15 +49,21 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
     saved: await ref.read(settingsStoreProvider).loadWebhook(),
   );
 
-  WebhookSettings get _current => state.value ?? const WebhookSettings();
+  /// Only read after the saved webhook has loaded (every edit awaits
+  /// [future] first), so an early edit can't start from nothing and save
+  /// over it.
+  WebhookSettings get _current => state.requireValue;
 
   /// Changes the URL being typed; see [save].
-  void editUrl(String text) =>
-      _setDraft(_current.draft.copyWith(url: text.trim()));
+  Future<void> editUrl(String text) async {
+    await future;
+    _setDraft(_current.draft.copyWith(url: text.trim()));
+  }
 
   /// Changes the credentials. Picking another kind applies at once, like
   /// any choice; typing in their fields waits for [save].
   Future<void> editAuth(WebhookAuth auth) async {
+    await future;
     final typeChanged = auth.type != _current.draft.auth.type;
     _setDraft(_current.draft.copyWith(auth: auth));
     if (typeChanged) await save();
@@ -67,6 +73,7 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
   /// remove it, and complete credentials. Called when typing is done: on
   /// Done, leaving the form, going back, or before a test.
   Future<void> save() async {
+    await future;
     final current = _current;
     final draft = current.draft;
     final saved = current.saved.copyWith(
@@ -83,6 +90,7 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
 
   /// Saves the draft and sends a test reading to it.
   Future<void> sendTest() async {
+    await future;
     if (!_current.canTest) return;
     await save();
     final tested = _current.saved;
