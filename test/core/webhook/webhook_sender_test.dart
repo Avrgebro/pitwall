@@ -157,6 +157,28 @@ void main() {
     pitwall.dispose();
   });
 
+  test('errors only the user can fix are not retried', () async {
+    for (final status in [401, 403, 404]) {
+      storage = FakeDeliveryStorage();
+      var requests = 0;
+      final pitwall = sender(
+        client: MockClient((_) async {
+          requests++;
+          return http.Response('', status);
+        }),
+      );
+      await pitwall.init();
+
+      await sendFuel(pitwall, 47.5);
+      // Well past several backoff periods.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(requests, 1, reason: 'HTTP $status');
+      expect(pitwall.status.value.queued, 1);
+      pitwall.dispose();
+    }
+  });
+
   test('credentials are sent as headers on every request', () async {
     final headers = <Map<String, String>>[];
     final pitwall = sender(

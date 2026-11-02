@@ -96,7 +96,7 @@ class WebhookSender {
 
   /// Delivers queued readings, oldest first, until the queue is empty or a
   /// send fails. After a failure that retrying can fix, a retry is
-  /// scheduled.
+  /// scheduled; see [DeliveryErrorKind.retryable].
   Future<void> flush() async {
     if (_flushing) return;
     _flushing = true;
@@ -208,12 +208,9 @@ class WebhookSender {
 
   void _fail(DeliveryError error) {
     _update(lastFailure: _clock(), error: error, failed: true);
-    // Without a URL or with incomplete credentials, only the user can fix
-    // it; delivery resumes on the next send or flush.
-    if (error.kind == DeliveryErrorKind.noUrl ||
-        error.kind == DeliveryErrorKind.authIncomplete) {
-      return;
-    }
+    // Only the user can fix the rest; delivery resumes on the next send,
+    // when the webhook settings change, or on Retry.
+    if (!error.kind.retryable) return;
     _retry = Timer(_backoff(_failures++), () => unawaited(flush()));
   }
 

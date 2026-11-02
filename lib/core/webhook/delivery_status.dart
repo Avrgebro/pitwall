@@ -4,28 +4,34 @@ import 'webhook_auth.dart';
 
 enum DeliveryErrorKind {
   /// No webhook URL is set.
-  noUrl,
+  noUrl(retryable: false),
 
   /// Authentication is chosen but incomplete.
-  authIncomplete,
+  authIncomplete(retryable: false),
 
   /// The URL can't be parsed.
-  invalidUrl,
+  invalidUrl(retryable: false),
 
   /// HTTP 401 or 403: the server doesn't accept these credentials or URL.
-  refused,
+  refused(retryable: false),
 
   /// HTTP 404: the server doesn't know this webhook.
-  notFound,
+  notFound(retryable: false),
 
   /// Any other non-2xx answer.
-  serverError,
+  serverError(retryable: true),
 
   /// The server didn't answer in time.
-  timeout,
+  timeout(retryable: true),
 
   /// The server couldn't be reached: no signal, wrong host, server down.
-  unreachable,
+  unreachable(retryable: true);
+
+  const DeliveryErrorKind({required this.retryable});
+
+  /// Whether retrying later can help without the user changing anything.
+  /// The sender retries only these; the rest wait for the user.
+  final bool retryable;
 }
 
 /// Why a delivery failed. Descriptions for people are written by the UI;
@@ -43,10 +49,7 @@ class DeliveryError {
   final AuthProblem? authProblem;
 
   /// Whether retrying later can help without the user changing anything.
-  bool get isTransient =>
-      kind == DeliveryErrorKind.timeout ||
-      kind == DeliveryErrorKind.unreachable ||
-      kind == DeliveryErrorKind.serverError;
+  bool get isTransient => kind.retryable;
 
   @override
   bool operator ==(Object other) =>
