@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/file_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
-import 'package:pitwall/core/settings/settings_store.dart';
+import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/settings_state.dart';
 
@@ -197,9 +197,13 @@ void main() {
     test('a profile whose file is gone is reported, not hidden', () async {
       final (container, _) = await start(profileName: 'default.json');
 
-      await expectLater(
-        container.read(vehicleProfileProvider('tucson').future),
-        throwsA(isA<ProfileUnreadableException>()),
+      expect(
+        await container.read(vehicleProfileProvider('tucson').future),
+        isA<UnreadableProfile>().having(
+          (p) => p.fileName,
+          'file',
+          'default.json',
+        ),
       );
     });
 
@@ -225,7 +229,7 @@ void main() {
       final before = container.read(vehicleProvider('tucson'))!;
       final profile = (await container.read(
         vehicleProfileProvider('tucson').future,
-      ))!;
+      )).signals!;
 
       await notifier.removeProfile('tucson');
       await notifier.restoreProfile(before, profile);

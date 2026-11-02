@@ -10,7 +10,6 @@ import '../core/profiles/signal_set.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
-import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'last_values_state.dart';
@@ -314,15 +313,11 @@ class SessionController extends Notifier<SessionState> {
     return ReadDone(reading);
   }
 
-  /// The vehicle's profile, or none if its file can't be read: standard
-  /// values still go out, and the vehicle's page shows the problem.
-  Future<SignalSet?> _profileFor(String vehicleId) async {
-    try {
-      return await ref.read(vehicleProfileProvider(vehicleId).future);
-    } on ProfileUnreadableException {
-      return null;
-    }
-  }
+  /// The vehicle's profile, if it loaded. One that can't be read reads
+  /// nothing: standard values still go out, and the vehicle's page shows
+  /// the problem.
+  Future<SignalSet?> _profileFor(String vehicleId) async =>
+      (await ref.read(vehicleProfileProvider(vehicleId).future)).signals;
 
   /// Sends raw commands to the adapter; replies show up in the log. AT
   /// commands can change settings the app relies on, so the adapter is

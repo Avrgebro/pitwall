@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../../core/profiles/signal_set.dart';
+import '../../../core/profiles/stored_profile.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
 
@@ -13,17 +13,13 @@ class ProfileCard extends StatelessWidget {
     super.key,
     required this.vehicle,
     required this.profile,
-    this.unreadable = false,
     required this.onImport,
     required this.onRemove,
     required this.onModelYear,
   });
 
   final Vehicle vehicle;
-  final SignalSet? profile;
-
-  /// The vehicle has a profile, but its file can't be read.
-  final bool unreadable;
+  final StoredProfile profile;
   final VoidCallback onImport;
   final VoidCallback onRemove;
   final ValueChanged<int> onModelYear;
@@ -35,14 +31,18 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (unreadable) {
-      return _Unreadable(
-        fileName: vehicle.profileName,
-        onImport: onImport,
-        onRemove: onRemove,
-      );
+    switch (profile) {
+      case UnreadableProfile(:final fileName):
+        return _Unreadable(
+          fileName: fileName,
+          onImport: onImport,
+          onRemove: onRemove,
+        );
+      case NoProfile():
+        return _Empty(onImport: onImport);
+      case LoadedProfile():
+        break;
     }
-    if (profile == null) return _Empty(onImport: onImport);
 
     final imported = vehicle.profileImportedAt;
     return ContentCard(
@@ -144,7 +144,7 @@ class _Unreadable extends StatelessWidget {
     required this.onRemove,
   });
 
-  final String? fileName;
+  final String fileName;
   final VoidCallback onImport;
   final VoidCallback onRemove;
 
@@ -154,7 +154,7 @@ class _Unreadable extends StatelessWidget {
     icon: Symbols.error_rounded,
     title: 'Profile can\'t be read',
     message:
-        '${fileName ?? 'The profile file'} is missing or damaged, so only '
+        '$fileName is missing or damaged, so only '
         'standard values are sent. Import it again, or remove it.',
     actions: [
       FilledButton.icon(

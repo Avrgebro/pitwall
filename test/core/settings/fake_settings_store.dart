@@ -1,4 +1,5 @@
 import 'package:pitwall/core/profiles/signal_set.dart';
+import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/settings/settings_store.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
@@ -27,14 +28,15 @@ class FakeSettingsStore implements SettingsStore {
   /// Like the real store: a vehicle with a profile whose file is missing
   /// or broken can't load it.
   @override
-  Future<SignalSet?> loadProfile(Vehicle vehicle) async {
-    if (vehicle.profileName == null) return null;
+  Future<StoredProfile> loadProfile(Vehicle vehicle) async {
+    final name = vehicle.profileName;
+    if (name == null) return const NoProfile();
     final source = profiles[vehicle.id];
-    if (source == null) throw const ProfileUnreadableException();
+    if (source == null) return UnreadableProfile(name);
     try {
-      return SignalSet.parse(source);
+      return LoadedProfile(SignalSet.parse(source));
     } on FormatException {
-      throw const ProfileUnreadableException();
+      return UnreadableProfile(name);
     }
   }
 

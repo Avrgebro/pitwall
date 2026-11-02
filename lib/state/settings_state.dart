@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/profiles/signal_set.dart';
+import '../core/profiles/stored_profile.dart';
 import '../core/readings/readings.dart';
 import '../core/settings/settings.dart';
-import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'last_values_state.dart';
@@ -179,28 +179,24 @@ final vehicleProvider = Provider.family<Vehicle?, String>(
   (ref, id) => ref.watch(appSettingsProvider).value?.vehicleById(id),
 );
 
-/// A vehicle's imported profile, parsed. Reloads only when the profile
-/// itself changes, not on every settings change. An error
-/// ([ProfileUnreadableException]) when its file can't be read; that isn't
-/// retried, since reading it again won't help, so waiting on it ends.
-final vehicleProfileProvider = FutureProvider.family<SignalSet?, String>(
-  retry: (count, error) => error is ProfileUnreadableException
-      ? null
-      : ProviderContainer.defaultRetry(count, error),
-  (ref, id) async {
-    final key = await ref.watch(
-      appSettingsProvider.selectAsync((settings) {
-        final vehicle = settings.vehicleById(id);
-        return (vehicle?.profileName, vehicle?.profileImportedAt);
-      }),
-    );
-    if (key.$1 == null) return null;
-    final vehicle = ref.read(appSettingsProvider).requireValue.vehicleById(id);
-    return vehicle == null
-        ? null
-        : ref.read(settingsStoreProvider).loadProfile(vehicle);
-  },
-);
+/// A vehicle's profile as found on the phone. Reloads only when the
+/// profile itself changes, not on every settings change.
+final vehicleProfileProvider = FutureProvider.family<StoredProfile, String>((
+  ref,
+  id,
+) async {
+  final key = await ref.watch(
+    appSettingsProvider.selectAsync((settings) {
+      final vehicle = settings.vehicleById(id);
+      return (vehicle?.profileName, vehicle?.profileImportedAt);
+    }),
+  );
+  if (key.$1 == null) return const NoProfile();
+  final vehicle = ref.read(appSettingsProvider).requireValue.vehicleById(id);
+  return vehicle == null
+      ? const NoProfile()
+      : ref.read(settingsStoreProvider).loadProfile(vehicle);
+});
 
 /// A vehicle's values: what it can send, and what it does. Null while
 /// the vehicle doesn't exist; profile values join once the profile loads.
@@ -210,5 +206,8 @@ final vehicleValuesProvider = Provider.family<VehicleValues?, String>((
 ) {
   final vehicle = ref.watch(vehicleProvider(id));
   if (vehicle == null) return null;
-  return VehicleValues.of(vehicle, ref.watch(vehicleProfileProvider(id)).value);
+  return VehicleValues.of(
+    vehicle,
+    ref.watch(vehicleProfileProvider(id)).value?.signals,
+  );
 });

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
 import '../../core/profiles/signal_set.dart';
+import '../../core/profiles/stored_profile.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
@@ -23,8 +24,8 @@ class VehicleDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
     if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
-    final profileState = ref.watch(vehicleProfileProvider(vehicleId));
-    final profile = profileState.value;
+    final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
+    final profile = stored?.signals;
     final selected = VehicleValues.of(vehicle, profile).sent;
     final tripStart = TripStartText.summary(vehicle);
 
@@ -68,10 +69,12 @@ class VehicleDetailScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.data_object_rounded,
               title: 'Vehicle profile',
-              subtitle: profileState.hasError
+              subtitle: stored is UnreadableProfile
                   ? 'OBDb profile can\'t be read'
                   : _profileSummary(vehicle, profile),
-              subtitleTone: profileState.hasError ? StatusTone.error : null,
+              subtitleTone: stored is UnreadableProfile
+                  ? StatusTone.error
+                  : null,
               onTap: () => context.push(Routes.vehicleProfile(vehicle.id)),
             ),
             GroupTile(

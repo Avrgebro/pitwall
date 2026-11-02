@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../profiles/signal_set.dart';
+import '../profiles/stored_profile.dart';
 import '../storage/app_files.dart';
 import '../vehicles/vehicle.dart';
 import '../webhook/webhook_auth.dart';
@@ -94,18 +95,16 @@ class SettingsStore {
     }
   }
 
-  /// The vehicle's imported profile, or null if it has none.
-  ///
-  /// Throws [ProfileUnreadableException] if the vehicle has a profile but
-  /// its file is gone or no longer parses.
-  Future<SignalSet?> loadProfile(Vehicle vehicle) async {
-    if (vehicle.profileName == null) return null;
+  /// The vehicle's imported profile, as found on the phone.
+  Future<StoredProfile> loadProfile(Vehicle vehicle) async {
+    final name = vehicle.profileName;
+    if (name == null) return const NoProfile();
     final file = await _profileFile(vehicle.id);
-    if (!await file.exists()) throw const ProfileUnreadableException();
+    if (!await file.exists()) return UnreadableProfile(name);
     try {
-      return SignalSet.parse(await file.readAsString());
+      return LoadedProfile(SignalSet.parse(await file.readAsString()));
     } on FormatException {
-      throw const ProfileUnreadableException();
+      return UnreadableProfile(name);
     }
   }
 
@@ -154,9 +153,4 @@ class SettingsStore {
 
   Future<String> _directory() async =>
       (await getApplicationSupportDirectory()).path;
-}
-
-/// The vehicle has a profile, but its file is gone or no longer parses.
-class ProfileUnreadableException implements Exception {
-  const ProfileUnreadableException();
 }

@@ -27,21 +27,23 @@ class VehicleProfileScreen extends ConsumerWidget {
     if (vehicle == null) {
       return const VehicleRemovedPage(title: 'Vehicle profile');
     }
-    final profileState = ref.watch(vehicleProfileProvider(vehicleId));
+    final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',
       children: [
-        ProfileCard(
-          vehicle: vehicle,
-          profile: profileState.value,
-          unreadable: profileState.hasError,
-          onImport: () => _import(context, ref, vehicle),
-          onRemove: () => _remove(context, ref, vehicle, profileState.value),
-          onModelYear: (year) =>
-              notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
-        ),
-        if ((profileState.value, vehicle.modelYear) case (
+        if (stored == null)
+          const LoadingIndicator()
+        else
+          ProfileCard(
+            vehicle: vehicle,
+            profile: stored,
+            onImport: () => _import(context, ref, vehicle),
+            onRemove: () => _remove(context, ref, vehicle, stored.signals),
+            onModelYear: (year) =>
+                notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
+          ),
+        if ((stored?.signals, vehicle.modelYear) case (
           final profile?,
           final year?,
         ))
