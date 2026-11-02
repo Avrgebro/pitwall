@@ -2,8 +2,6 @@
 /// knows about cars or webhooks; features compose these.
 library;
 
-// Plain Dart, re-exported so screens get it with the rest.
-export '../core/format/formatters.dart';
 export 'components/app_row.dart';
 export 'components/checklist_row.dart';
 export 'components/button_group.dart';
@@ -32,6 +30,7 @@ export 'components/status_chip.dart';
 export 'components/value_tile.dart';
 export 'components/value_tile_data.dart';
 export 'layout/app_page.dart';
+export 'layout/app_sheet.dart';
 export 'layout/page_frame.dart';
 export 'theme/app_theme.dart';
 export 'theme/emphasis.dart';

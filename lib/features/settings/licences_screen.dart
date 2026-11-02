@@ -31,6 +31,7 @@ class LicencesScreen extends ConsumerWidget {
       AsyncError() => const [
         InfoNote(
           icon: Icons.error_outline,
+          tone: StatusTone.error,
           text: TextSpan(text: 'Couldn\'t read the licences.'),
         ),
       ],

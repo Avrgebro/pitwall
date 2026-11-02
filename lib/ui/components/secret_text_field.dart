@@ -91,7 +91,7 @@ class _SecretTextFieldState extends State<SecretTextField> {
         if (hasWarning)
           InfoNote(
             icon: Icons.warning_amber_rounded,
-            textColor: warning.accent,
+            tone: StatusTone.warning,
             text: widget.warning!,
             dense: true,
             // Lined up with the field's edge, a little apart from it.

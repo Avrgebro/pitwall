@@ -8,20 +8,13 @@ import 'pinned_bottom.dart';
 /// that content scrolls under, and an optional [bottom] pinned over the
 /// content. `AppPage` and setup's steps build on it.
 class PageFrame extends StatelessWidget {
-  const PageFrame({
-    super.key,
-    required this.body,
-    this.appBar,
-    this.bottom,
-    this.floatingActionButton,
-  });
+  const PageFrame({super.key, required this.body, this.appBar, this.bottom});
 
   final Widget body;
   final PreferredSizeWidget? appBar;
 
   /// Pinned over the bottom of [body]; see [PinnedBottom].
   final Widget? bottom;
-  final Widget? floatingActionButton;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +22,6 @@ class PageFrame extends StatelessWidget {
     return Scaffold(
       extendBodyBehindAppBar: appBar != null,
       appBar: appBar,
-      floatingActionButton: floatingActionButton,
       body: PageBackdrop(
         child: bottom == null
             ? body

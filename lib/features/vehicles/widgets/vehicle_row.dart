@@ -1,8 +1,10 @@
+import '../../../core/format/formatters.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
-import '../../common/trip_start_text.dart';
+import '../../common/vehicle_need_text.dart';
 
 enum VehicleBadge { none, connected, onHome }
 
@@ -23,13 +25,10 @@ class VehicleRow extends StatelessWidget {
   final VoidCallback onTap;
 
   /// What the vehicle needs before it works on its own, if anything.
-  static String? _problem(Vehicle vehicle) =>
-      switch (vehicle.needs.firstOrNull) {
-        null => null,
-        VehicleNeed.adapter => 'Choose its adapter',
-        VehicleNeed.headUnit || VehicleNeed.supportedTripStart =>
-          '${TripStartText.summary(vehicle).text} for trip start',
-      };
+  static String? _problem(Vehicle vehicle) => switch (vehicle.needs) {
+    [final need, ...] => VehicleNeedText.label(need),
+    [] => null,
+  };
 
   @override
   Widget build(BuildContext context) {

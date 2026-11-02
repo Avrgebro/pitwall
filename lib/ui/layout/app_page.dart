@@ -22,7 +22,6 @@ class AppPage extends StatelessWidget {
     required List<Widget> this.children,
     this.subtitle,
     this.actions,
-    this.floatingActionButton,
     this.bottom,
   }) : slivers = null;
 
@@ -32,7 +31,6 @@ class AppPage extends StatelessWidget {
       slivers = null,
       subtitle = null,
       actions = null,
-      floatingActionButton = null,
       bottom = null;
 
   /// A page whose content is slivers, such as a `SliverRowGroup`, mixed
@@ -43,7 +41,6 @@ class AppPage extends StatelessWidget {
     required List<Widget> this.slivers,
     this.subtitle,
     this.actions,
-    this.floatingActionButton,
     this.bottom,
   }) : children = null;
 
@@ -52,7 +49,6 @@ class AppPage extends StatelessWidget {
   final List<Widget>? children;
   final List<Widget>? slivers;
   final List<Widget>? actions;
-  final Widget? floatingActionButton;
 
   /// Pinned over the bottom of the content, such as [PinnedActions] or a
   /// `GlassBar`.
@@ -129,7 +125,6 @@ class AppPage extends StatelessWidget {
               ),
         actions: actions,
       ),
-      floatingActionButton: floatingActionButton,
       bottom: bottom,
       body: _content(),
     );

@@ -1,3 +1,5 @@
+import '../../../core/format/formatters.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -12,16 +14,7 @@ import '../../../ui/ui.dart';
 /// tools. While a car is live, the app follows it, so the others wait.
 abstract final class VehiclePickerSheet {
   static Future<void> show(BuildContext context, {required String title}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
-        builder: (context) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(Insets.l, 0, Insets.l, Insets.xl),
-          child: SafeArea(top: false, child: _Choices(title: title)),
-        ),
-      );
+      showAppSheet<void>(context, builder: (context) => _Choices(title: title));
 }
 
 class _Choices extends ConsumerWidget {

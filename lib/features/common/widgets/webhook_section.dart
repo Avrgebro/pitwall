@@ -1,3 +1,5 @@
+import '../../../core/format/formatters.dart';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -20,6 +22,7 @@ class WebhookSection extends ConsumerWidget {
         AsyncData(:final value) => _WebhookForm(initialUrl: value.draft.url),
         AsyncError() => const InfoNote(
           icon: Icons.error_outline,
+          tone: StatusTone.error,
           text: TextSpan(text: 'Couldn\'t read the saved webhook.'),
         ),
         _ => const LoadingIndicator(),

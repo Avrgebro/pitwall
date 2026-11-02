@@ -285,4 +285,19 @@ void main() {
     final text = tester.widget<Text>(find.text('Check the token'));
     expect(text.style?.color, onContainer.withValues(alpha: 0.75));
   });
+
+  testWidgets('a toned note takes the tone\'s accent', (tester) async {
+    await tester.pumpWidget(
+      _frame(
+        const InfoNote(
+          tone: StatusTone.error,
+          text: TextSpan(text: 'Couldn\'t read the licences.'),
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(InfoNote));
+    final text = tester.widget<Text>(find.text('Couldn\'t read the licences.'));
+    expect(text.style?.color, context.tone(StatusTone.error).accent);
+  });
 }

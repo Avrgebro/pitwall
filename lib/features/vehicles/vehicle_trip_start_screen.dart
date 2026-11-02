@@ -90,30 +90,19 @@ class VehicleTripStartScreen extends ConsumerWidget {
     WidgetRef ref,
     Vehicle vehicle,
   ) async {
-    final device = await showModalBottomSheet<BondedDevice>(
-      context: context,
-      // Grows with the list, up to just below the status bar; a longer
-      // list scrolls.
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => SingleChildScrollView(
-        padding: Insets.page.copyWith(bottom: Insets.xl),
-        child: SafeArea(
-          top: false,
-          child: AdapterPicker(
-            title: 'Paired devices',
-            role: DeviceRole.headUnit,
-            selectedAddress: vehicle.headUnitAddress,
-            // Asked as the list shows, not from when the sheet opened.
-            ownerOf: (address) => ref
-                .read(appSettingsProvider)
-                .value
-                ?.otherHeadUnitOwner(address, vehicleId: vehicle.id)
-                ?.name,
-            onSelected: (device) => Navigator.pop(context, device),
-          ),
-        ),
+    final device = await showAppSheet<BondedDevice>(
+      context,
+      builder: (context) => AdapterPicker(
+        title: 'Paired devices',
+        role: DeviceRole.headUnit,
+        selectedAddress: vehicle.headUnitAddress,
+        // Asked as the list shows, not from when the sheet opened.
+        ownerOf: (address) => ref
+            .read(appSettingsProvider)
+            .value
+            ?.otherHeadUnitOwner(address, vehicleId: vehicle.id)
+            ?.name,
+        onSelected: (device) => Navigator.pop(context, device),
       ),
     );
     if (device == null) return;

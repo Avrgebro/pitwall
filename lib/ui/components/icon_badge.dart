@@ -26,10 +26,12 @@ class IconBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tone(tone);
+    final scheme = Theme.of(context).colorScheme;
+    // As a StatusChip shows each emphasis.
     final (fill, foreground) = switch (emphasis) {
       Emphasis.filled => (colors.accent, colors.onAccent),
       Emphasis.tonal => (colors.container, colors.onContainer),
-      Emphasis.outlined => (null, colors.accent),
+      Emphasis.outlined => (null, scheme.onSurface),
     };
     return Container(
       width: size,
@@ -37,7 +39,7 @@ class IconBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: fill,
         border: emphasis == Emphasis.outlined
-            ? Border.all(color: colors.accent)
+            ? Border.all(color: scheme.outline)
             : null,
         shape: shape,
         borderRadius: shape == BoxShape.rectangle

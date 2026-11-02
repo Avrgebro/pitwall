@@ -22,7 +22,6 @@ class StatusCard extends StatelessWidget {
     this.message,
     this.stats = const [],
     this.actions = const [],
-    this.trailing,
   });
 
   final StatusTone tone;
@@ -37,9 +36,6 @@ class StatusCard extends StatelessWidget {
 
   /// Buttons at the bottom.
   final List<Widget> actions;
-
-  /// A widget beside the text, such as a compact action.
-  final Widget? trailing;
 
   bool get _tinted => tone == StatusTone.warning || tone == StatusTone.error;
 
@@ -60,7 +56,6 @@ class StatusCard extends StatelessWidget {
             ),
             title: title,
             subtitle: message,
-            trailing: trailing,
           ),
           if (stats.isNotEmpty) ...[
             const SizedBox(height: Insets.l),

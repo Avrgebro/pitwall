@@ -31,7 +31,9 @@ class SessionPanel extends ConsumerWidget {
     // Assumed on until Android says otherwise, so nothing flashes.
     final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
     final canConnect =
-        vehicle != null && vehicle.adapterAddress != null && bluetoothOn;
+        vehicle != null &&
+        !vehicle.needs.contains(VehicleNeed.adapter) &&
+        bluetoothOn;
 
     final (chip, detail) = switch (session) {
       SessionConnected(
@@ -68,8 +70,8 @@ class SessionPanel extends ConsumerWidget {
         ),
         switch (vehicle) {
           null => 'Add a vehicle first.',
-          Vehicle(adapterAddress: null, :final name) =>
-            'Choose $name\'s adapter first.',
+          final vehicle when vehicle.needs.contains(VehicleNeed.adapter) =>
+            'Choose ${vehicle.name}\'s adapter first.',
           _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
           final vehicle =>
             _problem(problem) ??

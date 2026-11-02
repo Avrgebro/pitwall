@@ -81,6 +81,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
           ),
           AsyncError(:final error) => InfoNote(
             icon: Icons.error_outline,
+            tone: StatusTone.error,
             text: TextSpan(text: _describe(error)),
           ),
           _ => const LoadingIndicator(),
