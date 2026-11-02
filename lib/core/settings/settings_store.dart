@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../profiles/profile_ref.dart';
 import '../profiles/signal_set.dart';
 import '../profiles/stored_profile.dart';
 import '../storage/app_files.dart';
@@ -98,15 +99,15 @@ class SettingsStore {
   /// The vehicle's imported profile, as found on the phone. A file that's
   /// gone, can't be read, or no longer parses is an [UnreadableProfile].
   Future<StoredProfile> loadProfile(Vehicle vehicle) async {
-    final name = vehicle.profileName;
-    if (name == null) return const NoProfile();
+    final ref = vehicle.profile;
+    if (ref == null) return const NoProfile();
     try {
       final file = await _profileFile(vehicle.id);
-      return LoadedProfile(SignalSet.parse(await file.readAsString()));
+      return LoadedProfile(ref, SignalSet.parse(await file.readAsString()));
     } on FileSystemException {
-      return UnreadableProfile(name);
+      return UnreadableProfile(ref);
     } on FormatException {
-      return UnreadableProfile(name);
+      return UnreadableProfile(ref);
     }
   }
 
@@ -136,8 +137,10 @@ class SettingsStore {
           SignalSet.parse(await legacy.readAsString()),
         );
         vehicle = vehicle.copyWith(
-          profileName: name ?? _legacyProfileFile,
-          profileImportedAt: DateTime.now(),
+          profile: ProfileRef(
+            name ?? _legacyProfileFile,
+            importedAt: DateTime.now(),
+          ),
         );
       } on FormatException {
         // A profile that no longer parses isn't carried over.

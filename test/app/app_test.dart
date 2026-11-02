@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/app/app.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
@@ -629,7 +630,7 @@ void main() {
       tester,
       settings: AppSettings(
         // The vehicle says it has a profile, but there's no file for it.
-        vehicles: [_tucson.copyWith(profileName: 'default.json')],
+        vehicles: [_tucson.copyWith(profile: const ProfileRef('default.json'))],
         setupDone: true,
       ),
     );

@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
-import '../../core/profiles/signal_set.dart';
 import '../../core/profiles/stored_profile.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
@@ -33,8 +32,8 @@ class VehicleProfileScreen extends ConsumerWidget {
     final stored = switch (ref.watch(vehicleProfileProvider(vehicleId))) {
       // Kept while it reloads, as after an import.
       AsyncValue(:final value?) => value,
-      AsyncError() => switch (vehicle.profileName) {
-        final name? => UnreadableProfile(name),
+      AsyncError() => switch (vehicle.profile) {
+        final ref? => UnreadableProfile(ref),
         null => const NoProfile(),
       },
       AsyncLoading() => null,
@@ -50,12 +49,12 @@ class VehicleProfileScreen extends ConsumerWidget {
             vehicle: vehicle,
             profile: stored,
             onImport: () => _import(context, ref, vehicle),
-            onRemove: () => _remove(context, ref, vehicle, stored.signals),
+            onRemove: () => _remove(context, ref, vehicle, stored),
             onModelYear: (year) =>
                 notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
           ),
-        if ((stored?.signals, vehicle.modelYear) case (
-          final profile?,
+        if ((stored, vehicle.modelYear) case (
+          LoadedProfile(signals: final profile),
           final year?,
         ))
           ProfileContents(
@@ -87,7 +86,7 @@ class VehicleProfileScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Vehicle vehicle,
-    SignalSet? profile,
+    StoredProfile stored,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(appSettingsProvider.notifier);
@@ -95,12 +94,17 @@ class VehicleProfileScreen extends ConsumerWidget {
     messenger.showSnackBar(
       SnackBar(
         content: const Text('Profile removed'),
-        action: profile == null
-            ? null
-            : SnackBarAction(
-                label: 'Undo',
-                onPressed: () => notifier.restoreProfile(vehicle, profile),
-              ),
+        action: switch (stored) {
+          final LoadedProfile profile => SnackBarAction(
+            label: 'Undo',
+            onPressed: () => notifier.restoreProfile(
+              vehicle.id,
+              profile,
+              modelYear: vehicle.modelYear,
+            ),
+          ),
+          NoProfile() || UnreadableProfile() => null,
+        },
       ),
     );
   }

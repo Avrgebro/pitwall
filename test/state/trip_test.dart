@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/session/car_reading.dart';
@@ -198,7 +199,7 @@ void main() {
     final c = container(
       adapter: (_) => _Adapter(),
       // The vehicle says it has a profile, but there's no file for it.
-      vehicles: [_tucson.copyWith(profileName: 'default.json')],
+      vehicles: [_tucson.copyWith(profile: const ProfileRef('default.json'))],
     );
     c.read(tripProvider);
 

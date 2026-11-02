@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/obd/elm327.dart';
 import '../core/profiles/signal_set.dart';
+import '../core/profiles/stored_profile.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
@@ -291,7 +292,10 @@ class SessionController extends Notifier<SessionState> {
   /// nothing: standard values still go out, and the vehicle's page shows
   /// the problem.
   Future<SignalSet?> _profileFor(String vehicleId) async =>
-      (await ref.read(vehicleProfileProvider(vehicleId).future)).signals;
+      switch (await ref.read(vehicleProfileProvider(vehicleId).future)) {
+        LoadedProfile(:final signals) => signals,
+        NoProfile() || UnreadableProfile() => null,
+      };
 
   /// Sends raw commands to the adapter; replies show up in the log. AT
   /// commands can change settings the app relies on, so the adapter is

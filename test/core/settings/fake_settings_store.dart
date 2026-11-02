@@ -29,14 +29,14 @@ class FakeSettingsStore implements SettingsStore {
   /// or broken can't load it.
   @override
   Future<StoredProfile> loadProfile(Vehicle vehicle) async {
-    final name = vehicle.profileName;
-    if (name == null) return const NoProfile();
+    final ref = vehicle.profile;
+    if (ref == null) return const NoProfile();
     final source = profiles[vehicle.id];
-    if (source == null) return UnreadableProfile(name);
+    if (source == null) return UnreadableProfile(ref);
     try {
-      return LoadedProfile(SignalSet.parse(source));
+      return LoadedProfile(ref, SignalSet.parse(source));
     } on FormatException {
-      return UnreadableProfile(name);
+      return UnreadableProfile(ref);
     }
   }
 

@@ -26,7 +26,10 @@ class VehicleDetailScreen extends ConsumerWidget {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
     if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
     final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
-    final profile = stored?.signals;
+    final profile = switch (stored) {
+      LoadedProfile(:final signals) => signals,
+      _ => null,
+    };
     final selected = VehicleValues.of(vehicle, profile).sent;
     final tripStart = TripStartText.summary(vehicle);
 

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:material_ui/material_ui.dart';
@@ -49,7 +50,7 @@ void main() {
               id: 'tucson',
               name: 'Tucson',
               modelYear: 2023,
-              profileName: 'default.json',
+              profile: ProfileRef('default.json'),
             ),
           ],
         ),
@@ -105,7 +106,7 @@ void main() {
               id: 'tucson',
               name: 'Tucson',
               modelYear: 2023,
-              profileName: 'default.json',
+              profile: ProfileRef('default.json'),
             ),
           ],
         ),

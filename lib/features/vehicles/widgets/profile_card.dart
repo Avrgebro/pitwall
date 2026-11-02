@@ -3,6 +3,7 @@ import '../../../core/format/formatters.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../core/profiles/profile_ref.dart';
 import '../../../core/profiles/stored_profile.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
@@ -34,19 +35,21 @@ class ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     switch (profile) {
-      case UnreadableProfile(:final fileName):
+      case UnreadableProfile(:final ref):
         return _Unreadable(
-          fileName: fileName,
+          fileName: ref.name,
           onImport: onImport,
           onRemove: onRemove,
         );
       case NoProfile():
         return _Empty(onImport: onImport);
-      case LoadedProfile():
-        break;
+      case LoadedProfile(:final ref):
+        return _loaded(ref);
     }
+  }
 
-    final imported = vehicle.profileImportedAt;
+  Widget _loaded(ProfileRef ref) {
+    final imported = ref.importedAt;
     return ContentCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -55,7 +58,7 @@ class ProfileCard extends StatelessWidget {
             badge: const IconBadge(icon: Symbols.data_object_rounded),
             title: 'OBDb profile',
             subtitle: [
-              vehicle.profileName ?? 'profile.json',
+              ref.name,
               if (imported != null) 'imported ${Formatters.date(imported)}',
             ].join(', '),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
+import '../core/profiles/profile_ref.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/profiles/stored_profile.dart';
 import '../core/readings/readings.dart';
@@ -122,15 +123,13 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<SignalSet> importProfile(String vehicleId, PickedFile file) async {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) throw StateError('No vehicle $vehicleId');
-    final profile = SignalSet.parse(file.contents);
-    await ref.read(settingsStoreProvider).saveProfile(vehicleId, profile);
-    await saveVehicle(
-      vehicle.copyWith(
-        profileName: file.name,
-        profileImportedAt: DateTime.now(),
-      ),
+    final signals = SignalSet.parse(file.contents);
+    await _setProfile(
+      vehicle,
+      LoadedProfile(ProfileRef(file.name, importedAt: DateTime.now()), signals),
+      modelYear: vehicle.modelYear,
     );
-    return profile;
+    return signals;
   }
 
   /// Makes [keys] the values the vehicle sends; see
@@ -148,34 +147,43 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await saveVehicle(vehicle.copyWith(selectedKeys: null));
   }
 
-  /// Puts back the profile [before] had, after it was removed: the file,
-  /// its name, when it was imported, and the model year. Does nothing once
-  /// the vehicle has another profile, so Undo can't replace a newer one.
-  Future<void> restoreProfile(Vehicle before, SignalSet profile) async {
-    final vehicle = _current.vehicleById(before.id);
-    if (vehicle == null || vehicle.profileName != null) return;
-    await ref.read(settingsStoreProvider).saveProfile(before.id, profile);
-    await saveVehicle(
-      vehicle.copyWith(
-        profileName: before.profileName,
-        profileImportedAt: before.profileImportedAt,
-        modelYear: before.modelYear,
-      ),
-    );
+  /// Puts back [profile] after it was removed, with the model year it
+  /// had. Does nothing once the vehicle has another profile, so Undo can't
+  /// replace a newer one.
+  Future<void> restoreProfile(
+    String vehicleId,
+    LoadedProfile profile, {
+    required int? modelYear,
+  }) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null || vehicle.profile != null) return;
+    await _setProfile(vehicle, profile, modelYear: modelYear);
   }
 
+  /// Removes the profile, and the model year, which only picks which of
+  /// its requests apply.
   Future<void> removeProfile(String vehicleId) async {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) return;
-    await ref.read(settingsStoreProvider).deleteProfile(vehicleId);
-    // The model year only picks which of the profile's requests apply.
+    await _setProfile(vehicle, null, modelYear: null);
+  }
+
+  /// The one way a vehicle's profile changes: the file and the settings,
+  /// in the order that never leaves the settings naming a file that isn't
+  /// there. A file left behind does no harm.
+  Future<void> _setProfile(
+    Vehicle vehicle,
+    LoadedProfile? profile, {
+    required int? modelYear,
+  }) async {
+    final store = ref.read(settingsStoreProvider);
+    if (profile != null) {
+      await store.saveProfile(vehicle.id, profile.signals);
+    }
     await saveVehicle(
-      vehicle.copyWith(
-        profileName: null,
-        profileImportedAt: null,
-        modelYear: null,
-      ),
+      vehicle.copyWith(profile: profile?.ref, modelYear: modelYear),
     );
+    if (profile == null) await store.deleteProfile(vehicle.id);
   }
 }
 
@@ -191,12 +199,11 @@ final vehicleProfileProvider = FutureProvider.family<StoredProfile, String>((
   id,
 ) async {
   final key = await ref.watch(
-    appSettingsProvider.selectAsync((settings) {
-      final vehicle = settings.vehicleById(id);
-      return (vehicle?.profileName, vehicle?.profileImportedAt);
-    }),
+    appSettingsProvider.selectAsync(
+      (settings) => settings.vehicleById(id)?.profile,
+    ),
   );
-  if (key.$1 == null) return const NoProfile();
+  if (key == null) return const NoProfile();
   final vehicle = ref.read(appSettingsProvider).requireValue.vehicleById(id);
   return vehicle == null
       ? const NoProfile()
@@ -211,8 +218,10 @@ final vehicleValuesProvider = Provider.family<VehicleValues?, String>((
 ) {
   final vehicle = ref.watch(vehicleProvider(id));
   if (vehicle == null) return null;
-  return VehicleValues.of(
-    vehicle,
-    ref.watch(vehicleProfileProvider(id)).value?.signals,
-  );
+  return VehicleValues.of(vehicle, switch (ref
+      .watch(vehicleProfileProvider(id))
+      .value) {
+    LoadedProfile(:final signals) => signals,
+    _ => null,
+  });
 });

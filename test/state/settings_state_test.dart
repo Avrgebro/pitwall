@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/file_gateway.dart';
@@ -140,7 +141,7 @@ void main() {
 
   group('profiles', () {
     Future<(ProviderContainer, FakeSettingsStore)> start({
-      String? profileName,
+      ProfileRef? profile,
     }) async {
       final store = FakeSettingsStore(
         settings: AppSettings(
@@ -149,7 +150,7 @@ void main() {
               id: 'tucson',
               name: 'Tucson',
               modelYear: 2023,
-              profileName: profileName,
+              profile: profile,
             ),
           ],
         ),
@@ -174,8 +175,8 @@ void main() {
 
       expect(store.profiles['tucson'], testProfileJson);
       final vehicle = container.read(vehicleProvider('tucson'))!;
-      expect(vehicle.profileName, 'default.json');
-      expect(vehicle.profileImportedAt, isNotNull);
+      expect(vehicle.profile?.name, 'default.json');
+      expect(vehicle.profile?.importedAt, isNotNull);
       expect(
         await container.read(vehicleProfileProvider('tucson').future),
         isNotNull,
@@ -195,16 +196,18 @@ void main() {
         throwsFormatException,
       );
       expect(store.profiles, isEmpty);
-      expect(container.read(vehicleProvider('tucson'))!.profileName, isNull);
+      expect(container.read(vehicleProvider('tucson'))!.profile, isNull);
     });
 
     test('a profile whose file is gone is reported, not hidden', () async {
-      final (container, _) = await start(profileName: 'default.json');
+      final (container, _) = await start(
+        profile: const ProfileRef('default.json'),
+      );
 
       expect(
         await container.read(vehicleProfileProvider('tucson').future),
         isA<UnreadableProfile>().having(
-          (p) => p.fileName,
+          (p) => p.ref.name,
           'file',
           'default.json',
         ),
@@ -212,7 +215,9 @@ void main() {
     });
 
     test('removing clears the file, the profile and its model year', () async {
-      final (container, store) = await start(profileName: 'default.json');
+      final (container, store) = await start(
+        profile: const ProfileRef('default.json'),
+      );
       store.profiles['tucson'] = testProfileJson;
 
       await container
@@ -221,47 +226,49 @@ void main() {
 
       expect(store.profiles, isEmpty);
       final vehicle = container.read(vehicleProvider('tucson'))!;
-      expect(vehicle.profileName, isNull);
+      expect(vehicle.profile, isNull);
       // It only chose which of the profile's requests apply.
       expect(vehicle.modelYear, isNull);
     });
 
     test('a removed profile can be put back', () async {
-      final (container, store) = await start(profileName: 'default.json');
+      final (container, store) = await start(
+        profile: const ProfileRef('default.json'),
+      );
       store.profiles['tucson'] = testProfileJson;
       final notifier = container.read(appSettingsProvider.notifier);
-      final before = container.read(vehicleProvider('tucson'))!;
-      final profile = (await container.read(
+      final profile = await container.read(
         vehicleProfileProvider('tucson').future,
-      )).signals!;
+      ) as LoadedProfile;
 
       await notifier.removeProfile('tucson');
-      await notifier.restoreProfile(before, profile);
+      await notifier.restoreProfile('tucson', profile, modelYear: 2023);
 
       expect(store.profiles['tucson'], testProfileJson);
       final vehicle = container.read(vehicleProvider('tucson'))!;
-      expect(vehicle.profileName, 'default.json');
+      expect(vehicle.profile?.name, 'default.json');
       expect(vehicle.modelYear, 2023);
     });
 
     test('Undo doesn\'t replace a profile imported since', () async {
-      final (container, store) = await start(profileName: 'default.json');
+      final (container, store) = await start(
+        profile: const ProfileRef('default.json'),
+      );
       store.profiles['tucson'] = testProfileJson;
       final notifier = container.read(appSettingsProvider.notifier);
-      final before = container.read(vehicleProvider('tucson'))!;
-      final profile = (await container.read(
+      final profile = await container.read(
         vehicleProfileProvider('tucson').future,
-      )).signals!;
+      ) as LoadedProfile;
 
       await notifier.removeProfile('tucson');
       await notifier.importProfile(
         'tucson',
         const PickedFile(name: 'newer.json', contents: testProfileJson),
       );
-      await notifier.restoreProfile(before, profile);
+      await notifier.restoreProfile('tucson', profile, modelYear: 2023);
 
       expect(
-        container.read(vehicleProvider('tucson'))!.profileName,
+        container.read(vehicleProvider('tucson'))!.profile?.name,
         'newer.json',
       );
     });

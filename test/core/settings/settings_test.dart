@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
@@ -11,7 +12,7 @@ void main() {
     adapterName: 'OBDII',
     modelYear: 2023,
     selectedKeys: {'tucson_fli_vol', 'battery_v'},
-    profileName: 'default.json',
+    profile: ProfileRef('default.json'),
     headUnitAddress: 'AA:BB:CC:DD:EE:FF',
     headUnitName: 'TUCSON BT',
   );
@@ -32,7 +33,7 @@ void main() {
     expect(vehicle.adapterName, 'OBDII');
     expect(vehicle.modelYear, 2023);
     expect(vehicle.selectedKeys, {'tucson_fli_vol', 'battery_v'});
-    expect(vehicle.profileName, 'default.json');
+    expect(vehicle.profile, const ProfileRef('default.json'));
     expect(vehicle.tripStart, TripStart.carBluetooth);
     expect(vehicle.headUnitAddress, 'AA:BB:CC:DD:EE:FF');
     expect(vehicle.headUnitName, 'TUCSON BT');

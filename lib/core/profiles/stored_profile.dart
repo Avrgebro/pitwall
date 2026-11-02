@@ -1,12 +1,10 @@
+import 'profile_ref.dart';
 import 'signal_set.dart';
 
 /// A vehicle's profile as found on the phone: none, one that can't be read
 /// (its file is gone or no longer parses), or one that loaded.
 sealed class StoredProfile {
   const StoredProfile();
-
-  /// The parsed profile, when it loaded.
-  SignalSet? get signals => null;
 }
 
 final class NoProfile extends StoredProfile {
@@ -14,15 +12,15 @@ final class NoProfile extends StoredProfile {
 }
 
 final class UnreadableProfile extends StoredProfile {
-  const UnreadableProfile(this.fileName);
+  const UnreadableProfile(this.ref);
 
   /// The file the vehicle says it has.
-  final String fileName;
+  final ProfileRef ref;
 }
 
 final class LoadedProfile extends StoredProfile {
-  const LoadedProfile(this.signals);
+  const LoadedProfile(this.ref, this.signals);
 
-  @override
+  final ProfileRef ref;
   final SignalSet signals;
 }

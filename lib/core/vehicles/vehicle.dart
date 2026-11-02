@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../bluetooth/adapter_type.dart';
+import '../profiles/profile_ref.dart';
 import 'device_id.dart';
 
 /// What starts a trip in a vehicle.
@@ -42,8 +43,7 @@ class Vehicle {
     this.headUnitName,
     this.modelYear,
     this.selectedKeys,
-    this.profileName,
-    this.profileImportedAt,
+    this.profile,
     this.lastSeen,
   });
 
@@ -98,9 +98,8 @@ class Vehicle {
   /// Payload keys to send. Null means the default set.
   final Set<String>? selectedKeys;
 
-  /// File name the profile was imported from, or null without a profile.
-  final String? profileName;
-  final DateTime? profileImportedAt;
+  /// The imported OBDb profile, or null without one.
+  final ProfileRef? profile;
 
   /// When the vehicle's adapter last connected.
   final DateTime? lastSeen;
@@ -115,8 +114,7 @@ class Vehicle {
     Object? headUnitName = _keep,
     Object? modelYear = _keep,
     Object? selectedKeys = _keep,
-    Object? profileName = _keep,
-    Object? profileImportedAt = _keep,
+    Object? profile = _keep,
     DateTime? lastSeen,
   }) => Vehicle(
     id: id,
@@ -139,12 +137,7 @@ class Vehicle {
     selectedKeys: selectedKeys == _keep
         ? this.selectedKeys
         : selectedKeys as Set<String>?,
-    profileName: profileName == _keep
-        ? this.profileName
-        : profileName as String?,
-    profileImportedAt: profileImportedAt == _keep
-        ? this.profileImportedAt
-        : profileImportedAt as DateTime?,
+    profile: profile == _keep ? this.profile : profile as ProfileRef?,
     lastSeen: lastSeen ?? this.lastSeen,
   );
 
@@ -159,8 +152,8 @@ class Vehicle {
     'headUnitName': headUnitName,
     'modelYear': modelYear,
     'selectedKeys': selectedKeys?.toList()?..sort(),
-    'profileName': profileName,
-    'profileImportedAt': profileImportedAt?.toUtc().toIso8601String(),
+    'profileName': profile?.name,
+    'profileImportedAt': profile?.importedAt?.toUtc().toIso8601String(),
     'lastSeen': lastSeen?.toUtc().toIso8601String(),
   };
 
@@ -190,8 +183,13 @@ class Vehicle {
       final List<Object?> keys => {...keys.whereType<String>()},
       _ => null,
     },
-    profileName: _string(json['profileName']),
-    profileImportedAt: _time(json['profileImportedAt']),
+    profile: switch (_string(json['profileName'])) {
+      final name? => ProfileRef(
+        name,
+        importedAt: _time(json['profileImportedAt']),
+      ),
+      null => null,
+    },
     lastSeen: _time(json['lastSeen']),
   );
 
