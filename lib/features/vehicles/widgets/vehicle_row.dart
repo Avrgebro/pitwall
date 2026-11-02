@@ -23,13 +23,13 @@ class VehicleRow extends StatelessWidget {
   final VoidCallback onTap;
 
   /// What the vehicle needs before it works on its own, if anything.
-  static String? _problem(Vehicle vehicle) {
-    if (vehicle.adapterAddress == null) return 'Choose its adapter';
-    if (!vehicle.hasTripStart) {
-      return '${TripStartText.summary(vehicle).text} for trip start';
-    }
-    return null;
-  }
+  static String? _problem(Vehicle vehicle) =>
+      switch (vehicle.needs.firstOrNull) {
+        null => null,
+        VehicleNeed.adapter => 'Choose its adapter',
+        VehicleNeed.headUnit || VehicleNeed.supportedTripStart =>
+          '${TripStartText.summary(vehicle).text} for trip start',
+      };
 
   @override
   Widget build(BuildContext context) {

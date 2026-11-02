@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../state/attention_state.dart';
 import '../state/permissions_state.dart';
-import '../state/settings_state.dart';
-import '../state/webhook_state.dart';
 import '../ui/ui.dart';
 
 /// The three tabs and their navigation bar. Each tab keeps its own
@@ -42,19 +41,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final deliveryError = ref.watch(
-      deliveryStatusProvider.select((status) => status.lastError),
-    );
-    final settingsNeedAttention =
-        (deliveryError != null && !deliveryError.isTransient) ||
-        ref.watch(missingPermissionsProvider) > 0;
-    // A vehicle that won't start sending on its own.
-    final vehiclesNeedAttention = ref.watch(
-      appSettingsProvider.select(
-        (settings) =>
-            settings.value?.vehicles.any((v) => !v.hasTripStart) ?? false,
-      ),
-    );
+    final settingsNeedAttention = ref.watch(settingsAttentionProvider);
+    final vehiclesNeedAttention = ref.watch(vehiclesAttentionProvider);
 
     return Scaffold(
       // Content scrolls behind the floating bar.

@@ -147,6 +147,29 @@ void main() {
     );
   });
 
+  testWidgets('a vehicle without an adapter puts a dot on Vehicles', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(
+        vehicles: [
+          Vehicle(
+            id: 'tucson',
+            name: 'Tucson',
+            headUnitAddress: 'AA',
+            headUnitName: 'T',
+          ),
+        ],
+        setupDone: true,
+      ),
+    );
+    expect(_badge(tester, 'Vehicles'), isTrue);
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose its adapter'), findsOneWidget);
+  });
+
   testWidgets('vehicles that start on their own leave Vehicles quiet', (
     tester,
   ) async {

@@ -52,7 +52,7 @@ class VehicleDetailScreen extends ConsumerWidget {
               icon: Symbols.bluetooth_rounded,
               title: 'Adapter',
               subtitle: _adapterSummary(vehicle),
-              subtitleTone: vehicle.adapterAddress == null
+              subtitleTone: vehicle.needs.contains(VehicleNeed.adapter)
                   ? StatusTone.error
                   : null,
               onTap: () => context.push(Routes.vehicleAdapter(vehicle.id)),

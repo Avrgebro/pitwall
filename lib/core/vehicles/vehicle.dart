@@ -21,6 +21,21 @@ enum TripStart {
   drivingDetection,
 }
 
+/// Something a vehicle lacks before its trips start and send on their own.
+enum VehicleNeed {
+  /// No adapter is chosen.
+  adapter,
+
+  /// Its trips start from the car's Bluetooth, but none is chosen.
+  headUnit,
+
+  /// Its trip start isn't built yet.
+  supportedTripStart;
+
+  /// Whether this is about how trips start, rather than the adapter.
+  bool get isTripStart => this != adapter;
+}
+
 /// One car: its adapter, the name sent in payloads, what starts its trips,
 /// its optional OBDb profile and the values to send.
 class Vehicle {
@@ -72,8 +87,18 @@ class Vehicle {
   String? get startingHeadUnit =>
       tripStart == TripStart.carBluetooth ? headUnitAddress : null;
 
-  /// Whether something will start this vehicle's trips on its own.
-  bool get hasTripStart => startingHeadUnit != null;
+  /// What the vehicle lacks before it works on its own; empty when
+  /// nothing does. The adapter comes first.
+  List<VehicleNeed> get needs => [
+    if (adapterAddress == null) VehicleNeed.adapter,
+    ...switch (tripStart) {
+      TripStart.carBluetooth when headUnitAddress == null => [
+        VehicleNeed.headUnit,
+      ],
+      TripStart.carBluetooth => const <VehicleNeed>[],
+      TripStart.drivingDetection => [VehicleNeed.supportedTripStart],
+    },
+  ];
 
   /// Picks which of the profile's signals apply.
   final int? modelYear;

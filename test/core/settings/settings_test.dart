@@ -95,7 +95,10 @@ void main() {
       );
 
       expect(settings.startingHeadUnits, isEmpty);
-      expect(settings.vehicles.single.hasTripStart, isFalse);
+      expect(
+        settings.vehicles.single.needs,
+        contains(VehicleNeed.supportedTripStart),
+      );
       // It still belongs to the vehicle, so no other can take it.
       expect(settings.headUnitOwner('AA:BB:CC:DD:EE:FF')?.id, 'a1');
     });
