@@ -16,7 +16,6 @@ class ValueOption {
     required this.name,
     required this.unit,
     this.shortName,
-    this.fromProfile = false,
     this.category,
   });
 
@@ -30,51 +29,39 @@ class ValueOption {
   String get label => shortName ?? name;
   final String unit;
 
+  /// For profile values, where OBDb files them, such as `Engine`; null for
+  /// the standard ones.
+  final String? category;
+
   /// From the vehicle's profile rather than standard OBD-II. These aren't
   /// sent by default: a profile can have hundreds, mostly diagnostic.
-  final bool fromProfile;
-
-  /// For profile values, where OBDb files them, such as `Engine`.
-  final String? category;
+  bool get fromProfile => category != null;
 }
 
 /// Every value Pitwall can send for this car: battery voltage, the standard
-/// PIDs, and the profile's signals for [modelYear]. Keys are unique; a
-/// signal the profile lists under several commands appears once.
-List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
-  final options = <String, ValueOption>{
-    batteryVoltageKey: const ValueOption(
-      key: batteryVoltageKey,
-      name: 'Battery voltage',
-      shortName: 'Battery',
-      unit: 'V',
+/// PIDs, and the values [profile] says it can read.
+List<ValueOption> valueOptions(ProfileSummary? profile) => [
+  const ValueOption(
+    key: batteryVoltageKey,
+    name: 'Battery voltage',
+    shortName: 'Battery',
+    unit: 'V',
+  ),
+  for (final definition in standardPids)
+    ValueOption(
+      key: definition.key,
+      name: definition.name,
+      shortName: definition.shortName,
+      unit: definition.unit,
     ),
-    for (final definition in standardPids)
-      definition.key: ValueOption(
-        key: definition.key,
-        name: definition.name,
-        shortName: definition.shortName,
-        unit: definition.unit,
-      ),
-  };
-  if (profile != null && modelYear != null) {
-    for (final command in profile.commandsFor(modelYear)) {
-      for (final signal in command.signals) {
-        options.putIfAbsent(
-          signal.key,
-          () => ValueOption(
-            key: signal.key,
-            name: signal.name,
-            unit: signal.unit,
-            fromProfile: true,
-            category: signal.category,
-          ),
-        );
-      }
-    }
-  }
-  return options.values.toList();
-}
+  for (final signal in profile?.readable ?? const <ProfileSignal>[])
+    ValueOption(
+      key: signal.key,
+      name: signal.name,
+      unit: signal.unit,
+      category: signal.category,
+    ),
+];
 
 /// A vehicle's values: every one it can send, and the ones it does.
 @immutable
@@ -84,10 +71,15 @@ class VehicleValues {
     this.sent,
     this._chosen, {
     required this.customised,
+    required this.profile,
   });
 
-  factory VehicleValues.of(Vehicle vehicle, SignalSet? profile) {
-    final options = valueOptions(profile, vehicle.modelYear);
+  factory VehicleValues.of(Vehicle vehicle, SignalSet? signals) {
+    final year = vehicle.modelYear;
+    final profile = signals == null || year == null
+        ? null
+        : signals.summaryFor(year);
+    final options = valueOptions(profile);
     final offered = {for (final option in options) option.key};
     final chosen =
         vehicle.selectedKeys ??
@@ -101,10 +93,15 @@ class VehicleValues {
       chosen.intersection(offered),
       chosen,
       customised: vehicle.selectedKeys != null,
+      profile: profile,
     );
   }
 
   final List<ValueOption> options;
+
+  /// What the profile adds for the vehicle's model year, once both are
+  /// known.
+  final ProfileSummary? profile;
 
   /// The keys it sends: the chosen ones it offers.
   final Set<String> sent;

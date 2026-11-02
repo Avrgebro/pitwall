@@ -4,7 +4,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
-import '../../core/profiles/signal_set.dart';
 import '../../core/profiles/stored_profile.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
@@ -26,11 +25,8 @@ class VehicleDetailScreen extends ConsumerWidget {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
     if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
     final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
-    final profile = switch (stored) {
-      LoadedProfile(:final signals) => signals,
-      _ => null,
-    };
-    final selected = VehicleValues.of(vehicle, profile).sent;
+    final values = ref.watch(vehicleValuesProvider(vehicleId))!;
+    final selected = values.sent;
     final tripStart = TripStartText.summary(vehicle);
 
     return AppPage(
@@ -75,7 +71,7 @@ class VehicleDetailScreen extends ConsumerWidget {
               title: 'Vehicle profile',
               subtitle: stored is UnreadableProfile
                   ? 'OBDb profile can\'t be read'
-                  : _profileSummary(vehicle, profile),
+                  : _profileSummary(stored, values),
               subtitleTone: stored is UnreadableProfile
                   ? StatusTone.error
                   : null,
@@ -111,12 +107,12 @@ class VehicleDetailScreen extends ConsumerWidget {
         final name => '$name (${vehicle.adapterType.label})',
       };
 
-  static String _profileSummary(Vehicle vehicle, SignalSet? profile) =>
-      switch ((profile, vehicle.modelYear)) {
-        (null, _) => 'Standard values only',
-        (_, null) => 'OBDb profile: choose the model year',
-        (final profile?, final year?) =>
-          'OBDb profile: ${ProfileText.forYear(profile, year)}',
+  static String _profileSummary(StoredProfile? stored, VehicleValues values) =>
+      switch ((stored, values.profile)) {
+        (LoadedProfile(), final summary?) =>
+          'OBDb profile: ${ProfileText.forYear(summary)}',
+        (LoadedProfile(), null) => 'OBDb profile: choose the model year',
+        _ => 'Standard values only',
       };
 
   Future<void> _delete(

@@ -8,14 +8,12 @@ const _fuel = ValueOption(
   key: 'tucson_fli_vol',
   name: 'Fuel level',
   unit: 'L',
-  fromProfile: true,
   category: 'Fuel',
 );
 const _tyre = ValueOption(
   key: 'tucson_tp_fl',
   name: 'Front left tyre pressure',
   unit: 'kPa',
-  fromProfile: true,
   category: 'Tires',
 );
 const _all = [_speed, _fuel, _tyre];

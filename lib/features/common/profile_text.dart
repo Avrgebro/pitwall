@@ -31,13 +31,19 @@ abstract final class ProfileText {
   };
 
   /// "271 values for 2023".
-  static String forYear(SignalSet profile, int year) =>
-      '${values(profile.summaryFor(year).readable.length)} for $year';
+  static String forYear(ProfileSummary profile) =>
+      '${values(profile.readable.length)} for ${profile.year}';
+
+  /// "3 requests would change something in the car".
+  static String neverSent(int requests) => requests == 1
+      ? '1 request would change something in the car'
+      : '$requests requests would change something in the car';
 
   /// "1 value", "271 values".
   static String values(int count) => count == 1 ? '1 value' : '$count values';
 
-  /// "Trips 12, Engine 4", the largest first.
-  static String categories(List<({String category, int count})> counts) =>
-      counts.map((c) => '${c.category} ${c.count}').join(', ');
+  /// "Trips 12, Engine 4", in the order given.
+  static String categories(List<SignalGroup> groups) => groups
+      .map((group) => '${group.category} ${group.signals.length}')
+      .join(', ');
 }

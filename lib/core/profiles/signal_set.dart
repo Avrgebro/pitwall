@@ -5,11 +5,12 @@ import 'dart:convert';
 ///
 /// Profiles are imported by the user, so parsing treats them as untrusted:
 /// only read services are accepted, and anything Pitwall can't send safely
-/// or doesn't support yet ends up in [skipped] instead of [commands]. Every
+/// or doesn't support yet is a [SkippedRequest] rather than a
+/// [ProfileCommand]. Every
 /// field is read by checking its type, so a field that isn't what OBDb
 /// writes counts as missing rather than failing the whole profile.
 class SignalSet {
-  SignalSet._(this.source, this.commands, this.skipped);
+  SignalSet._(this.source, this.requests);
 
   /// Services that only read data: current data, vehicle info, and the two
   /// manufacturer "read data by identifier" services.
@@ -21,8 +22,12 @@ class SignalSet {
   /// The file this was parsed from, kept so it can be saved as imported.
   final String source;
 
-  final List<ProfileCommand> commands;
-  final List<SkippedCommand> skipped;
+  /// Every request in the profile, in its order: ones Pitwall sends, and
+  /// ones it skips, with why.
+  final List<ProfileRequest> requests;
+
+  Iterable<ProfileCommand> get commands => requests.whereType<ProfileCommand>();
+  Iterable<SkippedRequest> get skipped => requests.whereType<SkippedRequest>();
 
   /// Parses a signal-set file. Throws [FormatException] if it isn't one.
   factory SignalSet.parse(String source) {
@@ -35,8 +40,7 @@ class SignalSet {
     if (json is! Map || json['commands'] is! List) {
       throw const FormatException('Not an OBDb signal set: no "commands".');
     }
-    final commands = <ProfileCommand>[];
-    final skipped = <SkippedCommand>[];
+    final requests = <ProfileRequest>[];
     for (final entry in json['commands'] as List) {
       if (entry is! Map) continue;
       // Kept for skipped requests too, to say what they would have read.
@@ -46,10 +50,10 @@ class SignalSet {
           if (signal is Map) ?ProfileSignal._parse(signal),
       ];
       try {
-        commands.add(_parseCommand(entry, filter, signals));
+        requests.add(_parseCommand(entry, filter, signals));
       } on _Unsupported catch (e) {
-        skipped.add(
-          SkippedCommand(
+        requests.add(
+          SkippedRequest(
             _describe(entry),
             e.reason,
             filter: filter,
@@ -58,46 +62,51 @@ class SignalSet {
         );
       }
     }
-    return SignalSet._(source, commands, skipped);
+    return SignalSet._(source, requests);
   }
 
-  int get signalCount =>
-      commands.fold(0, (count, command) => count + command.signals.length);
+  /// The requests that apply to a car of [modelYear].
+  Iterable<ProfileRequest> requestsFor(int modelYear) =>
+      requests.where((request) => request.appliesTo(modelYear));
 
-  /// Commands that apply to a car of [modelYear].
+  /// The requests Pitwall sends to a car of [modelYear].
   Iterable<ProfileCommand> commandsFor(int modelYear) =>
-      commands.where((command) => command.filter?.matches(modelYear) ?? true);
+      requestsFor(modelYear).whereType<ProfileCommand>();
 
-  /// Skipped requests that would apply to a car of [modelYear].
-  Iterable<SkippedCommand> skippedFor(int modelYear) =>
-      skipped.where((command) => command.filter?.matches(modelYear) ?? true);
-
-  /// What this profile offers a car of [modelYear]: the values it can read,
-  /// by category, and the ones it can't, by reason.
+  /// What this profile offers a car of [modelYear]; see [ProfileSummary].
   ProfileSummary summaryFor(int modelYear) {
-    final readable = <String, ProfileSignal>{
-      for (final command in commandsFor(modelYear))
-        for (final signal in command.signals) signal.key: signal,
-    };
-    final unreadable = <SkipReason, Map<String, ProfileSignal>>{};
-    final requests = <SkipReason, int>{};
-    for (final command in skippedFor(modelYear)) {
-      requests[command.reason] = (requests[command.reason] ?? 0) + 1;
-      final signals = unreadable[command.reason] ??= {};
+    final readable = <String, ProfileSignal>{};
+    for (final command in commandsFor(modelYear)) {
       for (final signal in command.signals) {
-        // Read through another request, so not missing after all.
-        if (!readable.containsKey(signal.key)) signals[signal.key] = signal;
+        // A signal several requests read is read through the first.
+        readable.putIfAbsent(signal.key, () => signal);
+      }
+    }
+    final missing = <SkipReason, Map<String, ProfileSignal>>{};
+    var neverSent = 0;
+    for (final request in requestsFor(modelYear)) {
+      switch (request) {
+        case ProfileCommand():
+          break;
+        case SkippedRequest(reason: SkipReason.notReadOnly):
+          neverSent++;
+        case SkippedRequest(:final reason, :final signals):
+          final byKey = missing[reason] ??= {};
+          for (final signal in signals) {
+            // Read through another request, so not missing after all.
+            if (!readable.containsKey(signal.key)) byKey[signal.key] = signal;
+          }
       }
     }
     return ProfileSummary(
+      year: modelYear,
       readable: readable.values.toList(),
-      unreadable: {
-        for (final MapEntry(key: reason, value: count) in requests.entries)
-          reason: (
-            requests: count,
-            signals: unreadable[reason]!.values.toList(),
-          ),
-      },
+      notYetReadable: [
+        for (final MapEntry(key: reason, value: byKey) in missing.entries)
+          if (byKey.isNotEmpty)
+            (reason: reason, signals: byKey.values.toList()),
+      ],
+      neverSentRequests: neverSent,
     );
   }
 
@@ -158,15 +167,27 @@ class SignalSet {
   }
 }
 
-/// One request to one module, and the signals decoded from its reply.
-class ProfileCommand {
+/// One request in a profile: the model years it's for, and the values its
+/// reply holds. Pitwall either sends it, as a [ProfileCommand], or skips
+/// it, as a [SkippedRequest].
+sealed class ProfileRequest {
+  const ProfileRequest({required this.filter, required this.signals});
+
+  final YearFilter? filter;
+  final List<ProfileSignal> signals;
+
+  bool appliesTo(int modelYear) => filter?.matches(modelYear) ?? true;
+}
+
+/// A request Pitwall sends to one module.
+final class ProfileCommand extends ProfileRequest {
   const ProfileCommand({
     required this.header,
     required this.receive,
     required this.service,
     required this.id,
-    required this.filter,
-    required this.signals,
+    required super.filter,
+    required super.signals,
   });
 
   /// CAN id the request is sent to, e.g. `7C6`.
@@ -177,8 +198,6 @@ class ProfileCommand {
 
   final int service;
   final List<int> id;
-  final YearFilter? filter;
-  final List<ProfileSignal> signals;
 }
 
 /// Why a request in a profile isn't used.
@@ -199,49 +218,68 @@ enum SkipReason {
   noUsableSignals,
 }
 
-class SkippedCommand {
-  const SkippedCommand(
+/// A request Pitwall doesn't send, and why. Its signals are what it would
+/// have read.
+final class SkippedRequest extends ProfileRequest {
+  const SkippedRequest(
     this.description,
     this.reason, {
-    this.filter,
-    this.signals = const [],
+    super.filter,
+    super.signals = const [],
   });
 
   /// The request, like `7E0: 22 0100`.
   final String description;
   final SkipReason reason;
-  final YearFilter? filter;
-
-  /// What it would have read.
-  final List<ProfileSignal> signals;
 }
 
 /// What a profile offers a car of one model year; see
 /// [SignalSet.summaryFor].
 class ProfileSummary {
-  const ProfileSummary({required this.readable, required this.unreadable});
+  ProfileSummary({
+    required this.year,
+    required this.readable,
+    required this.notYetReadable,
+    required this.neverSentRequests,
+  }) : readableByCategory = byCategory(readable);
+
+  /// The model year it's for.
+  final int year;
 
   /// Each value the profile can read, once.
   final List<ProfileSignal> readable;
 
-  /// Requests that can't be sent, by reason, and the values only they hold.
-  final Map<SkipReason, ({int requests, List<ProfileSignal> signals})>
-  unreadable;
+  /// [readable] by category, the largest first.
+  final List<SignalGroup> readableByCategory;
 
-  /// How many values each category has, the largest first.
-  static List<({String category, int count})> byCategory(
-    Iterable<ProfileSignal> signals,
-  ) {
-    final counts = <String, int>{};
+  /// Values Pitwall can't read yet, by reason: only ones no sent request
+  /// reads. Requests that would change something in the car aren't among
+  /// them; see [neverSentRequests].
+  final List<({SkipReason reason, List<ProfileSignal> signals})> notYetReadable;
+
+  /// Requests that would change something in the car, which are never
+  /// sent.
+  final int neverSentRequests;
+
+  /// [signals] by category, the largest first.
+  static List<SignalGroup> byCategory(Iterable<ProfileSignal> signals) {
+    final groups = <String, List<ProfileSignal>>{};
     for (final signal in signals) {
-      counts[signal.category] = (counts[signal.category] ?? 0) + 1;
+      (groups[signal.category] ??= []).add(signal);
     }
     return [
-      for (final MapEntry(:key, :value)
-          in counts.entries.toList()..sort((a, b) => b.value - a.value))
-        (category: key, count: value),
-    ];
+      for (final MapEntry(:key, :value) in groups.entries)
+        SignalGroup(key, value),
+    ]..sort((a, b) => b.signals.length - a.signals.length);
   }
+}
+
+/// The values in one OBDb category, such as `Engine`.
+class SignalGroup {
+  const SignalGroup(this.category, this.signals);
+
+  final String category;
+  final List<ProfileSignal> signals;
 }
 
 /// Model years a command applies to. OBDb filters are a union: `to` covers

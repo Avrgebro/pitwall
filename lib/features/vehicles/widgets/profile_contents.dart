@@ -11,13 +11,11 @@ class ProfileContents extends StatelessWidget {
   const ProfileContents({
     super.key,
     required this.summary,
-    required this.year,
     required this.selected,
     required this.onOpenValues,
   });
 
   final ProfileSummary summary;
-  final int year;
 
   /// The keys the vehicle sends.
   final Set<String> selected;
@@ -30,18 +28,13 @@ class ProfileContents extends StatelessWidget {
     final readable = summary.readable;
     int on(Iterable<ProfileSignal> signals) =>
         signals.where((s) => selected.contains(s.key)).length;
-    final notYet = [
-      for (final MapEntry(key: reason, value: entry)
-          in summary.unreadable.entries)
-        if (reason != SkipReason.notReadOnly && entry.signals.isNotEmpty)
-          (reason: reason, signals: entry.signals),
-    ];
-    final neverSent = summary.unreadable[SkipReason.notReadOnly]?.requests;
+    final notYet = summary.notYetReadable;
+    final neverSent = summary.neverSentRequests;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('What it adds', trailing: '$year'),
+        SectionHeader('What it adds', trailing: '${summary.year}'),
         RowGroup(
           children: [
             GroupTile(
@@ -55,19 +48,15 @@ class ProfileContents extends StatelessWidget {
               },
               onTap: () => onOpenValues(null),
             ),
-            for (final (:category, :count) in ProfileSummary.byCategory(
-              readable,
-            ))
+            for (final SignalGroup(:category, :signals)
+                in summary.readableByCategory)
               GroupTile(
                 icon: _icon(category),
                 title: category,
-                subtitle: switch (on(
-                  readable.where((s) => s.category == category),
-                )) {
-                  0 => ProfileText.values(count),
+                subtitle: switch (on(signals)) {
+                  0 => ProfileText.values(signals.length),
                   final turnedOn =>
-                    '${ProfileText.values(count)}, '
-                        '$turnedOn on',
+                    '${ProfileText.values(signals.length)}, $turnedOn on',
                 },
                 onTap: () => onOpenValues(category),
               ),
@@ -82,15 +71,13 @@ class ProfileContents extends StatelessWidget {
             ],
           ),
         ],
-        if (neverSent != null && neverSent > 0) ...[
+        if (neverSent > 0) ...[
           const SectionHeader('Never sent'),
           RowGroup(
             children: [
               AppRow(
                 leading: const Icon(Symbols.lock_rounded),
-                title: neverSent == 1
-                    ? '1 request would change something in the car'
-                    : '$neverSent requests would change something in the car',
+                title: ProfileText.neverSent(neverSent),
                 subtitle: Text(
                   ProfileText.unreadableDetail(SkipReason.notReadOnly),
                 ),

@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
 import '../../core/profiles/stored_profile.dart';
-import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/infrastructure.dart';
 import '../../state/settings_state.dart';
@@ -38,6 +37,7 @@ class VehicleProfileScreen extends ConsumerWidget {
       },
       AsyncLoading() => null,
     };
+    final values = ref.watch(vehicleValuesProvider(vehicleId))!;
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',
@@ -53,14 +53,10 @@ class VehicleProfileScreen extends ConsumerWidget {
             onModelYear: (year) =>
                 notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
           ),
-        if ((stored, vehicle.modelYear) case (
-          LoadedProfile(signals: final profile),
-          final year?,
-        ))
+        if ((stored, values.profile) case (LoadedProfile(), final summary?))
           ProfileContents(
-            summary: profile.summaryFor(year),
-            year: year,
-            selected: VehicleValues.of(vehicle, profile).sent,
+            summary: summary,
+            selected: values.sent,
             onOpenValues: (category) => context.push(
               Routes.vehicleValues(vehicle.id, category: category),
             ),
@@ -125,7 +121,8 @@ class VehicleProfileScreen extends ConsumerWidget {
       final year = vehicle.modelYear;
       message = year == null
           ? 'Profile imported. Choose the model year.'
-          : 'Profile imported: ${ProfileText.forYear(profile, year)}';
+          : 'Profile imported: '
+                '${ProfileText.forYear(profile.summaryFor(year))}';
     } on UnreadableFileException catch (e) {
       message = e.tooLarge
           ? 'That file is too large to be a profile.'

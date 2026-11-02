@@ -12,7 +12,7 @@ void main() {
 
   group('value options', () {
     test('without a profile: battery voltage and standard values', () {
-      final keys = valueOptions(null, null).map((o) => o.key);
+      final keys = valueOptions(null).map((o) => o.key);
 
       expect(keys, [
         'battery_v',
@@ -26,7 +26,7 @@ void main() {
     });
 
     test('profile signals keep their ids and are off by default', () {
-      final options = valueOptions(profile, 2018);
+      final options = valueOptions(profile.summaryFor(2018));
       final profileKeys = [
         for (final option in options)
           if (option.fromProfile) option.key,

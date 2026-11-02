@@ -7,7 +7,7 @@ void main() {
     final tiles = ValueDisplay.tiles({
       'engine_run_time_s': 1420,
       'speed_kmh': 52,
-    }, valueOptions(null, null));
+    }, valueOptions(null));
 
     final runTime = tiles.firstWhere((t) => t.label == 'Run time');
     expect(runTime.value, '23 min');

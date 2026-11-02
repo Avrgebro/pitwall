@@ -155,26 +155,25 @@ void main() {
       ]);
       expect(
         {
-          for (final (:category, :count) in ProfileSummary.byCategory(
-            summary.readable,
-          ))
-            category: count,
+          for (final group in summary.readableByCategory)
+            group.category: group.signals.length,
         },
         {'Fuel': 1, 'Trips': 1},
       );
     });
 
     test('unreadable values by reason; writes are only counted', () {
-      final unreadable = signalSet.summaryFor(2023).unreadable;
+      final summary = signalSet.summaryFor(2023);
+      final notYet = {
+        for (final (:reason, :signals) in summary.notYetReadable)
+          reason: signals.map((s) => s.id).toList(),
+      };
 
-      expect(unreadable[SkipReason.notReadOnly]!.requests, 3);
-      expect(unreadable[SkipReason.extendedAddress]!.signals.map((s) => s.id), [
-        'TEST_29BIT',
-      ]);
-      expect(
-        unreadable[SkipReason.specialFlowControl]!.signals.map((s) => s.id),
-        ['TEST_FCM1'],
-      );
+      expect(summary.neverSentRequests, 3);
+      expect(notYet, {
+        SkipReason.extendedAddress: ['TEST_29BIT'],
+        SkipReason.specialFlowControl: ['TEST_FCM1'],
+      });
     });
 
     const flowControlOnly = """
@@ -195,13 +194,10 @@ void main() {
     test('skipped requests count only for the years they apply to', () {
       final profile = SignalSet.parse(flowControlOnly);
       List<String> unreadable(int year) => [
-        for (final signal
-            in profile
-                    .summaryFor(year)
-                    .unreadable[SkipReason.specialFlowControl]
-                    ?.signals ??
-                const <ProfileSignal>[])
-          signal.id,
+        for (final (:reason, :signals)
+            in profile.summaryFor(year).notYetReadable)
+          if (reason == SkipReason.specialFlowControl)
+            for (final signal in signals) signal.id,
       ];
 
       expect(unreadable(2018), ['OLD_TRIP']);
@@ -212,10 +208,8 @@ void main() {
       final summary = SignalSet.parse(flowControlOnly).summaryFor(2023);
 
       expect(summary.readable.single.id, 'BOTH');
-      expect(
-        summary.unreadable[SkipReason.specialFlowControl]!.signals,
-        isEmpty,
-      );
+      // Nothing left for the reason, so the reason isn't listed.
+      expect(summary.notYetReadable, isEmpty);
     });
 
     test('a category comes from the top of the path', () {
