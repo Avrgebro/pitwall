@@ -162,24 +162,14 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
         if (suited.isNotEmpty) group(suited),
         if (others.isNotEmpty && suited.isNotEmpty) ...[
           const SectionHeader('Other devices'),
-          if (!keptOpen) ...[
-            RowGroup(
-              children: [
-                GroupTile(
-                  icon: Symbols.devices_other_rounded,
-                  title: _showOthers
-                      ? 'Hide ${others.length} devices'
-                      : 'Show ${others.length} more',
-                  trailing: Icon(
-                    _showOthers ? Icons.expand_less : Icons.expand_more,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  onTap: () => setState(() => _showOthers = !_showOthers),
-                ),
-              ],
+          if (!keptOpen)
+            DisclosureGroup(
+              open: _showOthers,
+              icon: Symbols.devices_other_rounded,
+              showLabel: 'Show ${others.length} more',
+              hideLabel: 'Hide ${others.length} devices',
+              onToggle: () => setState(() => _showOthers = !_showOthers),
             ),
-            if (_showOthers) const SizedBox(height: Insets.m),
-          ],
         ],
         if (others.isNotEmpty && othersOpen) group(others),
       ],

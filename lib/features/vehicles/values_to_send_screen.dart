@@ -110,27 +110,17 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                 ),
               ],
               // Matches are what was searched for; no need to expand them.
-              if (fromProfile.isNotEmpty && !filtering) ...[
-                RowGroup(
-                  children: [
-                    GroupTile(
-                      icon: Symbols.manage_search_rounded,
-                      title: _showProfile
-                          ? 'Hide ${fromProfile.length} signals'
-                          : 'Show ${fromProfile.length} signals',
-                      subtitle:
-                          'Sent under their OBDb names, in the profile\'s units. '
-                          'Each one adds a request to every reading.',
-                      trailing: Icon(
-                        _showProfile ? Icons.expand_less : Icons.expand_more,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      onTap: () => setState(() => _showProfile = !_showProfile),
-                    ),
-                  ],
+              if (fromProfile.isNotEmpty && !filtering)
+                DisclosureGroup(
+                  open: _showProfile,
+                  icon: Symbols.manage_search_rounded,
+                  showLabel: 'Show ${fromProfile.length} signals',
+                  hideLabel: 'Hide ${fromProfile.length} signals',
+                  subtitle:
+                      'Sent under their OBDb names, in the profile\'s units. '
+                      'Each one adds a request to every reading.',
+                  onToggle: () => setState(() => _showProfile = !_showProfile),
                 ),
-                if (_showProfile) const SizedBox(height: Insets.m),
-              ],
             ],
           ),
           if (fromProfile.isNotEmpty && (filtering || _showProfile))

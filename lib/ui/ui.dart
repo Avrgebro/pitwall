@@ -9,6 +9,7 @@ export 'components/checklist_row.dart';
 export 'components/card_header.dart';
 export 'components/content_card.dart';
 export 'components/detail_rows.dart';
+export 'components/disclosure_group.dart';
 export 'components/floating_nav_bar.dart';
 export 'components/glass_bar.dart';
 export 'components/glass_button.dart';
