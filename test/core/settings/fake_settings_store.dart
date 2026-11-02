@@ -24,26 +24,25 @@ class FakeSettingsStore implements SettingsStore {
   @override
   Future<void> saveWebhook(WebhookTarget target) async => webhook = target;
 
+  /// Like the real store: a vehicle with a profile whose file is missing
+  /// or broken can't load it.
   @override
-  Future<SignalSet?> loadProfile(Vehicle vehicle) async =>
-      switch (profiles[vehicle.id]) {
-        final source? => SignalSet.parse(source),
-        null => null,
-      };
-
-  @override
-  Future<Vehicle> saveProfile(
-    Vehicle vehicle,
-    String source,
-    String name,
-  ) async {
-    profiles[vehicle.id] = source;
-    return vehicle.copyWith(profileName: name);
+  Future<SignalSet?> loadProfile(Vehicle vehicle) async {
+    if (vehicle.profileName == null) return null;
+    final source = profiles[vehicle.id];
+    if (source == null) throw const ProfileUnreadableException();
+    try {
+      return SignalSet.parse(source);
+    } on FormatException {
+      throw const ProfileUnreadableException();
+    }
   }
 
   @override
-  Future<Vehicle> deleteProfile(Vehicle vehicle) async {
-    profiles.remove(vehicle.id);
-    return vehicle.copyWith(profileName: null);
-  }
+  Future<void> saveProfile(String vehicleId, SignalSet profile) async =>
+      profiles[vehicleId] = profile.source;
+
+  @override
+  Future<void> deleteProfile(String vehicleId) async =>
+      profiles.remove(vehicleId);
 }

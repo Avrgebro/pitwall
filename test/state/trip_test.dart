@@ -181,6 +181,23 @@ void main() {
     expect(lastValues.saved.of(_tucson.id)['battery_v']?.value, 13.6);
   });
 
+  test('an unreadable profile still lets standard values go out', () async {
+    final c = container(
+      adapter: (_) => _Adapter(),
+      // The vehicle says it has a profile, but there's no file for it.
+      vehicles: [_tucson.copyWith(profileName: 'default.json')],
+    );
+    c.read(tripProvider);
+
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    await running(c);
+    await until(() => received.isNotEmpty, 'a reading');
+    c.read(tripProvider.notifier).stop();
+    await ended(c);
+
+    expect(received.first['values'], {'battery_v': 13.6});
+  });
+
   test('a request made before Dart was ready still starts a trip', () async {
     final c = container(
       adapter: (_) => _Adapter(),

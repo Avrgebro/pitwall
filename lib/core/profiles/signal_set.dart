@@ -7,7 +7,7 @@ import 'dart:convert';
 /// only read services are accepted, and anything Pitwall can't send safely
 /// or doesn't support yet ends up in [skipped] instead of [commands].
 class SignalSet {
-  SignalSet._(this.commands, this.skipped);
+  SignalSet._(this.source, this.commands, this.skipped);
 
   /// Services that only read data: current data, vehicle info, and the two
   /// manufacturer "read data by identifier" services.
@@ -15,6 +15,9 @@ class SignalSet {
 
   static final _canId = RegExp(r'^[0-9A-F]{3}$');
   static final _hexBytes = RegExp(r'^(?:[0-9A-F]{2}){1,4}$');
+
+  /// The file this was parsed from, kept so it can be saved as imported.
+  final String source;
 
   final List<ProfileCommand> commands;
   final List<SkippedCommand> skipped;
@@ -41,7 +44,7 @@ class SignalSet {
         skipped.add(SkippedCommand(description, e.reason));
       }
     }
-    return SignalSet._(commands, skipped);
+    return SignalSet._(source, commands, skipped);
   }
 
   int get signalCount =>

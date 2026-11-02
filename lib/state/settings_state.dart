@@ -4,6 +4,7 @@ import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/settings/settings.dart';
+import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'last_values_state.dart';
@@ -62,7 +63,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
-    await ref.read(settingsStoreProvider).deleteProfile(vehicle);
+    await ref.read(settingsStoreProvider).deleteProfile(id);
     await ref.read(lastValuesProvider.notifier).forget(id);
     await _save(_current.withoutVehicle(id));
   }
@@ -115,18 +116,22 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) throw StateError('No vehicle $vehicleId');
     final profile = SignalSet.parse(file.contents);
-    final updated = await ref
-        .read(settingsStoreProvider)
-        .saveProfile(vehicle, file.contents, file.name);
-    await saveVehicle(updated);
+    await ref.read(settingsStoreProvider).saveProfile(vehicleId, profile);
+    await saveVehicle(
+      vehicle.copyWith(
+        profileName: file.name,
+        profileImportedAt: DateTime.now(),
+      ),
+    );
     return profile;
   }
 
   Future<void> removeProfile(String vehicleId) async {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) return;
+    await ref.read(settingsStoreProvider).deleteProfile(vehicleId);
     await saveVehicle(
-      await ref.read(settingsStoreProvider).deleteProfile(vehicle),
+      vehicle.copyWith(profileName: null, profileImportedAt: null),
     );
   }
 }
@@ -137,20 +142,24 @@ final vehicleProvider = Provider.family<Vehicle?, String>(
 );
 
 /// A vehicle's imported profile, parsed. Reloads only when the profile
-/// itself changes, not on every settings change.
-final vehicleProfileProvider = FutureProvider.family<SignalSet?, String>((
-  ref,
-  id,
-) async {
-  final key = await ref.watch(
-    appSettingsProvider.selectAsync((settings) {
-      final vehicle = settings.vehicleById(id);
-      return (vehicle?.profileName, vehicle?.profileImportedAt);
-    }),
-  );
-  if (key.$1 == null) return null;
-  final vehicle = ref.read(appSettingsProvider).requireValue.vehicleById(id);
-  return vehicle == null
+/// itself changes, not on every settings change. An error
+/// ([ProfileUnreadableException]) when its file can't be read; that isn't
+/// retried, since reading it again won't help, so waiting on it ends.
+final vehicleProfileProvider = FutureProvider.family<SignalSet?, String>(
+  retry: (count, error) => error is ProfileUnreadableException
       ? null
-      : ref.read(settingsStoreProvider).loadProfile(vehicle);
-});
+      : ProviderContainer.defaultRetry(count, error),
+  (ref, id) async {
+    final key = await ref.watch(
+      appSettingsProvider.selectAsync((settings) {
+        final vehicle = settings.vehicleById(id);
+        return (vehicle?.profileName, vehicle?.profileImportedAt);
+      }),
+    );
+    if (key.$1 == null) return null;
+    final vehicle = ref.read(appSettingsProvider).requireValue.vehicleById(id);
+    return vehicle == null
+        ? null
+        : ref.read(settingsStoreProvider).loadProfile(vehicle);
+  },
+);

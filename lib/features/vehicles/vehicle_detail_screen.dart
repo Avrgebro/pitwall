@@ -27,7 +27,8 @@ class VehicleDetailScreen extends ConsumerWidget {
         children: [InfoNote(text: TextSpan(text: 'This vehicle was removed.'))],
       );
     }
-    final profile = ref.watch(vehicleProfileProvider(vehicleId)).value;
+    final profileState = ref.watch(vehicleProfileProvider(vehicleId));
+    final profile = profileState.value;
     final options = valueOptions(profile, vehicle.modelYear);
     final selected = keysToSend(vehicle, options);
     final tripStart = TripStartText.summary(vehicle);
@@ -72,7 +73,10 @@ class VehicleDetailScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.data_object_rounded,
               title: 'Vehicle profile',
-              subtitle: _profileSummary(vehicle, profile),
+              subtitle: profileState.hasError
+                  ? 'OBDb profile can\'t be read'
+                  : _profileSummary(vehicle, profile),
+              subtitleTone: profileState.hasError ? StatusTone.error : null,
               onTap: () => context.push(Routes.vehicleProfile(vehicle.id)),
             ),
             GroupTile(

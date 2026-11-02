@@ -7,12 +7,14 @@ import '../../../ui/ui.dart';
 import '../../common/profile_text.dart';
 
 /// The vehicle's OBDb profile: what it adds, which model year applies, and
-/// what was skipped. Without a profile, an invitation to import one.
+/// what was skipped. Without a profile, an invitation to import one; with
+/// one that can't be read, a way to replace or remove it.
 class ProfileCard extends StatelessWidget {
   const ProfileCard({
     super.key,
     required this.vehicle,
     required this.profile,
+    this.unreadable = false,
     required this.onImport,
     required this.onRemove,
     required this.onModelYear,
@@ -20,6 +22,9 @@ class ProfileCard extends StatelessWidget {
 
   final Vehicle vehicle;
   final SignalSet? profile;
+
+  /// The vehicle has a profile, but its file can't be read.
+  final bool unreadable;
   final VoidCallback onImport;
   final VoidCallback onRemove;
   final ValueChanged<int> onModelYear;
@@ -31,6 +36,13 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (unreadable) {
+      return _Unreadable(
+        fileName: vehicle.profileName,
+        onImport: onImport,
+        onRemove: onRemove,
+      );
+    }
     final profile = this.profile;
     if (profile == null) return _Empty(onImport: onImport);
 
@@ -223,4 +235,34 @@ class _Empty extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Unreadable extends StatelessWidget {
+  const _Unreadable({
+    required this.fileName,
+    required this.onImport,
+    required this.onRemove,
+  });
+
+  final String? fileName;
+  final VoidCallback onImport;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => StatusCard(
+    tone: StatusTone.error,
+    icon: Symbols.error_rounded,
+    title: 'Profile can\'t be read',
+    message:
+        '${fileName ?? 'The profile file'} is missing or damaged, so only '
+        'standard values are sent. Import it again, or remove it.',
+    actions: [
+      FilledButton.icon(
+        onPressed: onImport,
+        icon: const Icon(Symbols.upload_file_rounded),
+        label: const Text('Import again'),
+      ),
+      TextButton(onPressed: onRemove, child: const Text('Remove')),
+    ],
+  );
 }

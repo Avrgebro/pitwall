@@ -584,6 +584,27 @@ void main() {
     expect(find.text('vLinker MC+'), findsNothing);
   });
 
+  testWidgets('a profile that can\'t be read says so', (tester) async {
+    await _pumpApp(
+      tester,
+      settings: AppSettings(
+        // The vehicle says it has a profile, but there's no file for it.
+        vehicles: [_tucson.copyWith(profileName: 'default.json')],
+        setupDone: true,
+      ),
+    );
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tucson'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('OBDb profile can\'t be read'), findsOneWidget);
+    await tester.tap(find.text('Vehicle profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Profile can\'t be read'), findsOneWidget);
+    expect(find.text('Import again'), findsOneWidget);
+  });
+
   testWidgets('licences open in the app\'s own pages', (tester) async {
     LicenseRegistry.addLicense(
       () => Stream.value(

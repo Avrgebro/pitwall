@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/obd/elm327.dart';
+import '../core/profiles/signal_set.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/readings/readings.dart';
 import '../core/session/car_state.dart';
+import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'last_values_state.dart';
@@ -181,7 +183,7 @@ class SessionController extends Notifier<SessionState> {
     final log = ref.read(adapterLogProvider);
     state = state.copyWith(busy: true, clearProblem: true);
     try {
-      final profile = await ref.read(vehicleProfileProvider(vehicleId).future);
+      final profile = await _profileFor(vehicleId);
       final values = await readValues(
         elm,
         keys: keysToSend(vehicle, valueOptions(profile, vehicle.modelYear)),
@@ -225,6 +227,16 @@ class SessionController extends Notifier<SessionState> {
         return const {};
       }
       await _fail(e);
+      return null;
+    }
+  }
+
+  /// The vehicle's profile, or none if its file can't be read: standard
+  /// values still go out, and the vehicle's page shows the problem.
+  Future<SignalSet?> _profileFor(String vehicleId) async {
+    try {
+      return await ref.read(vehicleProfileProvider(vehicleId).future);
+    } on ProfileUnreadableException {
       return null;
     }
   }

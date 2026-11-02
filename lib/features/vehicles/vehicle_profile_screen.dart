@@ -21,14 +21,15 @@ class VehicleProfileScreen extends ConsumerWidget {
     if (vehicle == null) {
       return const AppPage(title: 'Vehicle profile', children: []);
     }
-    final profile = ref.watch(vehicleProfileProvider(vehicleId)).value;
+    final profileState = ref.watch(vehicleProfileProvider(vehicleId));
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',
       children: [
         ProfileCard(
           vehicle: vehicle,
-          profile: profile,
+          profile: profileState.value,
+          unreadable: profileState.hasError,
           onImport: () => _import(context, ref, vehicle),
           onRemove: () => notifier.removeProfile(vehicle.id),
           onModelYear: (year) =>

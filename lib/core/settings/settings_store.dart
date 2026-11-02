@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../profiles/signal_set.dart';
+import '../storage/app_files.dart';
 import '../vehicles/vehicle.dart';
 import '../webhook/webhook_auth.dart';
 import '../webhook/webhook_target.dart';
@@ -94,39 +95,31 @@ class SettingsStore {
   }
 
   /// The vehicle's imported profile, or null if it has none.
+  ///
+  /// Throws [ProfileUnreadableException] if the vehicle has a profile but
+  /// its file is gone or no longer parses.
   Future<SignalSet?> loadProfile(Vehicle vehicle) async {
     if (vehicle.profileName == null) return null;
     final file = await _profileFile(vehicle.id);
-    if (!await file.exists()) return null;
+    if (!await file.exists()) throw const ProfileUnreadableException();
     try {
       return SignalSet.parse(await file.readAsString());
     } on FormatException {
-      return null;
+      throw const ProfileUnreadableException();
     }
   }
 
-  /// Saves an imported profile for [vehicle] and returns the vehicle with
-  /// its profile name set; the caller saves the settings. [source] must
-  /// already have parsed.
-  Future<Vehicle> saveProfile(
-    Vehicle vehicle,
-    String source,
-    String name,
-  ) async {
-    final file = await _profileFile(vehicle.id);
+  /// Saves [profile] as the vehicle's profile file. Only a parsed profile
+  /// can be saved, so the file always holds one.
+  Future<void> saveProfile(String vehicleId, SignalSet profile) async {
+    final file = await _profileFile(vehicleId);
     await file.parent.create(recursive: true);
-    await file.writeAsString(source, flush: true);
-    return vehicle.copyWith(
-      profileName: name,
-      profileImportedAt: DateTime.now(),
-    );
+    await writeAtomically(file, profile.source);
   }
 
-  /// Deletes the vehicle's profile and returns the vehicle without it.
-  Future<Vehicle> deleteProfile(Vehicle vehicle) async {
-    final file = await _profileFile(vehicle.id);
+  Future<void> deleteProfile(String vehicleId) async {
+    final file = await _profileFile(vehicleId);
     if (await file.exists()) await file.delete();
-    return vehicle.copyWith(profileName: null, profileImportedAt: null);
   }
 
   /// Moves the single-car profile file to the migrated vehicle and saves
@@ -136,11 +129,18 @@ class SettingsStore {
     final legacy = File('${await _directory()}/$_legacyProfileFile');
     if (await legacy.exists()) {
       final name = await _preferences.getString(_legacyProfileNameKey);
-      vehicle = await saveProfile(
-        vehicle,
-        await legacy.readAsString(),
-        name ?? _legacyProfileFile,
-      );
+      try {
+        await saveProfile(
+          vehicle.id,
+          SignalSet.parse(await legacy.readAsString()),
+        );
+        vehicle = vehicle.copyWith(
+          profileName: name ?? _legacyProfileFile,
+          profileImportedAt: DateTime.now(),
+        );
+      } on FormatException {
+        // A profile that no longer parses isn't carried over.
+      }
       await legacy.delete();
       await _preferences.remove(_legacyProfileNameKey);
     }
@@ -154,4 +154,9 @@ class SettingsStore {
 
   Future<String> _directory() async =>
       (await getApplicationSupportDirectory()).path;
+}
+
+/// The vehicle has a profile, but its file is gone or no longer parses.
+class ProfileUnreadableException implements Exception {
+  const ProfileUnreadableException();
 }

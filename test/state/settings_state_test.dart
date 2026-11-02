@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
+import 'package:pitwall/core/platform/file_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/settings/settings_store.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/settings_state.dart';
 
+import '../core/profiles/test_profile.dart';
+import '../core/settings/fake_settings_store.dart';
 import '../helpers/fakes.dart';
 
 void main() {
@@ -107,6 +111,88 @@ void main() {
       expect(saved.adapterName, vlinker.name);
       expect(saved.name, 'Tucson');
       expect(saved.headUnitAddress, 'BB');
+    });
+  });
+
+  group('profiles', () {
+    Future<(ProviderContainer, FakeSettingsStore)> start({
+      String? profileName,
+    }) async {
+      final store = FakeSettingsStore(
+        settings: AppSettings(
+          vehicles: [
+            Vehicle(
+              id: 'tucson',
+              name: 'Tucson',
+              modelYear: 2023,
+              profileName: profileName,
+            ),
+          ],
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: testOverrides(store: store),
+      );
+      addTearDown(container.dispose);
+      await container.read(appSettingsProvider.future);
+      return (container, store);
+    }
+
+    test('importing saves the file and the vehicle together', () async {
+      final (container, store) = await start();
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .importProfile(
+            'tucson',
+            const PickedFile(name: 'default.json', contents: testProfileJson),
+          );
+
+      expect(store.profiles['tucson'], testProfileJson);
+      final vehicle = container.read(vehicleProvider('tucson'))!;
+      expect(vehicle.profileName, 'default.json');
+      expect(vehicle.profileImportedAt, isNotNull);
+      expect(
+        await container.read(vehicleProfileProvider('tucson').future),
+        isNotNull,
+      );
+    });
+
+    test('a file that isn\'t a profile is refused before saving', () async {
+      final (container, store) = await start();
+
+      await expectLater(
+        container
+            .read(appSettingsProvider.notifier)
+            .importProfile(
+              'tucson',
+              const PickedFile(name: 'notes.json', contents: '{}'),
+            ),
+        throwsFormatException,
+      );
+      expect(store.profiles, isEmpty);
+      expect(container.read(vehicleProvider('tucson'))!.profileName, isNull);
+    });
+
+    test('a profile whose file is gone is reported, not hidden', () async {
+      final (container, _) = await start(profileName: 'default.json');
+
+      await expectLater(
+        container.read(vehicleProfileProvider('tucson').future),
+        throwsA(isA<ProfileUnreadableException>()),
+      );
+    });
+
+    test('removing clears the file and the vehicle\'s profile', () async {
+      final (container, store) = await start(profileName: 'default.json');
+      store.profiles['tucson'] = testProfileJson;
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .removeProfile('tucson');
+
+      expect(store.profiles, isEmpty);
+      expect(container.read(vehicleProvider('tucson'))!.profileName, isNull);
     });
   });
 }
