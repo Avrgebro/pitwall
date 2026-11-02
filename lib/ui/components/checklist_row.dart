@@ -1,10 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
-import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
 import 'row_group.dart';
-import 'row_layout.dart';
+import 'app_row.dart';
 
 /// An item that's either done or needs fixing, with a fix action.
 class ChecklistRow extends StatelessWidget {
@@ -26,7 +25,7 @@ class ChecklistRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.tone(done ? StatusTone.healthy : StatusTone.error);
-    return RowLayout(
+    return AppRow(
       title: title,
       leading: Icon(
         done ? Icons.check_circle : Icons.error,
@@ -62,11 +61,9 @@ class ToggleRow extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => RowLayout(
+  Widget build(BuildContext context) => AppRow(
     title: title,
-    subtitle: caption == null
-        ? null
-        : Text(caption!, style: Theme.of(context).textTheme.mono),
+    subtitle: caption == null ? null : RowCaption(caption!),
     trailing: Checkbox(
       value: value,
       onChanged: (checked) => onChanged(checked ?? false),
@@ -114,7 +111,7 @@ class ChoiceRow<T> extends StatelessWidget {
       ),
       child: option,
     );
-    final row = RowLayout(
+    final row = AppRow(
       title: title,
       enabled: enabled,
       leading: Radio<T>(value: value, enabled: enabled),

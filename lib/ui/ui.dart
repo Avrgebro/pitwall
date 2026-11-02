@@ -4,6 +4,7 @@ library;
 
 // Plain Dart, re-exported so screens get it with the rest.
 export '../core/format/formatters.dart';
+export 'components/app_row.dart';
 export 'components/checklist_row.dart';
 export 'components/content_card.dart';
 export 'components/detail_rows.dart';
@@ -13,7 +14,6 @@ export 'components/glass_button.dart';
 export 'components/glass_surface.dart';
 export 'components/group_tile.dart';
 export 'components/row_group.dart';
-export 'components/row_layout.dart';
 export 'components/icon_badge.dart';
 export 'components/info_note.dart';
 export 'components/line_icon.dart';

@@ -56,23 +56,18 @@ class VehicleRow extends StatelessWidget {
       ),
       VehicleBadge.none => null,
     };
-    final accent = Theme.of(context).colorScheme.primary;
-    return RowLayout(
+    return AppRow(
       title: vehicle.name,
       // A problem replaces the status, so a car that needs something reads
       // differently at a glance.
-      subtitle: Text(
-        problem ?? status,
-        style: problem == null
-            ? null
-            : TextStyle(color: context.tone(StatusTone.error).accent),
-      ),
+      subtitle: Text(problem ?? status),
+      subtitleTone: problem == null ? null : StatusTone.error,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           ?chip,
           if (chip != null) const SizedBox(width: Insets.s),
-          Icon(Icons.chevron_right, color: accent),
+          const RowChevron(),
         ],
       ),
       onTap: onTap,

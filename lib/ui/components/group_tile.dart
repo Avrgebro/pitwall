@@ -1,23 +1,37 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
-import '../theme/text_styles.dart';
-import 'row_layout.dart';
+import 'app_row.dart';
 
-/// A row in a `RowGroup`: accent icon, title, subtitle or monospace caption,
-/// and a trailing widget. With [onTap] and no trailing, shows a chevron.
+/// The common [AppRow]: an accent icon, a title, a one-line subtitle, and
+/// a chevron when it opens a page. For a row that does something in place,
+/// such as deleting, use [GroupTile.action], which has no chevron.
 class GroupTile extends StatelessWidget {
+  /// A row that opens a page on tap, or shows [trailing] instead of the
+  /// chevron.
   const GroupTile({
     super.key,
     required this.title,
     this.icon,
     this.subtitle,
     this.subtitleTone,
-    this.caption,
     this.trailing,
     this.onTap,
-    this.destructive = false,
-  });
+  }) : tone = null,
+       _opensPage = true;
+
+  /// A row that acts in place: no chevron. [tone] colours it, e.g. error
+  /// for "Delete vehicle".
+  const GroupTile.action({
+    super.key,
+    required this.title,
+    required VoidCallback this.onTap,
+    this.icon,
+    this.subtitle,
+    this.subtitleTone,
+    this.tone,
+  }) : trailing = null,
+       _opensPage = false;
 
   final String title;
   final IconData? icon;
@@ -25,41 +39,20 @@ class GroupTile extends StatelessWidget {
 
   /// Colours the subtitle, e.g. error for "1 needs fixing".
   final StatusTone? subtitleTone;
-
-  /// A technical detail shown in monospace, such as a payload key.
-  final String? caption;
   final Widget? trailing;
   final VoidCallback? onTap;
-
-  /// An action that removes something: shown in the error colour.
-  final bool destructive;
+  final StatusTone? tone;
+  final bool _opensPage;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = destructive
-        ? context.tone(StatusTone.error).accent
-        : theme.colorScheme.primary;
-    return RowLayout(
-      title: title,
-      titleColor: destructive ? accent : null,
-      leading: icon == null ? null : Icon(icon, color: accent),
-      subtitle: switch ((subtitle, caption)) {
-        (final text?, _) => Text(
-          text,
-          style: subtitleTone == null
-              ? null
-              : TextStyle(color: context.tone(subtitleTone!).accent),
-        ),
-        (null, final code?) => Text(code, style: theme.textTheme.mono),
-        _ => null,
-      },
-      trailing:
-          trailing ??
-          (onTap == null || destructive
-              ? null
-              : Icon(Icons.chevron_right, color: accent)),
-      onTap: onTap,
-    );
-  }
+  Widget build(BuildContext context) => AppRow(
+    title: title,
+    tone: tone,
+    leading: icon == null ? null : Icon(icon),
+    subtitle: subtitle == null ? null : Text(subtitle!),
+    subtitleTone: subtitleTone,
+    trailing:
+        trailing ?? (_opensPage && onTap != null ? const RowChevron() : null),
+    onTap: onTap,
+  );
 }

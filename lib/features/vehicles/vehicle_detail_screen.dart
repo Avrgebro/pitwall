@@ -91,10 +91,10 @@ class VehicleDetailScreen extends ConsumerWidget {
         const SizedBox(height: Insets.xxl),
         RowGroup(
           children: [
-            GroupTile(
+            GroupTile.action(
               icon: Symbols.delete_rounded,
               title: 'Delete vehicle',
-              destructive: true,
+              tone: StatusTone.error,
               onTap: () => _delete(context, ref, vehicle),
             ),
           ],
