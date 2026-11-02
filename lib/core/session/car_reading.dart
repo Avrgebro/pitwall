@@ -9,12 +9,21 @@ sealed class CarReading {
   const CarReading();
 }
 
-/// The car answered. [values] are what it, and the adapter, reported:
-/// possibly none of the chosen ones.
+/// The car answered, with [values] to send: what it, and the adapter,
+/// reported. Never empty; see [CarAwake].
 final class CarAnswered extends CarReading {
-  const CarAnswered(this.values, this.carState);
+  const CarAnswered(this.values, this.carState)
+    : assert(values.length > 0, 'Nothing to send is CarAwake');
 
   final Map<String, double> values;
+  final CarState carState;
+}
+
+/// The car answered, but with nothing to send: none of the chosen values,
+/// or it was only asked whether it answers.
+final class CarAwake extends CarReading {
+  const CarAwake(this.carState);
+
   final CarState carState;
 }
 
@@ -49,10 +58,8 @@ Future<CarReading> readCar(
     }
     // The engine's state needs the battery voltage, sent or not.
     final voltage = values[batteryVoltageKey] ?? await elm.readBatteryVoltage();
-    return CarAnswered(
-      values,
-      carStateFrom({...values, batteryVoltageKey: ?voltage}),
-    );
+    final carState = carStateFrom({...values, batteryVoltageKey: ?voltage});
+    return values.isEmpty ? CarAwake(carState) : CarAnswered(values, carState);
   } on ElmException catch (e) {
     if (e.error != ElmError.unableToConnect) rethrow;
     return const CarSilent();

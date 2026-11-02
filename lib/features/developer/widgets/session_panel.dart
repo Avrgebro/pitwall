@@ -4,7 +4,10 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/session/car_state.dart';
 import '../../../core/vehicles/vehicle.dart';
+import '../../../core/platform/permission_gateway.dart';
 import '../../../state/infrastructure.dart';
+import '../../../state/permissions_state.dart';
+import '../../../state/reading_keeper.dart';
 import '../../../state/session_state.dart';
 import '../../../state/trip_state.dart';
 import '../../../ui/ui.dart';
@@ -27,6 +30,7 @@ class SessionPanel extends ConsumerWidget {
     final trip = ref.watch(tripProvider);
     final tripController = ref.read(tripProvider.notifier);
     final controller = ref.read(sessionProvider.notifier);
+    final readings = ref.read(readingKeeperProvider);
     final vehicle = this.vehicle;
     // Assumed on until Android says otherwise, so nothing flashes.
     final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
@@ -120,7 +124,7 @@ class SessionPanel extends ConsumerWidget {
               ],
               SessionConnected(:final busy) => [
                 FilledButton.icon(
-                  onPressed: busy ? null : controller.readAndSend,
+                  onPressed: busy ? null : readings.readAndKeep,
                   icon: const Icon(Symbols.send_rounded),
                   label: const Text('Read and send'),
                 ),
@@ -133,7 +137,14 @@ class SessionPanel extends ConsumerWidget {
               SessionIdle() => [
                 FilledButton.icon(
                   onPressed: canConnect
-                      ? () => controller.connect(vehicle)
+                      ? () async {
+                          // Asked here, where there's a screen to ask on;
+                          // connecting only checks.
+                          await ref
+                              .read(permissionsProvider.notifier)
+                              .request(AppPermission.bluetooth);
+                          await controller.connect(vehicle);
+                        }
                       : null,
                   icon: const Icon(Symbols.bluetooth_connected_rounded),
                   label: const Text('Connect'),
@@ -191,20 +202,14 @@ class SessionPanel extends ConsumerWidget {
     CarState.unknown => 'checking the car',
   };
 
-  static String? _problem(SessionProblem? problem) => switch (problem) {
-    SessionProblem.permissionDenied =>
+  static String? _problem(ConnectionProblem? problem) => switch (problem) {
+    ConnectionProblem.permissionDenied =>
       'Pitwall needs the Bluetooth permission to connect.',
-    SessionProblem.connectFailed =>
+    ConnectionProblem.connectFailed =>
       'Couldn\'t reach the adapter. Is it plugged in and the ignition on?',
-    SessionProblem.disconnected => 'The adapter disconnected.',
-    SessionProblem.adapterError =>
+    ConnectionProblem.disconnected => 'The adapter disconnected.',
+    ConnectionProblem.adapterError =>
       'The adapter stopped answering. Connect again.',
-    SessionProblem.noAdapter => 'Choose the vehicle\'s adapter first.',
-    SessionProblem.inUse => 'Another connection is open.',
-    // Only ever the outcome of a step, never why the session is idle.
-    SessionProblem.notConnected ||
-    SessionProblem.busy ||
-    SessionProblem.vehicleRemoved ||
     null => null,
   };
 }

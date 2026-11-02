@@ -62,7 +62,12 @@ class WebhookSender {
   List<QueuedReading> _queue = [];
   int _seq = 0;
   int _deliveredThrough = 0;
-  bool _flushing = false;
+
+  /// The delivery under way, if one is.
+  Future<void>? _flushing;
+
+  /// Set by [dispose]: a delivery under way stops at its next step.
+  bool _disposed = false;
   Timer? _retry;
 
   /// Loads what was left from earlier runs and starts delivering it.
@@ -75,25 +80,9 @@ class WebhookSender {
     unawaited(flush());
   }
 
-  /// Queues a reading and tries to deliver everything queued.
-  Future<void> send({
-    required String device,
-    required Map<String, double> values,
-    required bool connected,
-    bool? engineRunning,
-  }) async {
-    await queue(
-      device: device,
-      values: values,
-      connected: connected,
-      engineRunning: engineRunning,
-    );
-    await flush();
-  }
-
-  /// Queues a reading without delivering it yet, and returns its sequence
-  /// number: it's delivered once the status's `deliveredThrough` reaches
-  /// it. [flush] delivers.
+  /// Queues a reading and starts delivering what's queued, without waiting
+  /// for it; [flush] waits. Returns the reading's sequence number: it's
+  /// delivered once the status's `deliveredThrough` reaches it.
   Future<int> queue({
     required String device,
     required Map<String, double> values,
@@ -114,37 +103,40 @@ class WebhookSender {
     }
     await _persist();
     _publish();
+    unawaited(flush());
     return reading.seq;
   }
 
   /// Delivers queued readings, oldest first, until the queue is empty or a
-  /// send fails. After a failure that retrying can fix, a retry is
-  /// scheduled; see [DeliveryErrorKind.retryable].
-  Future<void> flush() async {
-    if (_flushing) return;
-    _flushing = true;
+  /// send fails, and completes then. A delivery already under way is the
+  /// one waited for: it takes in readings queued meanwhile. After a failure
+  /// that retrying can fix, a retry is scheduled; see
+  /// [DeliveryErrorKind.retryable].
+  Future<void> flush() =>
+      _flushing ??= _deliver().whenComplete(() => _flushing = null);
+
+  Future<void> _deliver() async {
     _retry?.cancel();
-    try {
-      while (_queue.isNotEmpty) {
-        final target = await _webhookTarget();
-        if (_unusable(target) case final error?) {
-          _failed(error);
-          return;
-        }
-        final (:error, :elapsed) = await _post(
-          target,
-          jsonEncode(_queue.first.toJson()),
-        );
-        if (error != null) {
-          _failed(error);
-          return;
-        }
-        _deliveredThrough = _queue.removeAt(0).seq;
-        await _persist();
-        _succeeded();
+    while (_queue.isNotEmpty) {
+      final target = await _webhookTarget();
+      if (_disposed) return;
+      if (_unusable(target) case final error?) {
+        _failed(error);
+        return;
       }
-    } finally {
-      _flushing = false;
+      final (:error, :elapsed) = await _post(
+        target,
+        jsonEncode(_queue.first.toJson()),
+      );
+      // The reading stays queued; the next run delivers it.
+      if (_disposed) return;
+      if (error != null) {
+        _failed(error);
+        return;
+      }
+      _deliveredThrough = _queue.removeAt(0).seq;
+      await _persist();
+      _succeeded();
     }
   }
 
@@ -171,6 +163,7 @@ class WebhookSender {
   }
 
   void dispose() {
+    _disposed = true;
     _retry?.cancel();
     _client.close();
     status.dispose();
@@ -262,6 +255,7 @@ class WebhookSender {
 
   /// Shows the queue and the last delivery outcome as they are now.
   void _publish() {
+    if (_disposed) return;
     status.value = DeliveryStatus(
       queued: _queue.length,
       failedAttempts: _outcome.failedAttempts,

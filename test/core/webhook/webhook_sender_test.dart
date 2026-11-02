@@ -40,11 +40,15 @@ void main() {
     backoff: (_) => const Duration(milliseconds: 10),
   );
 
-  Future<void> sendFuel(WebhookSender sender, double litres) => sender.send(
-    device: 'tucson',
-    values: {'tucson_fli_vol': litres},
-    connected: true,
-  );
+  /// Queues a reading and waits for the delivery it starts.
+  Future<void> sendFuel(WebhookSender sender, double litres) async {
+    await sender.queue(
+      device: 'tucson',
+      values: {'tucson_fli_vol': litres},
+      connected: true,
+    );
+    await sender.flush();
+  }
 
   setUp(() {
     storage = FakeDeliveryStorage();
@@ -309,4 +313,15 @@ void main() {
       pitwall.dispose();
     },
   );
+
+  test('queueing starts delivery without being asked', () async {
+    final pitwall = sender();
+    await pitwall.init();
+
+    await pitwall.queue(device: 'tucson', values: const {}, connected: false);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(received.single['connected'], isFalse);
+    pitwall.dispose();
+  });
 }

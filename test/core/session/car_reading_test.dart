@@ -48,4 +48,20 @@ void main() {
           .having((r) => r.carState, 'carState', CarState.engineRunning),
     );
   });
+
+  test('none of the chosen values, but the car answers: awake', () async {
+    final reading = await read(
+      {'0100': '4100BE3EB811', 'ATRV': '12.4V'},
+      {'speed_kmh'},
+    );
+
+    expect(
+      reading,
+      isA<CarAwake>().having(
+        (r) => r.carState,
+        'carState',
+        CarState.ignitionOn,
+      ),
+    );
+  });
 }

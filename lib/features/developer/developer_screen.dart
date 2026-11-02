@@ -38,8 +38,8 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
         .map((c) => c.toUpperCase())
         .toList();
     if (commands.isEmpty) return;
-    final problem = await ref.read(sessionProvider.notifier).sendRaw(commands);
-    if (problem == null && mounted) _command.clear();
+    final outcome = await ref.read(sessionProvider.notifier).sendRaw(commands);
+    if (outcome is StepDone && mounted) _command.clear();
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
+import 'package:pitwall/core/session/car_reading.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_notification_text.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
@@ -14,6 +16,7 @@ import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
+import 'package:pitwall/state/reading_keeper.dart';
 import 'package:pitwall/state/session_state.dart';
 import 'package:pitwall/state/settings_state.dart';
 import 'package:pitwall/state/trip_state.dart';
@@ -81,6 +84,7 @@ void main() {
     TripTarget? pendingRequest,
     FakePermissionGateway? permissions,
     FakeBluetoothGateway? bluetooth,
+    Future<http.Response>? Function()? answer,
   }) {
     service = FakeTripServiceGateway(pendingRequest: pendingRequest);
     received = [];
@@ -98,7 +102,7 @@ void main() {
           const WebhookTarget('https://example.com/api/webhook/x'),
       client: MockClient((request) async {
         received.add(jsonDecode(request.body) as Map<String, Object?>);
-        return http.Response('', 200);
+        return await answer?.call() ?? http.Response('', 200);
       }),
     );
     final c = ProviderContainer(
@@ -207,15 +211,16 @@ void main() {
     expect(received.first['values'], {'battery_v': 13.6});
   });
 
-  test('a failure while sending doesn\'t leave the adapter busy', () async {
+  test('a failure while keeping doesn\'t leave the adapter busy', () async {
     final c = container(adapter: (_) => _Adapter());
     await c.read(appSettingsProvider.future);
     final session = c.read(sessionProvider.notifier);
-    await session.connect(_tucson, askPermission: false);
+    final readings = c.read(readingKeeperProvider);
+    await session.connect(_tucson);
     lastValues.failing = true;
 
     await expectLater(
-      session.readAndSend(),
+      readings.readAndKeep(),
       throwsA(isA<FileSystemException>()),
     );
 
@@ -223,7 +228,7 @@ void main() {
     expect(c.read(sessionProvider), isA<SessionConnected>());
     expect((c.read(sessionProvider) as SessionConnected).busy, isFalse);
     lastValues.failing = false;
-    expect(await session.readAndSend(), isA<ReadDone>());
+    expect(await readings.readAndKeep(), isA<StepDone<CarReading>>());
     await session.disconnect();
   });
 
@@ -410,6 +415,51 @@ void main() {
 
     expect(trip.lastEnd, TripEnd.adapterLost);
     expect(received.last['connected'], isFalse);
+  });
+
+  test(
+    'losing the permission mid-trip says so, not that the adapter went',
+    () async {
+      final adapters = <_Adapter>[];
+      final permissions = FakePermissionGateway();
+      final c = container(
+        adapter: (_) {
+          final adapter = _Adapter();
+          adapters.add(adapter);
+          return adapter;
+        },
+        permissions: permissions,
+      );
+      c.read(tripProvider);
+      service.send(const HeadUnitTarget(_tucsonStereo));
+      await running(c);
+
+      permissions.granted[AppPermission.bluetooth] = false;
+      await adapters.single.disconnect();
+      final trip = await ended(c);
+
+      expect(trip.lastEnd, TripEnd.permissionMissing);
+    },
+  );
+
+  test('reading doesn\'t wait for delivery', () async {
+    // A server that doesn't answer until the end.
+    final server = Completer<http.Response>();
+    final c = container(
+      adapter: (_) => _Adapter(),
+      answer: () => server.future,
+    );
+    await c.read(appSettingsProvider.future);
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+
+    final outcome = await c.read(readingKeeperProvider).readAndKeep();
+
+    expect(outcome, isA<StepDone<CarReading>>());
+    await until(() => received.isNotEmpty, 'the reading to be posted');
+    expect(lastValues.saved.of(_tucson.id), isNotEmpty);
+    server.complete(http.Response('', 200));
+    await session.disconnect();
   });
 
   test(
