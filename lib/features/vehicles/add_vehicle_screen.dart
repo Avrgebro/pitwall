@@ -59,16 +59,12 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   @override
   Widget build(BuildContext context) => AppPage(
     title: 'Add vehicle',
-    bottom: SafeArea(
-      top: false,
-      child: Padding(
-        padding: Insets.card,
-        child: SizedBox(
-          width: double.infinity,
-          child: GlassButton(
-            onPressed: _draft.isComplete ? _save : null,
-            child: const Text('Add vehicle'),
-          ),
+    bottom: PinnedActions(
+      child: SizedBox(
+        width: double.infinity,
+        child: GlassButton(
+          onPressed: _draft.isComplete ? _save : null,
+          child: const Text('Add vehicle'),
         ),
       ),
     ),

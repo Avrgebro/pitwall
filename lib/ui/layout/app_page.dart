@@ -3,8 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../theme/glass_colors.dart';
 import '../theme/glass_filters.dart';
 import '../theme/tokens.dart';
-import 'page_backdrop.dart';
-import 'pinned_bottom.dart';
+import 'page_frame.dart';
 
 /// The frame of every screen: a title (with a back button on sub-screens),
 /// an optional subtitle, and scrolling content with page padding.
@@ -45,8 +44,8 @@ class AppPage extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? floatingActionButton;
 
-  /// Pinned over the bottom of the content, such as a main button or an
-  /// input bar; see [PinnedBottom].
+  /// Pinned over the bottom of the content, such as [PinnedActions] or a
+  /// `GlassBar`.
   final Widget? bottom;
 
   /// Taller than Material's 64, so the large title has room to breathe.
@@ -71,10 +70,8 @@ class AppPage extends StatelessWidget {
     // The same test AppBar uses to imply a back button.
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
     final subtitle = this.subtitle;
-    final bottom = this.bottom;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
+    return PageFrame(
       appBar: AppBar(
         toolbarHeight: _barHeight,
         automaticallyImplyLeading: false,
@@ -123,11 +120,8 @@ class AppPage extends StatelessWidget {
         actions: actions,
       ),
       floatingActionButton: floatingActionButton,
-      body: PageBackdrop(
-        child: bottom == null
-            ? _content()
-            : PinnedBottom(bottom: bottom, child: _content()),
-      ),
+      bottom: bottom,
+      body: _content(),
     );
   }
 

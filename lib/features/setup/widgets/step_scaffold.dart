@@ -40,77 +40,71 @@ class StepScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      body: PageBackdrop(
-        child: PinnedBottom(
-          bottom: SafeArea(
-            top: false,
-            child: Padding(
+    return PageFrame(
+      bottom: PinnedActions(
+        // Lined up with the step's content.
+        padding: const EdgeInsets.fromLTRB(
+          Insets.xl,
+          Insets.s,
+          Insets.xl,
+          Insets.l,
+        ),
+        child: _buttons(),
+      ),
+      // The bottom padding is the pinned buttons', for the list.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
               padding: const EdgeInsets.fromLTRB(
                 Insets.xl,
-                Insets.s,
-                Insets.xl,
                 Insets.l,
+                Insets.xl,
+                0,
               ),
-              child: _buttons(),
+              child: _Progress(step: step, steps: steps),
             ),
-          ),
-          // The bottom padding is the pinned buttons', for the list.
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
+            Expanded(
+              child: Builder(
+                builder: (context) => ListView(
+                  padding: EdgeInsets.fromLTRB(
                     Insets.xl,
-                    Insets.l,
                     Insets.xl,
-                    0,
+                    Insets.xl,
+                    MediaQuery.paddingOf(context).bottom + Insets.xl,
                   ),
-                  child: _Progress(step: step, steps: steps),
-                ),
-                Expanded(
-                  child: Builder(
-                    builder: (context) => ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        Insets.xl,
-                        Insets.xl,
-                        Insets.xl,
-                        MediaQuery.paddingOf(context).bottom + Insets.xl,
+                  children: [
+                    if (title != null)
+                      Text(title!, style: theme.textTheme.headlineMedium),
+                    if (message != null) ...[
+                      const SizedBox(height: Insets.s),
+                      Text(
+                        message!,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      children: [
-                        if (title != null)
-                          Text(title!, style: theme.textTheme.headlineMedium),
-                        if (message != null) ...[
-                          const SizedBox(height: Insets.s),
-                          Text(
-                            message!,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                        if (title != null || message != null)
-                          const SizedBox(height: Insets.xl),
-                        ...children,
-                        if (footnote != null) ...[
-                          const SizedBox(height: Insets.xl),
-                          Text(
-                            footnote!,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                    ],
+                    if (title != null || message != null)
+                      const SizedBox(height: Insets.xl),
+                    ...children,
+                    if (footnote != null) ...[
+                      const SizedBox(height: Insets.xl),
+                      Text(
+                        footnote!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

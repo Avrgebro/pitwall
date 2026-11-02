@@ -202,9 +202,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
-        home: PinnedBottom(
+        home: PageFrame(
           bottom: GlassButton(onPressed: () {}, child: const Text('Pinned')),
-          child: Center(
+          body: Center(
             child: GlassButton(onPressed: () {}, child: const Text('Inline')),
           ),
         ),
