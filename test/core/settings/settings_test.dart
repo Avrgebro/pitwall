@@ -10,7 +10,7 @@ void main() {
     adapterAddress: '00:11:22:33:44:55',
     adapterName: 'OBDII',
     modelYear: 2023,
-    selectedKeys: {'fuel_level_l', 'battery_v'},
+    selectedKeys: {'tucson_fli_vol', 'battery_v'},
     profileName: 'default.json',
     headUnitAddress: 'AA:BB:CC:DD:EE:FF',
     headUnitName: 'TUCSON BT',
@@ -31,7 +31,7 @@ void main() {
     expect(vehicle.adapterAddress, '00:11:22:33:44:55');
     expect(vehicle.adapterName, 'OBDII');
     expect(vehicle.modelYear, 2023);
-    expect(vehicle.selectedKeys, {'fuel_level_l', 'battery_v'});
+    expect(vehicle.selectedKeys, {'tucson_fli_vol', 'battery_v'});
     expect(vehicle.profileName, 'default.json');
     expect(vehicle.tripStart, TripStart.carBluetooth);
     expect(vehicle.headUnitAddress, 'AA:BB:CC:DD:EE:FF');
@@ -156,13 +156,13 @@ void main() {
       'adapterName': 'OBDII',
       'deviceName': 'tucson',
       'modelYear': 2023,
-      'selectedKeys': ['fuel_level_l'],
+      'selectedKeys': ['tucson_fli_vol'],
     });
 
     final vehicle = settings.vehicles.single;
     expect(vehicle.name, 'tucson');
     expect(vehicle.adapterAddress, '00:11:22:33:44:55');
-    expect(vehicle.selectedKeys, {'fuel_level_l'});
+    expect(vehicle.selectedKeys, {'tucson_fli_vol'});
     expect(vehicle.id, isNotEmpty);
   });
 

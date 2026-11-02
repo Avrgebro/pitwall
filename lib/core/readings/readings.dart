@@ -14,7 +14,6 @@ class ValueOption {
     required this.shortName,
     required this.unit,
     this.fromProfile = false,
-    this.recommended = true,
   });
 
   final String key;
@@ -23,16 +22,15 @@ class ValueOption {
   /// Compact label for tiles, e.g. "Fuel".
   final String shortName;
   final String unit;
-  final bool fromProfile;
 
-  /// Sent by default. Profile signals without a known meaning aren't: a
-  /// profile can have hundreds, mostly diagnostic.
-  final bool recommended;
+  /// From the vehicle's profile rather than standard OBD-II. These aren't
+  /// sent by default: a profile can have hundreds, mostly diagnostic.
+  final bool fromProfile;
 }
 
 /// Every value Pitwall can send for this car: battery voltage, the standard
 /// PIDs, and the profile's signals for [modelYear]. Keys are unique; a
-/// profile signal sharing a key with a standard value isn't listed twice.
+/// signal the profile lists under several commands appears once.
 List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
   final options = <String, ValueOption>{
     batteryVoltageKey: const ValueOption(
@@ -57,10 +55,9 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
           () => ValueOption(
             key: signal.key,
             name: signal.name,
-            shortName: _shortNames[signal.key] ?? signal.name,
+            shortName: signal.name,
             unit: signal.unit,
             fromProfile: true,
-            recommended: signal.hasKnownMeaning,
           ),
         );
       }
@@ -69,19 +66,15 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
   return options.values.toList();
 }
 
-/// Compact labels for the profile keys Pitwall recognises.
-const _shortNames = {'fuel_level_l': 'Fuel', 'odometer_km': 'Odometer'};
-
-/// The keys sent when the user hasn't chosen any.
+/// The keys sent when the user hasn't chosen any: the standard ones.
 Set<String> defaultKeys(List<ValueOption> options) => {
   for (final option in options)
-    if (option.recommended) option.key,
+    if (!option.fromProfile) option.key,
 };
 
 /// Reads the values in [keys]: battery voltage from the adapter, standard
 /// PIDs the car supports, and profile signals for [modelYear]. Only the
-/// requests those keys need are sent. Profile values replace standard ones
-/// that measure the same thing.
+/// requests those keys need are sent.
 Future<Map<String, double>> readValues(
   Elm327 elm, {
   required Set<String> keys,
@@ -103,5 +96,5 @@ Future<Map<String, double>> readValues(
   final fromProfile = profile != null && modelYear != null
       ? await readProfile(elm, profile, modelYear, keys: keys)
       : <String, double>{};
-  return mergeValues(standard, fromProfile);
+  return {...standard, ...fromProfile};
 }

@@ -24,17 +24,18 @@ void main() {
       ]);
     });
 
-    test('profile signals are added once, unknown ones not by default', () {
+    test('profile signals keep their ids and are off by default', () {
       final options = valueOptions(profile, 2018);
+      final profileKeys = [
+        for (final option in options)
+          if (option.fromProfile) option.key,
+      ];
 
-      // odometer_km is already a standard value, so it isn't repeated.
+      expect(profileKeys, ['test_fuel_vol', 'test_odo_mi', 'test_old_only']);
+      // A tagged odometer doesn't take over the standard one.
       expect(options.where((o) => o.key == 'odometer_km'), hasLength(1));
-      expect(
-        options.firstWhere((o) => o.key == 'fuel_level_l').fromProfile,
-        isTrue,
-      );
-      expect(defaultKeys(options), contains('fuel_level_l'));
-      expect(defaultKeys(options), isNot(contains('test_old_only')));
+      expect(defaultKeys(options), isNot(contains('test_fuel_vol')));
+      expect(defaultKeys(options), contains('odometer_km'));
     });
   });
 
@@ -55,13 +56,13 @@ void main() {
 
     final values = await readValues(
       Elm327(transport),
-      keys: {'rpm', 'fuel_level_l'},
+      keys: {'rpm', 'test_fuel_vol'},
       supportedPids: {0x0C, 0x0D, 0x2F},
       profile: profile,
       modelYear: 2023,
     );
 
-    expect(values, {'rpm': 1726, 'fuel_level_l': 52});
+    expect(values, {'rpm': 1726, 'test_fuel_vol': 52});
     expect(transport.sent, isNot(contains('ATRV')));
     expect(transport.sent, isNot(contains('010D')));
     expect(transport.sent, contains('221234'));

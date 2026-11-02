@@ -26,14 +26,12 @@ void main() {
       expect(signalSet.commandsFor(2018).map((c) => c.header), ['7A0', '7E0']);
     });
 
-    test('suggested metrics map to payload keys', () {
+    test('signals keep their id, in lower case, and their unit', () {
       final signals = signalSet.commands.first.signals;
 
-      expect(signals.map((s) => s.key), ['fuel_level_l', 'odometer_km']);
-      expect(signals.map((s) => s.unit), ['L', 'km']);
-    });
-
-    test('other signals use their id in lower case', () {
+      // Even with OBDb's suggestedMetric tags, nothing is renamed.
+      expect(signals.map((s) => s.key), ['test_fuel_vol', 'test_odo_mi']);
+      expect(signals.map((s) => s.unit), ['liters', 'miles']);
       expect(signalSet.commands.last.signals.single.key, 'test_old_only');
     });
 
@@ -104,17 +102,15 @@ void main() {
       expect(format.decode([0xCD, 0x00]), 20.5);
     });
 
-    test('miles convert to km', () {
+    test('values stay in the profile\'s units', () {
       final odometer = SignalSet.parse(testProfileJson)
           .commands
           .first
           .signals
           .last;
 
-      expect(
-        odometer.decode([0x00, 0x00, 0x00, 0x32, 0xF2]),
-        closeTo(20989.06, 0.01),
-      );
+      expect(odometer.unit, 'miles');
+      expect(odometer.decode([0x00, 0x00, 0x00, 0x32, 0xF2]), 13042);
     });
   });
 }

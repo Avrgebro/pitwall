@@ -199,8 +199,8 @@ class _Empty extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                     Text(
-                      'Import a profile for extras like fuel in litres and the '
-                      'real odometer.',
+                      'Import a profile to add your car\'s own signals to the '
+                      'values you can send.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

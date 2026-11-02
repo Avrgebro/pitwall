@@ -6,7 +6,6 @@ import '../../ui/format/formatters.dart';
 abstract final class ValueDisplay {
   /// Most glanceable first; the odometer last, where it gets a full row.
   static const _order = [
-    'fuel_level_l',
     'fuel_level_pct',
     batteryVoltageKey,
     'coolant_temp_c',

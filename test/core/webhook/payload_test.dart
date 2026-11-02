@@ -7,7 +7,7 @@ void main() {
       device: 'tucson',
       seq: 1284,
       timestamp: DateTime.utc(2026, 10, 31, 19, 40, 0, 123),
-      values: {'fuel_level_l': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
+      values: {'tucson_fli_vol': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
       connected: true,
       engineRunning: true,
     );
@@ -16,7 +16,7 @@ void main() {
       'device': 'tucson',
       'seq': 1284,
       'timestamp': '2026-10-31T19:40:00Z',
-      'values': {'fuel_level_l': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
+      'values': {'tucson_fli_vol': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
       'engine': 'running',
       'connected': true,
     });

@@ -189,53 +189,35 @@ class ProfileSignal {
     required this.key,
     required this.unit,
     required this.format,
-    this.factor = 1,
   });
 
   /// OBDb's signal id, e.g. `TUCSON_FLI_VOL`.
   final String id;
   final String name;
 
-  /// Field name in the webhook payload.
+  /// Field name in the webhook payload: the OBDb id in lowercase, e.g.
+  /// `tucson_fli_vol`. Pitwall doesn't rename signals or convert their
+  /// units; the profile is the source of truth.
   final String key;
+
+  /// OBDb's unit name, e.g. `liters`.
   final String unit;
   final SignalFormat format;
 
-  /// Unit conversion applied after decoding, e.g. miles to km.
-  final double factor;
-
-  /// Whether this signal maps to one of Pitwall's own payload keys, such as
-  /// `fuel_level_l`, rather than to its raw OBDb id.
-  bool get hasKnownMeaning => key != id.toLowerCase();
-
   /// Decodes this signal from a reply's data, or returns null if the reply
   /// is too short or the value means "not available".
-  double? decode(List<int> data) {
-    final value = format.decode(data);
-    return value == null ? null : value * factor;
-  }
-
-  static const _milesToKm = 1.609344;
+  double? decode(List<int> data) => format.decode(data);
 
   static ProfileSignal? _parse(Map json) {
     final id = json['id'];
     final format = SignalFormat._parse(json['fmt']);
     if (id is! String || format == null) return null;
-    final metric = json['suggestedMetric'];
-    final (key, unit, factor) = switch ((metric, format.unit)) {
-      ('fuelTankLevel', 'percent') => ('fuel_level_pct', '%', 1.0),
-      ('fuelTankLevel', 'liters') => ('fuel_level_l', 'L', 1.0),
-      ('odometer', 'kilometers') => ('odometer_km', 'km', 1.0),
-      ('odometer', 'miles') => ('odometer_km', 'km', _milesToKm),
-      _ => (id.toLowerCase(), format.unit, 1.0),
-    };
     return ProfileSignal(
       id: id,
       name: json['name'] as String? ?? id,
-      key: key,
-      unit: unit,
+      key: id.toLowerCase(),
+      unit: format.unit,
       format: format,
-      factor: factor,
     );
   }
 }

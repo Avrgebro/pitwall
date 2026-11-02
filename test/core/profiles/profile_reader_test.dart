@@ -33,8 +33,9 @@ void main() {
 
       final values = await readProfile(Elm327(transport), signalSet, 2023);
 
-      expect(values['fuel_level_l'], 52);
-      expect(values['odometer_km'], closeTo(20989.06, 0.01));
+      // Raw ids and the profile's own units: miles stay miles.
+      expect(values['test_fuel_vol'], 52);
+      expect(values['test_odo_mi'], 13042);
       expect(values, isNot(contains('test_old_only')));
       expect(transport.sent, [
         'ATSH7A0',
@@ -65,14 +66,5 @@ void main() {
     final values = await readProfile(Elm327(transport), signalSet, 2023);
 
     expect(values, isEmpty);
-  });
-
-  test('profile fuel in litres replaces the standard percent', () {
-    final merged = mergeValues(
-      {'fuel_level_pct': 0, 'rpm': 800},
-      {'fuel_level_l': 52},
-    );
-
-    expect(merged, {'rpm': 800, 'fuel_level_l': 52});
   });
 }

@@ -19,6 +19,10 @@ Vgate iCar Pro.
 - **Reads standard OBD-II values** on an interval (every minute by default),
   such as fuel level, speed, RPM, coolant temperature and battery voltage. It
   only sends values your car actually reports.
+- **Reads your car's own signals too**, if you import its profile from
+  [OBDb](https://github.com/OBDb), such as fuel in litres or tyre pressures.
+  You choose which to send. They keep their OBDb ids as keys
+  (`tucson_fli_vol`) and the profile's units.
 - **POSTs them as JSON** to a URL you choose. Home Assistant is the main
   target, but anything that accepts a POST works: Node-RED, n8n or your own
   server. Optional authentication: bearer token, username and password, or

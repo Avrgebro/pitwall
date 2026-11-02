@@ -18,7 +18,7 @@ class ValuesToSendScreen extends ConsumerStatefulWidget {
 }
 
 class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
-  bool _showOthers = false;
+  bool _showProfile = false;
 
   /// Whether the search bar is open, and what's typed in it.
   bool _searching = false;
@@ -43,10 +43,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final filtering = _searching && query.isNotEmpty;
     final shown = filtering ? _matching(options, query) : options;
     final standard = shown.where((o) => !o.fromProfile).toList();
-    final recognised = shown
-        .where((o) => o.fromProfile && o.recommended)
-        .toList();
-    final others = shown.where((o) => o.fromProfile && !o.recommended).toList();
+    final fromProfile = shown.where((o) => o.fromProfile).toList();
     final defaults = defaultKeys(options);
     Widget row(ValueOption option) => _SignalToggle(
       vehicleId: vehicle.id,
@@ -100,40 +97,36 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
             const SectionHeader('Standard', trailing: 'Works on most cars'),
             RowGroup(children: [for (final option in standard) row(option)]),
           ],
-          if (recognised.isNotEmpty) ...[
-            SectionHeader(
-              'From vehicle profile',
-              trailing: _profileLabel(vehicle),
-            ),
-            RowGroup(children: [for (final option in recognised) row(option)]),
+          if (fromProfile.isNotEmpty) ...[
+            SectionHeader('Profile signals', trailing: _profileLabel(vehicle)),
           ],
-          if (others.isNotEmpty && filtering) ...[
+          if (fromProfile.isNotEmpty && filtering) ...[
             // Matches are what was searched for; no need to expand them.
-            const SectionHeader('Other profile signals'),
-            RowGroup(children: [for (final option in others) row(option)]),
-          ] else if (others.isNotEmpty) ...[
-            const SectionHeader('Other profile signals'),
+            RowGroup(children: [for (final option in fromProfile) row(option)]),
+          ] else if (fromProfile.isNotEmpty) ...[
             RowGroup(
               children: [
                 GroupTile(
                   icon: Symbols.manage_search_rounded,
-                  title: _showOthers
-                      ? 'Hide ${others.length} signals'
-                      : 'Show ${others.length} signals',
+                  title: _showProfile
+                      ? 'Hide ${fromProfile.length} signals'
+                      : 'Show ${fromProfile.length} signals',
                   subtitle:
-                      'Mostly diagnostic. Each one costs an extra request every '
-                      'reading.',
+                      'Sent under their OBDb names, in the profile\'s units. '
+                      'Each one adds a request to every reading.',
                   trailing: Icon(
-                    _showOthers ? Icons.expand_less : Icons.expand_more,
+                    _showProfile ? Icons.expand_less : Icons.expand_more,
                     color: Theme.of(context).colorScheme.primary,
                   ),
-                  onTap: () => setState(() => _showOthers = !_showOthers),
+                  onTap: () => setState(() => _showProfile = !_showProfile),
                 ),
               ],
             ),
-            if (_showOthers) ...[
+            if (_showProfile) ...[
               const SizedBox(height: Insets.m),
-              RowGroup(children: [for (final option in others) row(option)]),
+              RowGroup(
+                children: [for (final option in fromProfile) row(option)],
+              ),
             ],
           ],
         ],

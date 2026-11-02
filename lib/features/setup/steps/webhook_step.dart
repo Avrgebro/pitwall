@@ -26,7 +26,7 @@ class WebhookStep extends StatelessWidget {
         seq: 1,
         timestamp: DateTime.now(),
         values: const {
-          'fuel_level_l': 47.5,
+          'fuel_level_pct': 87.5,
           'odometer_km': 33999,
           'battery_v': 13.6,
           'coolant_temp_c': 89,

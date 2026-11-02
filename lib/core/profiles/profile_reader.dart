@@ -1,13 +1,6 @@
 import '../obd/elm327.dart';
 import 'signal_set.dart';
 
-/// Profile keys that replace standard keys measuring the same thing. A
-/// profile with fuel in litres means the standard fuel percent can't be
-/// trusted on that car.
-const replacedStandardKeys = {
-  'fuel_level_l': {'fuel_level_pct'},
-};
-
 /// Reads the signals in [signalSet] that apply to [modelYear] and returns
 /// the values by payload key. If [keys] is given, only signals with those
 /// keys are decoded, and only the requests they need are sent. When several
@@ -45,20 +38,4 @@ Future<Map<String, double>> readProfile(
     if (!elm.isClosed) await elm.setTarget(null);
   }
   return values;
-}
-
-/// Combines standard values with profile values. Profile values win, and
-/// remove standard values they replace (see [replacedStandardKeys]).
-Map<String, double> mergeValues(
-  Map<String, double> standard,
-  Map<String, double> profile,
-) {
-  final replaced = {
-    for (final key in profile.keys) ...?replacedStandardKeys[key],
-  };
-  return {
-    for (final entry in standard.entries)
-      if (!replaced.contains(entry.key)) entry.key: entry.value,
-    ...profile,
-  };
 }

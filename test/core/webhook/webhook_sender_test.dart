@@ -41,7 +41,7 @@ void main() {
 
   Future<void> sendFuel(WebhookSender sender, double litres) => sender.send(
     device: 'tucson',
-    values: {'fuel_level_l': litres},
+    values: {'tucson_fli_vol': litres},
     connected: true,
   );
 
@@ -60,7 +60,7 @@ void main() {
 
     expect(received.map((p) => p['seq']), [1, 2]);
     expect(received.first['device'], 'tucson');
-    expect(received.first['values'], {'fuel_level_l': 47.5});
+    expect(received.first['values'], {'tucson_fli_vol': 47.5});
     expect(pitwall.status.value.queued, 0);
     expect(pitwall.status.value.lastSuccess, isNotNull);
     pitwall.dispose();
@@ -226,14 +226,14 @@ void main() {
     await pitwall.send(device: 'tucson', values: const {}, connected: false);
 
     final latest = pitwall.status.value.latest!;
-    expect(latest.values, {'fuel_level_l': 47.5});
+    expect(latest.values, {'tucson_fli_vol': 47.5});
     expect(latest.delivered, isFalse);
     expect(pitwall.status.value.queued, 2);
 
     failNext = 0;
     await pitwall.flush();
     expect(pitwall.status.value.latest!.delivered, isTrue);
-    expect(pitwall.status.value.latest!.values, {'fuel_level_l': 47.5});
+    expect(pitwall.status.value.latest!.values, {'tucson_fli_vol': 47.5});
     pitwall.dispose();
   });
 }
