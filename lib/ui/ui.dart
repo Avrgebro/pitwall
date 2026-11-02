@@ -16,6 +16,7 @@ export 'components/filter_field.dart';
 export 'components/glass_surface.dart';
 export 'components/group_tile.dart';
 export 'components/row_group.dart';
+export 'components/save_when_done.dart';
 export 'components/icon_badge.dart';
 export 'components/info_note.dart';
 export 'components/line_icon.dart';

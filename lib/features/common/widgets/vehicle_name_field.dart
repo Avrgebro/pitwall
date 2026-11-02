@@ -9,17 +9,16 @@ class VehicleNameField extends StatefulWidget {
   const VehicleNameField({
     super.key,
     required this.initialName,
-    required this.onChanged,
+    this.onChanged,
     this.onDone,
     this.note,
     this.autofocus = false,
   });
 
   final String initialName;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onChanged;
 
-  /// Called when typing is done: Done on the keyboard, or leaving the
-  /// field.
+  /// Called with the name when typing is done; see [SaveWhenDone].
   final ValueChanged<String>? onDone;
 
   /// An extra sentence after the id, like "You can change it later."
@@ -39,8 +38,6 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
     super.dispose();
   }
 
-  void _done() => widget.onDone?.call(_controller.text);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -49,27 +46,27 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
     );
     final mono = theme.textTheme.mono.copyWith(fontWeight: FontWeight.w600);
     final name = _controller.text.trim();
+    final field = TextField(
+      controller: _controller,
+      autofocus: widget.autofocus,
+      textCapitalization: TextCapitalization.words,
+      textInputAction: TextInputAction.done,
+      decoration: const InputDecoration(labelText: 'Vehicle name'),
+      onChanged: (text) {
+        setState(() {});
+        widget.onChanged?.call(text);
+      },
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Focus(
-          canRequestFocus: false,
-          skipTraversal: true,
-          onFocusChange: (focused) {
-            if (!focused) _done();
-          },
-          child: TextField(
-            controller: _controller,
-            autofocus: widget.autofocus,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(labelText: 'Vehicle name'),
-            onChanged: (text) {
-              setState(() {});
-              widget.onChanged(text);
-            },
+        switch (widget.onDone) {
+          final onDone? => SaveWhenDone(
+            onDone: () => onDone(_controller.text),
+            child: field,
           ),
-        ),
+          null => field,
+        },
         Padding(
           // Lined up with the field's edge, like the other field notes.
           padding: const EdgeInsets.only(top: Insets.s),

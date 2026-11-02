@@ -73,7 +73,11 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
   /// remove it, and complete credentials. Called when typing is done: on
   /// Done, leaving the form, going back, or before a test.
   Future<void> save() async {
+    // The last save comes as a form goes, which can be as the app closes,
+    // before or while the saved webhook loads.
+    if (!ref.mounted) return;
     await future;
+    if (!ref.mounted) return;
     final current = _current;
     final draft = current.draft;
     final saved = current.saved.copyWith(

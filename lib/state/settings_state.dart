@@ -39,9 +39,15 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     return vehicle;
   }
 
+  /// Renames the vehicle. A blank name, or the one it has, changes
+  /// nothing.
   Future<void> renameVehicle(String vehicleId, String name) async {
+    // The last rename comes as a form goes, which can be as the app closes.
+    if (!ref.mounted) return;
     final vehicle = _current.vehicleById(vehicleId);
-    if (vehicle != null) await saveVehicle(vehicle.copyWith(name: name.trim()));
+    final trimmed = name.trim();
+    if (vehicle == null || trimmed.isEmpty || trimmed == vehicle.name) return;
+    await saveVehicle(vehicle.copyWith(name: trimmed));
   }
 
   /// Makes [adapter] the vehicle's adapter.

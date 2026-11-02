@@ -43,7 +43,14 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
   late final _url = TextEditingController(text: widget.initialUrl);
   bool _testing = false;
 
-  WebhookNotifier get _webhook => ref.read(webhookProvider.notifier);
+  /// Kept from the start, as the last save comes as the form goes.
+  late final WebhookNotifier _webhook;
+
+  @override
+  void initState() {
+    super.initState();
+    _webhook = ref.read(webhookProvider.notifier);
+  }
 
   @override
   void dispose() {
@@ -63,88 +70,77 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
     final draft = settings.draft;
     final mono = Theme.of(context).textTheme.mono;
 
-    // What's typed is saved once typing is done: on leaving the form
-    // (Done on the keyboard does that) or leaving the page. Sending a test
-    // saves first too.
-    return PopScope(
-      onPopInvokedWithResult: (_, _) => _webhook.save(),
-      child: Focus(
-        canRequestFocus: false,
-        skipTraversal: true,
-        onFocusChange: (focused) {
-          if (!focused) _webhook.save();
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ContentCard(
-              child: SecretTextField(
-                controller: _url,
-                label: 'Webhook URL',
-                keyboardType: TextInputType.url,
-                helperText: 'Stored securely on this phone',
-                errorText: switch (draft.urlProblem) {
-                  final problem? => DeliveryText.urlProblem(problem),
-                  null => null,
-                },
-                multilineWhenShown: true,
-                onChanged: _webhook.editUrl,
-                warning: draft.isInsecure
-                    ? TextSpan(
-                        children: [
-                          TextSpan(
-                            text: draft.auth.type == WebhookAuthType.none
-                                ? 'Not encrypted. Anyone on the same network can '
-                                      'read your car\'s data. Use '
-                                : 'Not encrypted. Anyone on the same network can '
-                                      'read your car\'s data and credentials. Use ',
-                          ),
-                          TextSpan(
-                            text: 'https://',
-                            style: mono.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const TextSpan(text: ' if your server supports it.'),
-                        ],
-                      )
-                    : null,
-              ),
-            ),
-            const SectionHeader.icon(
-              'Authentication',
-              icon: Symbols.key_rounded,
-            ),
-            AuthEditor(auth: draft.auth, onChanged: _webhook.editAuth),
-            const SizedBox(height: Insets.xl),
-            GlassButton(
-              onPressed: settings.canTest && !_testing ? _sendTest : null,
-              icon: _testing
-                  ? const SizedBox.square(
-                      dimension: Sizes.iconSmall,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+    // What's typed is saved once typing is done. Sending a test saves
+    // first too.
+    return SaveWhenDone(
+      onDone: _webhook.save,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ContentCard(
+            child: SecretTextField(
+              controller: _url,
+              label: 'Webhook URL',
+              keyboardType: TextInputType.url,
+              helperText: 'Stored securely on this phone',
+              errorText: switch (draft.urlProblem) {
+                final problem? => DeliveryText.urlProblem(problem),
+                null => null,
+              },
+              multilineWhenShown: true,
+              onChanged: _webhook.editUrl,
+              warning: draft.isInsecure
+                  ? TextSpan(
+                      children: [
+                        TextSpan(
+                          text: draft.auth.type == WebhookAuthType.none
+                              ? 'Not encrypted. Anyone on the same network can '
+                                    'read your car\'s data. Use '
+                              : 'Not encrypted. Anyone on the same network can '
+                                    'read your car\'s data and credentials. Use ',
+                        ),
+                        TextSpan(
+                          text: 'https://',
+                          style: mono.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const TextSpan(text: ' if your server supports it.'),
+                      ],
                     )
-                  : const Icon(Symbols.send_rounded),
-              child: const Text('Send test'),
+                  : null,
             ),
-            if (settings.lastTest case (:final result, :final at)) ...[
-              const SizedBox(height: Insets.m),
-              if (result.error case final error?)
-                ResultBanner(
-                  tone: StatusTone.error,
-                  title: DeliveryText.error(error).title,
-                  message: DeliveryText.error(error).message,
-                )
-              else
-                ResultBanner(
-                  tone: StatusTone.healthy,
-                  title: 'Test reading delivered',
-                  message:
-                      'The server accepted it in '
-                      '${Formatters.elapsed(result.elapsed)}, at '
-                      '${Formatters.clock(at)}',
-                ),
-            ],
+          ),
+          const SectionHeader.icon('Authentication', icon: Symbols.key_rounded),
+          AuthEditor(auth: draft.auth, onChanged: _webhook.editAuth),
+          const SizedBox(height: Insets.xl),
+          GlassButton(
+            onPressed: settings.canTest && !_testing ? _sendTest : null,
+            icon: _testing
+                ? const SizedBox.square(
+                    dimension: Sizes.iconSmall,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Symbols.send_rounded),
+            child: const Text('Send test'),
+          ),
+          if (settings.lastTest case (:final result, :final at)) ...[
+            const SizedBox(height: Insets.m),
+            if (result.error case final error?)
+              ResultBanner(
+                tone: StatusTone.error,
+                title: DeliveryText.error(error).title,
+                message: DeliveryText.error(error).message,
+              )
+            else
+              ResultBanner(
+                tone: StatusTone.healthy,
+                title: 'Test reading delivered',
+                message:
+                    'The server accepted it in '
+                    '${Formatters.elapsed(result.elapsed)}, at '
+                    '${Formatters.clock(at)}',
+              ),
           ],
-        ),
+        ],
       ),
     );
   }

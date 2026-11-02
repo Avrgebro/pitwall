@@ -271,6 +271,30 @@ void main() {
     expect(find.text('Add a vehicle'), findsOneWidget);
   });
 
+  testWidgets('a webhook typed in setup is kept when moving on', (
+    tester,
+  ) async {
+    await _pumpApp(tester);
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Set up later'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    // Typed, with the field still focused, then straight on.
+    await tester.enterText(
+      find.byType(TextField).first,
+      'https://example.com/api/webhook/abc',
+    );
+    await tester.pump();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Almost there'), findsOneWidget);
+    expect(find.text('Not tested yet'), findsOneWidget);
+  });
+
   testWidgets('a tab page scrolls its last item clear of the nav bar', (
     tester,
   ) async {

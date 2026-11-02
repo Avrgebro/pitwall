@@ -6,9 +6,9 @@ import '../../ui/ui.dart';
 import '../common/widgets/vehicle_name_field.dart';
 import 'widgets/vehicle_removed_page.dart';
 
-/// Renames a vehicle. The name is saved when typing is done (Done, leaving
-/// the field, or going back), not on every key: it becomes the `device`
-/// id in readings, which shouldn't go out half-typed.
+/// Renames a vehicle. The name is saved when typing is done, not on every
+/// key: it becomes the `device` id in readings, which shouldn't go out
+/// half-typed.
 class VehicleNameScreen extends ConsumerStatefulWidget {
   const VehicleNameScreen({super.key, required this.vehicleId});
 
@@ -19,43 +19,35 @@ class VehicleNameScreen extends ConsumerStatefulWidget {
 }
 
 class _VehicleNameScreenState extends ConsumerState<VehicleNameScreen> {
-  /// What's typed, once something is.
-  String? _typed;
+  /// Kept from the start, as the last save comes as the screen goes.
+  late final AppSettingsNotifier _settings;
 
-  Future<void> _save() async {
-    final name = _typed?.trim();
-    final vehicle = ref.read(vehicleProvider(widget.vehicleId));
-    if (name == null || name.isEmpty || vehicle == null) return;
-    if (name == vehicle.name) return;
-    await ref
-        .read(appSettingsProvider.notifier)
-        .renameVehicle(vehicle.id, name);
+  @override
+  void initState() {
+    super.initState();
+    _settings = ref.read(appSettingsProvider.notifier);
   }
 
   @override
   Widget build(BuildContext context) {
     final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
     if (vehicle == null) return const VehicleRemovedPage(title: 'Name');
-    return PopScope(
-      onPopInvokedWithResult: (_, _) => _save(),
-      child: AppPage(
-        title: 'Name',
-        children: [
-          VehicleNameField(
-            initialName: vehicle.name,
-            autofocus: true,
-            onChanged: (name) => _typed = name,
-            onDone: (_) => _save(),
+    return AppPage(
+      title: 'Name',
+      children: [
+        VehicleNameField(
+          initialName: vehicle.name,
+          autofocus: true,
+          onDone: (name) => _settings.renameVehicle(vehicle.id, name),
+        ),
+        const InfoNote(
+          text: TextSpan(
+            text:
+                'Home Assistant tells your cars apart by this id. Renaming '
+                'changes it, so update automations that use the old one.',
           ),
-          const InfoNote(
-            text: TextSpan(
-              text:
-                  'Home Assistant tells your cars apart by this id. Renaming '
-                  'changes it, so update automations that use the old one.',
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

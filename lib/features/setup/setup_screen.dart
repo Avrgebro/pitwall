@@ -48,12 +48,6 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
     _go(_Step.permissions);
   }
 
-  /// Leaves the webhook step, keeping what was typed if it can be used.
-  Future<void> _leaveWebhook(_Step next) async {
-    await ref.read(webhookProvider.notifier).save();
-    _go(next);
-  }
-
   Future<void> _finish() async {
     await ref.read(appSettingsProvider.notifier).completeSetup();
     if (mounted) context.go(Routes.home);
@@ -121,12 +115,12 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             'and paste its URL here.',
         primaryLabel: 'Continue',
         onPrimary: ref.watch(webhookProvider).value?.draftHasUrl ?? false
-            ? () => _leaveWebhook(_Step.done)
+            ? () => _go(_Step.done)
             : null,
-        onBack: () => _leaveWebhook(_Step.permissions),
+        onBack: () => _go(_Step.permissions),
         // The webhook can be set later in Settings; readings wait on the
         // phone until then.
-        onSkip: () => _leaveWebhook(_Step.done),
+        onSkip: () => _go(_Step.done),
         children: [WebhookStep(vehicleName: _draft.name.trim())],
       ),
       _Step.done => StepScaffold(

@@ -137,6 +137,46 @@ void main() {
       expect(store.settings.vehicles.single.name, 'Hyundai Tucson');
     });
 
+    testWidgets('a name is saved as the app goes to the background', (
+      tester,
+    ) async {
+      final store = await pump(
+        tester,
+        const VehicleNameScreen(vehicleId: 'tucson'),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Hyundai Tucson');
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pumpAndSettle();
+
+      expect(store.settings.vehicles.single.name, 'Hyundai Tucson');
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    });
+
+    testWidgets(
+      'a name is saved when the screen goes, with the field focused',
+      (tester) async {
+        final store = await pump(
+          tester,
+          const VehicleNameScreen(vehicleId: 'tucson'),
+        );
+
+        await tester.enterText(find.byType(TextField), 'Hyundai Tucson');
+        // Replaced without a pop, as when another route takes over.
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: testOverrides(store: store),
+            child: const MaterialApp(key: ValueKey('other'), home: SizedBox()),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(store.settings.vehicles.single.name, 'Hyundai Tucson');
+      },
+    );
+
     testWidgets('a removed profile comes back with Undo', (tester) async {
       final store = await pump(
         tester,
