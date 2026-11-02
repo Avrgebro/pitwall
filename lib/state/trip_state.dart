@@ -97,6 +97,10 @@ class TripController extends Notifier<TripState> {
   /// close.
   bool _open = false;
 
+  /// The vehicle a trip started from the app is for, until Android hands
+  /// the start back.
+  String? _manualVehicleId;
+
   TripServiceGateway get _gateway => ref.read(tripServiceGatewayProvider);
   SessionController get _session => ref.read(sessionProvider.notifier);
   SessionState get _sessionState => ref.read(sessionProvider);
@@ -127,9 +131,13 @@ class TripController extends Notifier<TripState> {
     return const TripState();
   }
 
-  /// Starts a trip from the app, through the service. Without a head unit
-  /// to go by, it tries every vehicle's adapter.
-  Future<void> startManually() => _gateway.startService();
+  /// Starts a trip from the app, through the service, as if [vehicleId]'s
+  /// head unit had connected. Without a vehicle, it tries every vehicle's
+  /// adapter.
+  Future<void> startManually({String? vehicleId}) {
+    _manualVehicleId = vehicleId;
+    return _gateway.startService();
+  }
 
   /// Ends the trip after the current step; the last reading is still sent.
   void stop() {
@@ -139,17 +147,25 @@ class TripController extends Notifier<TripState> {
   }
 
   /// Runs a trip for the vehicle whose head unit is [headUnit], or, when
-  /// the app started it, for whichever vehicle's adapter answers.
+  /// the app started it, for the vehicle it named or whichever vehicle's
+  /// adapter answers.
   Future<void> _run({String? headUnit}) async {
     if (state.isActive) return;
     _stopRequested = false;
     _open = false;
+    final manualVehicleId = _manualVehicleId;
+    _manualVehicleId = null;
     state = TripState(phase: TripPhase.connecting, startedAt: DateTime.now());
     final settings = await ref.read(appSettingsProvider.future);
-    // A head unit names the vehicle; otherwise any may answer.
+    // A head unit or the app names the vehicle; otherwise any may answer.
+    final targeted = headUnit != null || manualVehicleId != null;
+    final named = headUnit != null
+        ? settings.vehicleForHeadUnit(headUnit)
+        : manualVehicleId == null
+        ? null
+        : settings.vehicleById(manualVehicleId);
     final List<Vehicle> candidates;
-    if (headUnit != null) {
-      final named = settings.vehicleForHeadUnit(headUnit);
+    if (targeted) {
       candidates = [if (named != null && named.adapterAddress != null) named];
     } else {
       candidates =

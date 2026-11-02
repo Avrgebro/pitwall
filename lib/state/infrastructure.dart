@@ -21,6 +21,11 @@ final bluetoothGatewayProvider = Provider<BluetoothGateway>(
   (ref) => const ClassicBluetoothGateway(),
 );
 
+/// Whether Bluetooth is on, kept current.
+final bluetoothOnProvider = StreamProvider<bool>(
+  (ref) => ref.watch(bluetoothGatewayProvider).enabled,
+);
+
 final permissionGatewayProvider = Provider<PermissionGateway>(
   (ref) => const PermissionHandlerGateway(),
 );

@@ -43,7 +43,13 @@ class FakePermissionGateway implements PermissionGateway {
 }
 
 class FakeBluetoothGateway implements BluetoothGateway {
-  FakeBluetoothGateway({this.devices = const [], this.adapter});
+  FakeBluetoothGateway({
+    this.devices = const [],
+    this.adapter,
+    this.bluetoothOn = true,
+  });
+
+  final bool bluetoothOn;
 
   final List<BondedDevice> devices;
 
@@ -57,6 +63,9 @@ class FakeBluetoothGateway implements BluetoothGateway {
 
   @override
   Future<List<BondedDevice>> bondedDevices() async => devices;
+
+  @override
+  Stream<bool> get enabled => Stream.value(bluetoothOn);
 
   @override
   Future<ClosableTransport> connect(String address) async {

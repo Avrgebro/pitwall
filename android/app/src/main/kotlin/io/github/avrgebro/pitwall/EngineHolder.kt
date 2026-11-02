@@ -23,6 +23,7 @@ object EngineHolder {
         val engine = FlutterEngine(appContext)
         val messenger = engine.dartExecutor.binaryMessenger
         ClassicBluetoothChannel(appContext, messenger)
+        BluetoothStateChannel(appContext, messenger)
         ServiceBridge.attach(appContext, messenger)
         engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         FlutterEngineCache.getInstance().put(ENGINE_ID, engine)

@@ -362,4 +362,22 @@ void main() {
     },
   );
 
+  test('a trip started from the app for one vehicle goes to it only', () async {
+    final bluetooth = FakeBluetoothGateway(adapter: (_) => _Adapter());
+    final c = container(
+      vehicles: [
+        _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+        _mazda,
+      ],
+      bluetooth: bluetooth,
+    );
+    c.read(tripProvider);
+
+    await c.read(tripProvider.notifier).startManually(vehicleId: 'mazda');
+
+    expect((await running(c)).vehicleId, 'mazda');
+    expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
+    c.read(tripProvider.notifier).stop();
+    await ended(c);
+  });
 }

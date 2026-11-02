@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../obd/obd_transport.dart';
 import 'classic_bluetooth.dart';
 
@@ -9,6 +11,9 @@ abstract interface class BluetoothGateway {
 
   /// Opens a connection to the adapter at [address].
   Future<ClosableTransport> connect(String address);
+
+  /// Whether Bluetooth is on: the current state, then each change.
+  Stream<bool> get enabled;
 }
 
 /// A transport the app can close when it's done.
@@ -27,4 +32,11 @@ class ClassicBluetoothGateway implements BluetoothGateway {
   @override
   Future<ClosableTransport> connect(String address) =>
       ClassicBluetooth.connect(address);
+
+  static const _state = EventChannel('pitwall/bluetooth_state');
+
+  /// Backed by `BluetoothStateChannel.kt`.
+  @override
+  Stream<bool> get enabled =>
+      _state.receiveBroadcastStream().map((on) => on as bool);
 }

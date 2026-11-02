@@ -70,7 +70,10 @@ class VehicleHeroCard extends StatelessWidget {
     final name = Text(model.title, style: style);
     final onSwitch = this.onSwitch;
     if (onSwitch == null) return name;
+    // Its own node, so screen readers don't fold the rest of the card into
+    // this button.
     return Semantics(
+      container: true,
       button: true,
       hint: 'Switch vehicle',
       child: InkWell(

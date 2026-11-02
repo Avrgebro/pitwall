@@ -4,17 +4,22 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/session/car_state.dart';
 import '../../../core/vehicles/vehicle.dart';
+import '../../../state/infrastructure.dart';
 import '../../../state/session_state.dart';
 import '../../../state/trip_state.dart';
 import '../../../ui/ui.dart';
 
-/// Connects to a vehicle's adapter by hand, or starts a background trip as
-/// if the car's head unit had connected.
+/// Connects to a vehicle's adapter by hand, or simulates an auto-start: a
+/// background trip, as if the car's head unit had connected.
 class SessionPanel extends ConsumerWidget {
-  const SessionPanel({super.key, required this.vehicle});
+  const SessionPanel({super.key, required this.vehicle, this.onChooseVehicle});
 
   /// The vehicle to connect to, or null if there's none with an adapter.
   final Vehicle? vehicle;
+
+  /// Picks another vehicle; null when there's no choice, or while a session
+  /// or trip is in progress.
+  final VoidCallback? onChooseVehicle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,6 +28,9 @@ class SessionPanel extends ConsumerWidget {
     final tripController = ref.read(tripProvider.notifier);
     final controller = ref.read(sessionProvider.notifier);
     final vehicle = this.vehicle;
+    // Assumed on until Android says otherwise, so nothing flashes.
+    final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
+    final canConnect = vehicle != null && bluetoothOn;
 
     final (chip, detail) = switch (session.phase) {
       SessionPhase.connected => (
@@ -52,10 +60,13 @@ class SessionPanel extends ConsumerWidget {
           emphasis: ChipEmphasis.outlined,
           icon: Symbols.bluetooth_disabled_rounded,
         ),
-        _problem(session.problem) ??
-            (vehicle == null
-                ? 'Add a vehicle with an adapter first.'
-                : 'Connect to ${vehicle.adapterName} to read by hand.'),
+        switch (vehicle) {
+          null => 'Add a vehicle with an adapter first.',
+          _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
+          final vehicle =>
+            _problem(session.problem) ??
+                'Connect to ${vehicle.adapterName} to read by hand.',
+        },
       ),
     };
 
@@ -64,6 +75,10 @@ class SessionPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (vehicle != null) ...[
+            _VehicleLine(vehicle: vehicle, onChoose: onChooseVehicle),
+            const SizedBox(height: Insets.m),
+          ],
           Row(
             children: [
               chip,
@@ -110,22 +125,37 @@ class SessionPanel extends ConsumerWidget {
               SessionPhase.connecting => const [],
               SessionPhase.idle => [
                 FilledButton.icon(
-                  onPressed: vehicle == null
-                      ? null
-                      : () => controller.connect(vehicle),
+                  onPressed: canConnect
+                      ? () => controller.connect(vehicle)
+                      : null,
                   icon: const Icon(Symbols.bluetooth_connected_rounded),
                   label: const Text('Connect'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: vehicle == null
-                      ? null
-                      : tripController.startManually,
+                  onPressed: canConnect
+                      ? () =>
+                            tripController.startManually(vehicleId: vehicle.id)
+                      : null,
                   icon: const Icon(Symbols.play_circle_rounded),
-                  label: const Text('Start trip'),
+                  label: const Text('Simulate auto-start'),
                 ),
               ],
             },
           ),
+          if (session.phase == SessionPhase.idle &&
+              !trip.isActive &&
+              canConnect) ...[
+            const SizedBox(height: Insets.m),
+            Text(
+              'Connect opens a manual session. Simulate auto-start runs the '
+              'automatic flow, as if the car\'s Bluetooth connected. Either '
+              'way the adapter must be within reach, usually in the car with '
+              'the ignition on.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -167,4 +197,55 @@ class SessionPanel extends ConsumerWidget {
       'The adapter stopped answering. Connect again.',
     null => null,
   };
+}
+
+/// The vehicle the session is for, with its adapter; a picker when there's
+/// a choice.
+class _VehicleLine extends StatelessWidget {
+  const _VehicleLine({required this.vehicle, required this.onChoose});
+
+  final Vehicle vehicle;
+  final VoidCallback? onChoose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final onChoose = this.onChoose;
+    final line = Row(
+      children: [
+        Icon(Symbols.directions_car_rounded, color: scheme.primary),
+        const SizedBox(width: Insets.m),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(vehicle.name, style: theme.textTheme.titleMedium),
+              if (vehicle.adapterName case final adapter?)
+                Text(
+                  adapter,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (onChoose != null) const Icon(Icons.arrow_drop_down),
+      ],
+    );
+    if (onChoose == null) return line;
+    // Its own node, so screen readers don't fold the rest of the card into
+    // this button.
+    return Semantics(
+      container: true,
+      button: true,
+      hint: 'Choose the vehicle',
+      child: InkWell(
+        onTap: onChoose,
+        borderRadius: Corners.mediumRadius,
+        child: line,
+      ),
+    );
+  }
 }

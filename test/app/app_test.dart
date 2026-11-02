@@ -22,10 +22,15 @@ Future<void> _pumpApp(
   WidgetTester tester, {
   AppSettings settings = const AppSettings(),
   Map<AppPermission, bool>? permissions,
+  FakeBluetoothGateway? bluetooth,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: testOverrides(settings: settings, permissions: permissions),
+      overrides: testOverrides(
+        settings: settings,
+        permissions: permissions,
+        bluetooth: bluetooth,
+      ),
       child: const PitwallApp(),
     ),
   );
@@ -386,4 +391,75 @@ void main() {
     expect(find.text('Car head unit'), findsOneWidget);
   });
 
+  testWidgets('developer tools connect to the vehicle picked', (tester) async {
+    final bluetooth = FakeBluetoothGateway();
+    await _pumpApp(
+      tester,
+      settings: AppSettings(
+        vehicles: [
+          _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+          const Vehicle(
+            id: 'mazda',
+            name: 'Mazda',
+            adapterAddress: 'BB',
+            adapterName: 'Mazda OBD',
+          ),
+        ],
+        setupDone: true,
+      ),
+      bluetooth: bluetooth,
+    );
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final developer = find.text('Developer tools');
+    await Scrollable.ensureVisible(tester.element(developer), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(developer);
+    await tester.pumpAndSettle();
+
+    // The car seen most recently comes first; the arrow opens the choice.
+    expect(find.text('vLinker MC+'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.arrow_drop_down));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mazda'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+    expect(bluetooth.connected, ['BB']);
+  });
+
+  testWidgets('developer tools say when Bluetooth is off', (tester) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+      bluetooth: FakeBluetoothGateway(bluetoothOn: false),
+    );
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final developer = find.text('Developer tools');
+    await Scrollable.ensureVisible(tester.element(developer), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(developer);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Bluetooth is off. Turn it on to connect.'),
+      findsOneWidget,
+    );
+    final connect = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Connect'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
+    );
+    final simulate = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Simulate auto-start'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
+    );
+    expect(connect.onPressed, isNull);
+    expect(simulate.onPressed, isNull);
+  });
 }
