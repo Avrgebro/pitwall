@@ -75,7 +75,7 @@ class DoneStep extends ConsumerWidget {
                 },
                 valueColor: testPassed ? healthy : null,
               ),
-              SummaryRow(
+              SummaryRow.stacked(
                 icon: Symbols.bluetooth_drive_rounded,
                 label: 'Trip start',
                 value: switch (vehicle) {
@@ -83,7 +83,6 @@ class DoneStep extends ConsumerWidget {
                   null => 'Add a vehicle first',
                 },
                 caption: 'On the vehicle\'s page',
-                stacked: true,
               ),
             ],
           ),

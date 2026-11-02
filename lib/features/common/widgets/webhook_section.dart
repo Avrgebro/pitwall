@@ -95,7 +95,7 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
                 : null,
           ),
         ),
-        const SectionHeader('Authentication', icon: Symbols.key_rounded),
+        const SectionHeader.icon('Authentication', icon: Symbols.key_rounded),
         AuthEditor(auth: draft.auth, onChanged: _webhook.editAuth),
         const SizedBox(height: Insets.xl),
         GlassButton(

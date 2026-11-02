@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/emphasis.dart';
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
 import 'card_header.dart';
@@ -55,7 +56,7 @@ class StatusCard extends StatelessWidget {
               icon: icon,
               tone: tone,
               shape: BoxShape.circle,
-              strong: _tinted,
+              emphasis: _tinted ? Emphasis.filled : Emphasis.tonal,
             ),
             title: title,
             subtitle: message,

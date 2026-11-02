@@ -59,10 +59,7 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
           onSend: _send,
         ),
         children: [
-          const SectionHeader(
-            'Session',
-            padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
-          ),
+          const SectionHeader('Session', padding: SectionHeader.firstPadding),
           SessionPanel(
             vehicle: ref.watch(focusedVehicleProvider),
             onChooseVehicle: vehicleCount > 1

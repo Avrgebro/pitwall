@@ -24,7 +24,6 @@ class PermissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final healthy = context.tone(StatusTone.healthy).accent;
     return ContentCard(
-      padding: Insets.card,
       child: CardHeader(
         badge: IconBadge(
           icon: icon,

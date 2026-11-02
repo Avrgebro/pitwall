@@ -1,18 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/emphasis.dart';
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
-
-enum ChipEmphasis {
-  /// Solid accent background, for the main state (Running).
-  filled,
-
-  /// Soft tone background (Connecting, 3 queued).
-  tonal,
-
-  /// Border only, for quiet states (Waiting for the car).
-  outlined,
-}
 
 /// A short status in a pill: background state, adapter, car, delivery.
 class StatusChip extends StatelessWidget {
@@ -20,7 +10,7 @@ class StatusChip extends StatelessWidget {
     super.key,
     required this.label,
     this.tone = StatusTone.neutral,
-    this.emphasis = ChipEmphasis.tonal,
+    this.emphasis = Emphasis.tonal,
     this.icon,
     this.dot = false,
     this.dense = false,
@@ -28,7 +18,7 @@ class StatusChip extends StatelessWidget {
 
   final String label;
   final StatusTone tone;
-  final ChipEmphasis emphasis;
+  final Emphasis emphasis;
   final IconData? icon;
 
   /// Shows a small dot before the label, for live states.
@@ -42,9 +32,9 @@ class StatusChip extends StatelessWidget {
     final colors = context.tone(tone);
     final scheme = Theme.of(context).colorScheme;
     final (background, foreground) = switch (emphasis) {
-      ChipEmphasis.filled => (colors.accent, colors.onAccent),
-      ChipEmphasis.tonal => (colors.container, colors.onContainer),
-      ChipEmphasis.outlined => (Colors.transparent, scheme.onSurface),
+      Emphasis.filled => (colors.accent, colors.onAccent),
+      Emphasis.tonal => (colors.container, colors.onContainer),
+      Emphasis.outlined => (Colors.transparent, scheme.onSurface),
     };
     final textStyle =
         (dense
@@ -61,7 +51,7 @@ class StatusChip extends StatelessWidget {
       decoration: ShapeDecoration(
         color: background,
         shape: StadiumBorder(
-          side: emphasis == ChipEmphasis.outlined
+          side: emphasis == Emphasis.outlined
               ? BorderSide(color: scheme.outline)
               : BorderSide.none,
         ),

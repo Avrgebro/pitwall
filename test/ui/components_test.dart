@@ -16,7 +16,7 @@ void main() {
         const StatusChip(
           label: 'Running',
           tone: StatusTone.active,
-          emphasis: ChipEmphasis.filled,
+          emphasis: Emphasis.filled,
           dot: true,
         ),
       ),
@@ -127,7 +127,7 @@ void main() {
   testWidgets('a section header centres its icon on the title', (tester) async {
     await tester.pumpWidget(
       _frame(
-        const SectionHeader(
+        const SectionHeader.icon(
           'Delivery',
           icon: Icons.cloud_upload,
           trailing: '2 rows',

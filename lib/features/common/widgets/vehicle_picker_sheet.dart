@@ -48,10 +48,7 @@ class _Choices extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(
-          title,
-          padding: const EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
-        ),
+        SectionHeader(title, padding: SectionHeader.firstPadding),
         RadioGroup<String>(
           groupValue: focused?.id,
           onChanged: (id) {

@@ -38,10 +38,10 @@ class SettingsScreen extends ConsumerWidget {
     return AppPage(
       title: 'Settings',
       children: [
-        const SectionHeader(
+        const SectionHeader.icon(
           'Sending',
           icon: Symbols.cloud_upload_rounded,
-          padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.m),
+          padding: SectionHeader.firstPadding,
         ),
         RowGroup(
           children: [
@@ -60,7 +60,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SectionHeader('Phone', icon: Symbols.smartphone_rounded),
+        const SectionHeader.icon('Phone', icon: Symbols.smartphone_rounded),
         RowGroup(
           children: [
             GroupTile(
@@ -72,7 +72,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SectionHeader('App', icon: Symbols.info_rounded),
+        const SectionHeader.icon('App', icon: Symbols.info_rounded),
         RowGroup(
           children: [
             GroupTile(

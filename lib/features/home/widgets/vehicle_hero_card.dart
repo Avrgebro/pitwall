@@ -88,7 +88,7 @@ class VehicleHeroCard extends StatelessWidget {
     HeroState.running => const StatusChip(
       label: 'Running',
       tone: StatusTone.active,
-      emphasis: ChipEmphasis.filled,
+      emphasis: Emphasis.filled,
       dot: true,
     ),
     HeroState.connecting => const StatusChip(
@@ -98,7 +98,7 @@ class VehicleHeroCard extends StatelessWidget {
     ),
     HeroState.waiting => const StatusChip(
       label: 'Waiting for the car',
-      emphasis: ChipEmphasis.outlined,
+      emphasis: Emphasis.outlined,
       icon: Symbols.radio_button_unchecked_rounded,
     ),
   };

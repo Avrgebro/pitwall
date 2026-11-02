@@ -33,27 +33,34 @@ class CodeBlock extends StatelessWidget {
   }
 }
 
-/// An icon, a label and a value on the right, for summaries.
+/// An icon, a label and its value, for summaries.
 class SummaryRow extends StatelessWidget {
+  /// The value on the right of the label.
   const SummaryRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  }) : caption = null,
+       stacked = false;
+
+  /// The value under the label, for long values, with an optional hint
+  /// under it.
+  const SummaryRow.stacked({
     super.key,
     required this.icon,
     required this.label,
     required this.value,
     this.caption,
     this.valueColor,
-    this.stacked = false,
-  });
+  }) : stacked = true;
 
   final IconData icon;
   final String label;
   final String value;
-
-  /// A hint under the value.
   final String? caption;
   final Color? valueColor;
-
-  /// Value under the label instead of on the right, for long values.
   final bool stacked;
 
   @override

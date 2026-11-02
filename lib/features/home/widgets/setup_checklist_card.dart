@@ -19,7 +19,7 @@ class SetupChecklistCard extends StatelessWidget {
       SectionHeader(
         'Finish setting up',
         trailing: '${checklist.doneCount} of ${checklist.items.length} done',
-        padding: const EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
+        padding: SectionHeader.firstPadding,
       ),
       RowGroup(
         children: [

@@ -158,9 +158,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ContentCard(
-      dashed: true,
-      padding: Insets.card,
+    return DashedCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

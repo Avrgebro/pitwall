@@ -31,6 +31,7 @@ export 'layout/app_page.dart';
 export 'layout/page_backdrop.dart';
 export 'layout/pinned_bottom.dart';
 export 'theme/app_theme.dart';
+export 'theme/emphasis.dart';
 export 'theme/glass_colors.dart';
 export 'theme/glass_filters.dart';
 export 'theme/status_colors.dart';

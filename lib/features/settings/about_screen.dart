@@ -48,7 +48,7 @@ class AboutScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SectionHeader('Credits', icon: Symbols.favorite_rounded),
+        const SectionHeader.icon('Credits', icon: Symbols.favorite_rounded),
         RowGroup(
           children: [
             GroupTile(

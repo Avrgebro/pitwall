@@ -44,14 +44,14 @@ class VehicleRow extends StatelessWidget {
       VehicleBadge.connected => const StatusChip(
         label: 'Connected',
         tone: StatusTone.active,
-        emphasis: ChipEmphasis.filled,
+        emphasis: Emphasis.filled,
         dot: true,
         dense: true,
       ),
       // Outlined: a neutral fill would vanish into the glass row.
       VehicleBadge.onHome => const StatusChip(
         label: 'On Home',
-        emphasis: ChipEmphasis.outlined,
+        emphasis: Emphasis.outlined,
         dense: true,
       ),
       VehicleBadge.none => null,

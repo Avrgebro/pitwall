@@ -46,7 +46,7 @@ class NewVehicleForm extends StatelessWidget {
     children: [
       const SectionHeader(
         'Name this vehicle',
-        padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
+        padding: SectionHeader.firstPadding,
       ),
       VehicleNameField(
         initialName: draft.name,

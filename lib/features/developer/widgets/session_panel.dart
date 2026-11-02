@@ -43,7 +43,7 @@ class SessionPanel extends ConsumerWidget {
           const StatusChip(
             label: 'Connected',
             tone: StatusTone.active,
-            emphasis: ChipEmphasis.filled,
+            emphasis: Emphasis.filled,
             dot: true,
           ),
           [
@@ -63,7 +63,7 @@ class SessionPanel extends ConsumerWidget {
       SessionIdle(:final problem) => (
         const StatusChip(
           label: 'Not connected',
-          emphasis: ChipEmphasis.outlined,
+          emphasis: Emphasis.outlined,
           icon: Symbols.bluetooth_disabled_rounded,
         ),
         switch (vehicle) {
@@ -79,7 +79,6 @@ class SessionPanel extends ConsumerWidget {
     };
 
     return ContentCard(
-      padding: Insets.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

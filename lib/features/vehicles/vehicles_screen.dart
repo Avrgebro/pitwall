@@ -85,8 +85,7 @@ class _AddVehicleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme.primary;
-    return ContentCard(
-      dashed: true,
+    return DashedCard(
       onTap: onTap,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -36,10 +36,10 @@ class VehicleDetailScreen extends ConsumerWidget {
     return AppPage(
       title: vehicle.name,
       children: [
-        const SectionHeader(
+        const SectionHeader.icon(
           'Vehicle',
           icon: Symbols.directions_car_rounded,
-          padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.m),
+          padding: SectionHeader.firstPadding,
         ),
         RowGroup(
           children: [
@@ -67,7 +67,7 @@ class VehicleDetailScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SectionHeader('Data', icon: Symbols.database_rounded),
+        const SectionHeader.icon('Data', icon: Symbols.database_rounded),
         RowGroup(
           children: [
             GroupTile(

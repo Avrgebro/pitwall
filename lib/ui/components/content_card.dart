@@ -10,42 +10,57 @@ class ContentCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = Insets.card,
-    this.dashed = false,
     this.onTap,
   });
 
   final Widget child;
   final EdgeInsets padding;
 
-  /// A dashed border, for an empty slot inviting an action.
-  final bool dashed;
-
-  /// Makes the whole card one tap target, such as an "Add" slot.
+  /// Makes the whole card one tap target.
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final padded = Padding(padding: padding, child: child);
-    final content = onTap == null
-        ? padded
-        : InkWell(onTap: onTap, child: padded);
-    if (dashed) {
-      return CustomPaint(
-        foregroundPainter: _DashedBorderPainter(
-          color: Theme.of(context).colorScheme.outline,
+    return GlassSurface(
+      child: onTap == null ? padded : InkWell(onTap: onTap, child: padded),
+    );
+  }
+}
+
+/// An empty slot inviting an action: a dashed outline with no fill, such
+/// as "Add a vehicle".
+class DashedCard extends StatelessWidget {
+  const DashedCard({
+    super.key,
+    required this.child,
+    this.padding = Insets.card,
+    this.onTap,
+  });
+
+  final Widget child;
+  final EdgeInsets padding;
+
+  /// Makes the whole slot one tap target.
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final padded = Padding(padding: padding, child: child);
+    return CustomPaint(
+      foregroundPainter: _DashedBorderPainter(
+        color: Theme.of(context).colorScheme.outline,
+      ),
+      // No fill of its own; a surface only for the tap ripple to show on.
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const RoundedRectangleBorder(
+          borderRadius: Corners.extraLargeRadius,
         ),
-        // No fill of its own; a surface only for the tap ripple to show on.
-        child: Material(
-          type: MaterialType.transparency,
-          shape: const RoundedRectangleBorder(
-            borderRadius: Corners.extraLargeRadius,
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: content,
-        ),
-      );
-    }
-    return GlassSurface(child: content);
+        clipBehavior: Clip.antiAlias,
+        child: onTap == null ? padded : InkWell(onTap: onTap, child: padded),
+      ),
+    );
   }
 }
 

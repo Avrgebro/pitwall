@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/emphasis.dart';
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
 
@@ -12,7 +13,7 @@ class IconBadge extends StatelessWidget {
     this.tone = StatusTone.active,
     this.size = Sizes.badge,
     this.shape = BoxShape.rectangle,
-    this.strong = false,
+    this.emphasis = Emphasis.tonal,
   });
 
   final IconData icon;
@@ -20,27 +21,30 @@ class IconBadge extends StatelessWidget {
   final double size;
   final BoxShape shape;
 
-  /// Uses the tone's accent colour instead of its soft container colour.
-  final bool strong;
+  final Emphasis emphasis;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tone(tone);
+    final (fill, foreground) = switch (emphasis) {
+      Emphasis.filled => (colors.accent, colors.onAccent),
+      Emphasis.tonal => (colors.container, colors.onContainer),
+      Emphasis.outlined => (null, colors.accent),
+    };
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: strong ? colors.accent : colors.container,
+        color: fill,
+        border: emphasis == Emphasis.outlined
+            ? Border.all(color: colors.accent)
+            : null,
         shape: shape,
         borderRadius: shape == BoxShape.rectangle
             ? BorderRadius.circular(size * 0.3)
             : null,
       ),
-      child: Icon(
-        icon,
-        size: size * 0.5,
-        color: strong ? colors.onAccent : colors.onContainer,
-      ),
+      child: Icon(icon, size: size * 0.5, color: foreground),
     );
   }
 }
