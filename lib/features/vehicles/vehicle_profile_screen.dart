@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
 import '../../core/profiles/signal_set.dart';
+import '../../core/profiles/stored_profile.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/infrastructure.dart';
@@ -27,7 +28,17 @@ class VehicleProfileScreen extends ConsumerWidget {
     if (vehicle == null) {
       return const VehicleRemovedPage(title: 'Vehicle profile');
     }
-    final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
+    // Loading a profile maps every failure to UnreadableProfile, so an
+    // error here can only come from the settings; it reads the same way.
+    final stored = switch (ref.watch(vehicleProfileProvider(vehicleId))) {
+      // Kept while it reloads, as after an import.
+      AsyncValue(:final value?) => value,
+      AsyncError() => switch (vehicle.profileName) {
+        final name? => UnreadableProfile(name),
+        null => const NoProfile(),
+      },
+      AsyncLoading() => null,
+    };
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',

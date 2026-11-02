@@ -95,14 +95,16 @@ class SettingsStore {
     }
   }
 
-  /// The vehicle's imported profile, as found on the phone.
+  /// The vehicle's imported profile, as found on the phone. A file that's
+  /// gone, can't be read, or no longer parses is an [UnreadableProfile].
   Future<StoredProfile> loadProfile(Vehicle vehicle) async {
     final name = vehicle.profileName;
     if (name == null) return const NoProfile();
-    final file = await _profileFile(vehicle.id);
-    if (!await file.exists()) return UnreadableProfile(name);
     try {
+      final file = await _profileFile(vehicle.id);
       return LoadedProfile(SignalSet.parse(await file.readAsString()));
+    } on FileSystemException {
+      return UnreadableProfile(name);
     } on FormatException {
       return UnreadableProfile(name);
     }

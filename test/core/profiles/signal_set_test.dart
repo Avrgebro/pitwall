@@ -39,6 +39,35 @@ void main() {
       expect(() => SignalSet.parse('not json'), throwsFormatException);
       expect(() => SignalSet.parse('{"ecu": []}'), throwsFormatException);
     });
+
+    test('a field of the wrong type counts as missing', () {
+      final profile = SignalSet.parse('''
+        {"commands": [
+          {"hdr": "7E0", "cmd": {"2E": "0100"}, "filter": "2020",
+           "signals": {"id": "WRITE"}},
+          {"hdr": "7E0", "cmd": {"22": "0101"}, "filter": {"from": "2020"},
+           "signals": [
+             {"id": "GOOD", "name": 7, "path": "Engine",
+              "fmt": {"len": 8, "mul": "2", "unit": 3}},
+             {"id": "BAD_LEN", "fmt": {"len": "8"}}
+           ]},
+          {"hdr": "7E0", "cmd": {"22": "0102"}, "signals": "none"}
+        ]}
+      ''');
+
+      // The write is still skipped as one, though its fields are malformed.
+      expect(profile.skipped.map((s) => s.reason), [
+        SkipReason.notReadOnly,
+        SkipReason.noUsableSignals,
+      ]);
+      final command = profile.commands.single;
+      // A year that isn't a number is no year.
+      expect(command.filter?.from, isNull);
+      final signal = command.signals.single;
+      expect(signal.name, 'GOOD');
+      expect(signal.unit, '');
+      expect(signal.format.multiply, 1);
+    });
   });
 
   group('decoding', () {

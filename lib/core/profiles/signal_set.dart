@@ -5,7 +5,9 @@ import 'dart:convert';
 ///
 /// Profiles are imported by the user, so parsing treats them as untrusted:
 /// only read services are accepted, and anything Pitwall can't send safely
-/// or doesn't support yet ends up in [skipped] instead of [commands].
+/// or doesn't support yet ends up in [skipped] instead of [commands]. Every
+/// field is read by checking its type, so a field that isn't what OBDb
+/// writes counts as missing rather than failing the whole profile.
 class SignalSet {
   SignalSet._(this.source, this.commands, this.skipped);
 
@@ -40,7 +42,7 @@ class SignalSet {
       // Kept for skipped requests too, to say what they would have read.
       final filter = YearFilter._parse(entry['filter']);
       final signals = [
-        for (final signal in entry['signals'] as List? ?? const [])
+        for (final signal in _list(entry['signals']))
           if (signal is Map) ?ProfileSignal._parse(signal),
       ];
       try {
@@ -144,6 +146,8 @@ class SignalSet {
       signals: signals,
     );
   }
+
+  static List<Object?> _list(Object? json) => json is List ? json : const [];
 
   static String _describe(Map entry) {
     final cmd = entry['cmd'];
@@ -257,10 +261,10 @@ class YearFilter {
   static YearFilter? _parse(Object? json) {
     if (json is! Map) return null;
     return YearFilter(
-      from: (json['from'] as num?)?.toInt(),
-      to: (json['to'] as num?)?.toInt(),
+      from: _int(json['from']),
+      to: _int(json['to']),
       years: {
-        for (final year in json['years'] as List? ?? const [])
+        for (final year in SignalSet._list(json['years']))
           if (year is num) year.toInt(),
       },
     );
@@ -309,7 +313,10 @@ class ProfileSignal {
     if (id is! String || format == null) return null;
     return ProfileSignal(
       id: id,
-      name: json['name'] as String? ?? id,
+      name: switch (json['name']) {
+        final String name => name,
+        _ => id,
+      },
       key: id.toLowerCase(),
       unit: format.unit,
       format: format,
@@ -388,27 +395,33 @@ class SignalFormat {
 
   static SignalFormat? _parse(Object? json) {
     if (json is! Map) return null;
-    final bitIndex = json['bix'] as num?;
-    final bitLength = json['len'] as num?;
+    final bitLength = _int(json['len']);
     if (bitLength == null) return null;
-    final divide = json['div'] as num? ?? 1;
+    final divide = _num(json['div']) ?? 1;
     if (divide == 0) return null;
     return SignalFormat(
-      bitIndex: bitIndex?.toInt() ?? 0,
-      bitLength: bitLength.toInt(),
+      bitIndex: _int(json['bix']) ?? 0,
+      bitLength: bitLength,
       littleEndian: json['blsb'] == true,
       signed: json['sign'] == true,
-      multiply: json['mul'] as num? ?? 1,
+      multiply: _num(json['mul']) ?? 1,
       divide: divide,
-      add: json['add'] as num? ?? 0,
-      nullMin: json['nullmin'] as num?,
-      nullMax: json['nullmax'] as num?,
-      min: json['min'] as num?,
-      max: json['max'] as num?,
-      unit: json['unit'] as String? ?? '',
+      add: _num(json['add']) ?? 0,
+      nullMin: _num(json['nullmin']),
+      nullMax: _num(json['nullmax']),
+      min: _num(json['min']),
+      max: _num(json['max']),
+      unit: switch (json['unit']) {
+        final String unit => unit,
+        _ => '',
+      },
     );
   }
 }
+
+num? _num(Object? json) => json is num ? json : null;
+
+int? _int(Object? json) => json is num ? json.toInt() : null;
 
 class _Unsupported implements Exception {
   const _Unsupported(this.reason);
