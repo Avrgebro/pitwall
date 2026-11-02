@@ -156,7 +156,7 @@ class _Progress extends StatelessWidget {
         Row(
           children: [
             for (var i = 1; i <= steps; i++) ...[
-              if (i > 1) const SizedBox(width: Insets.xs + 2),
+              if (i > 1) const SizedBox(width: Insets.xsPlus),
               Expanded(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),

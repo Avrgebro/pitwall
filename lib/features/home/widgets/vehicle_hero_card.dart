@@ -33,7 +33,7 @@ class VehicleHeroCard extends StatelessWidget {
       borderRadius: Corners.heroRadius,
       color: tint,
       child: Padding(
-        padding: const EdgeInsets.all(Insets.l + 4),
+        padding: const EdgeInsets.all(Insets.lPlus),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

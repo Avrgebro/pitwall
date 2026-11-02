@@ -22,16 +22,12 @@ class ValueTile extends StatelessWidget {
     super.key,
     required this.data,
     this.wide = false,
-    this.missingLabel = 'Car didn\'t report this',
   });
 
   final ValueTileData data;
 
   /// Full width, with the label beside the value instead of above it.
   final bool wide;
-
-  /// Shown under a dash when there's no value.
-  final String missingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +41,7 @@ class ValueTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: Insets.l,
-        vertical: Insets.m + 2,
+        vertical: Insets.mPlus,
       ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHigh,
@@ -55,7 +51,7 @@ class ValueTile extends StatelessWidget {
           ? Row(
               children: [
                 Expanded(child: label),
-                _Value(data: data, missingLabel: missingLabel),
+                _Value(data: data),
               ],
             )
           : Column(
@@ -63,7 +59,7 @@ class ValueTile extends StatelessWidget {
               children: [
                 label,
                 const SizedBox(height: Insets.xs),
-                _Value(data: data, missingLabel: missingLabel),
+                _Value(data: data),
               ],
             ),
     );
@@ -71,10 +67,9 @@ class ValueTile extends StatelessWidget {
 }
 
 class _Value extends StatelessWidget {
-  const _Value({required this.data, required this.missingLabel});
+  const _Value({required this.data});
 
   final ValueTileData data;
-  final String missingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +82,7 @@ class _Value extends StatelessWidget {
         children: [
           Text('—', style: theme.textTheme.value.copyWith(color: muted)),
           Text(
-            missingLabel,
+            'Car didn\'t report this',
             style: theme.textTheme.bodySmall?.copyWith(color: muted),
           ),
         ],

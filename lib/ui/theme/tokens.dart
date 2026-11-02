@@ -8,6 +8,11 @@ abstract final class Insets {
   static const double m = 12;
   static const double l = 16;
   static const double xl = 24;
+
+  // Half steps, for spots the main steps don't fit.
+  static const double xsPlus = 6;
+  static const double mPlus = 14;
+  static const double lPlus = 20;
   static const double xxl = 32;
 
   /// Horizontal padding of every page.

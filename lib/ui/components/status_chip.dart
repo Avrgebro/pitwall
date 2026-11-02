@@ -56,7 +56,7 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: dense ? Insets.s : Insets.m,
-        vertical: dense ? Insets.xxs : Insets.xs + 2,
+        vertical: dense ? Insets.xxs : Insets.xsPlus,
       ),
       decoration: ShapeDecoration(
         color: background,

@@ -163,7 +163,7 @@ class _Item extends StatelessWidget {
         child: SizedBox(
           width: FloatingNavBar._itemWidth,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: Insets.s - 2),
+            padding: const EdgeInsets.symmetric(vertical: Insets.xsPlus),
             // The label follows the sliding pill, lighting up as it arrives.
             // The icon only switches colour; nothing about it animates.
             child: TweenAnimationBuilder<double>(

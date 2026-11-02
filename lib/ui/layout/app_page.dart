@@ -40,7 +40,7 @@ class AppPage extends StatelessWidget {
   static const _leadingWidth = 64.0;
 
   /// Without a back button, the title lines up with section headers.
-  static const _titleInset = Insets.l + Insets.xs;
+  static const _titleInset = Insets.lPlus;
 
   static const _barShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.vertical(

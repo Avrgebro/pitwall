@@ -18,7 +18,7 @@ class RowLayout extends StatelessWidget {
   });
 
   /// Horizontal padding of a row.
-  static const inset = Insets.l + 4;
+  static const _inset = Insets.lPlus;
 
   final String title;
   final Widget? leading;
@@ -35,7 +35,7 @@ class RowLayout extends StatelessWidget {
     final theme = Theme.of(context);
     final content = Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: inset,
+        horizontal: _inset,
         vertical: Insets.l,
       ),
       child: Row(
@@ -45,7 +45,7 @@ class RowLayout extends StatelessWidget {
               width: Sizes.icon,
               child: Center(child: leading),
             ),
-            const SizedBox(width: inset),
+            const SizedBox(width: _inset),
           ],
           Expanded(
             child: Column(

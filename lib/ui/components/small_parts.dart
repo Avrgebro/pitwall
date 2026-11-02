@@ -4,64 +4,6 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
 import 'line_icon.dart';
 
-/// A small outlined label beside a name, such as "Bluetooth LE".
-class TagLabel extends StatelessWidget {
-  const TagLabel(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Insets.s - 2,
-        vertical: Insets.xxs,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: Corners.smallRadius,
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
-      child: Text(text, style: theme.textTheme.labelSmall),
-    );
-  }
-}
-
-/// A small icon and a line of text, for detail lines in list items.
-class IconText extends StatelessWidget {
-  const IconText({
-    super.key,
-    required this.icon,
-    required this.text,
-    this.color,
-  });
-
-  final IconData icon;
-  final String text;
-
-  /// Instead of the muted default, e.g. the error colour for a problem.
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = this.color ?? theme.colorScheme.onSurfaceVariant;
-    return Row(
-      children: [
-        Icon(icon, size: Sizes.iconSmall - 2, color: color),
-        const SizedBox(width: Insets.s),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodyMedium?.copyWith(color: color),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Monospace text on a soft background: payload samples, raw traffic.
 class CodeBlock extends StatelessWidget {
   const CodeBlock({super.key, required this.child});

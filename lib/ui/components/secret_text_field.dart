@@ -123,7 +123,7 @@ class _Helper extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           LineIcon(icon, style: style, size: 14, color: color),
-          const SizedBox(width: Insets.xs + 2),
+          const SizedBox(width: Insets.xsPlus),
           Expanded(child: Text.rich(text, style: style)),
         ],
       ),
