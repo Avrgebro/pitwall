@@ -11,6 +11,7 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
+import '../common/vehicle_text.dart';
 import '../common/trip_start_text.dart';
 import 'widgets/vehicle_removed_page.dart';
 
@@ -102,10 +103,9 @@ class VehicleDetailScreen extends ConsumerWidget {
   }
 
   static String _adapterSummary(Vehicle vehicle) =>
-      switch ((vehicle.adapterName, vehicle.adapterType)) {
-        (null, _) => 'Not chosen yet',
-        (final name?, AdapterType.classic) => '$name (Classic)',
-        (final name?, AdapterType.ble) => '$name (Bluetooth LE)',
+      switch (vehicle.adapterName) {
+        null => 'Not chosen yet',
+        final name => '$name (${vehicle.adapterType.label})',
       };
 
   static String _profileSummary(Vehicle vehicle, SignalSet? profile) =>

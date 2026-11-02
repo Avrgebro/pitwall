@@ -11,6 +11,8 @@ import '../../../state/reading_keeper.dart';
 import '../../../state/session_state.dart';
 import '../../../state/trip_state.dart';
 import '../../../ui/ui.dart';
+import '../../common/session_text.dart';
+import '../../common/vehicle_text.dart';
 
 /// Connects to a vehicle's adapter by hand, or simulates an auto-start: a
 /// background trip, as if the car's head unit had connected.
@@ -34,10 +36,8 @@ class SessionPanel extends ConsumerWidget {
     final vehicle = this.vehicle;
     // Assumed on until Android says otherwise, so nothing flashes.
     final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
-    final canConnect =
-        vehicle != null &&
-        !vehicle.needs.contains(VehicleNeed.adapter) &&
-        bluetoothOn;
+    final needsAdapter = vehicle?.needs.contains(VehicleNeed.adapter) ?? false;
+    final canConnect = vehicle != null && !needsAdapter && bluetoothOn;
 
     final (chip, detail) = switch (session) {
       SessionConnected(
@@ -74,11 +74,10 @@ class SessionPanel extends ConsumerWidget {
         ),
         switch (vehicle) {
           null => 'Add a vehicle first.',
-          final vehicle when vehicle.needs.contains(VehicleNeed.adapter) =>
-            'Choose ${vehicle.name}\'s adapter first.',
+          _ when needsAdapter => '${VehicleNeed.adapter.label} first.',
           _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
           final vehicle =>
-            _problem(problem) ??
+            problem?.label ??
                 'Connect to ${vehicle.adapterName} to read by hand.',
         },
       ),
@@ -182,17 +181,7 @@ class SessionPanel extends ConsumerWidget {
     TripRunning() => 'Background trip: running',
     TripEnding() => 'Background trip: sending the last reading',
     TripIdle(lastEnd: null) => null,
-    TripIdle(:final lastEnd?) => 'Last trip ended: ${_tripEnd(lastEnd)}',
-  };
-
-  static String _tripEnd(TripEnd end) => switch (end) {
-    TripEnd.stopped => 'stopped',
-    TripEnd.noVehicle => 'no vehicle has an adapter',
-    TripEnd.permissionMissing => 'Bluetooth permission missing',
-    TripEnd.adapterNotFound => 'the adapter didn\'t answer',
-    TripEnd.carOff => 'the car stopped answering',
-    TripEnd.adapterLost => 'the adapter dropped',
-    TripEnd.failed => 'something went wrong (see the log)',
+    TripIdle(:final lastEnd?) => 'Last trip ended: ${lastEnd.label}',
   };
 
   static String _carState(CarState state) => switch (state) {
@@ -200,17 +189,6 @@ class SessionPanel extends ConsumerWidget {
     CarState.ignitionOn => 'ignition on',
     CarState.off => 'car not answering',
     CarState.unknown => 'checking the car',
-  };
-
-  static String? _problem(ConnectionProblem? problem) => switch (problem) {
-    ConnectionProblem.permissionDenied =>
-      'Pitwall needs the Bluetooth permission to connect.',
-    ConnectionProblem.connectFailed =>
-      'Couldn\'t reach the adapter. Is it plugged in and the ignition on?',
-    ConnectionProblem.disconnected => 'The adapter disconnected.',
-    ConnectionProblem.adapterError =>
-      'The adapter stopped answering. Connect again.',
-    null => null,
   };
 }
 

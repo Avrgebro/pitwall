@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/app/app.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -457,7 +458,13 @@ void main() {
         overrides: testOverrides(
           settings: const AppSettings(setupDone: true),
           bluetooth: FakeBluetoothGateway(
-            devices: const [BondedDevice(name: 'OBDII', address: 'A')],
+            devices: const [
+              BondedDevice(
+                name: 'OBDII',
+                address: 'A',
+                type: AdapterType.classic,
+              ),
+            ],
           ),
         ),
         child: const PitwallApp(),

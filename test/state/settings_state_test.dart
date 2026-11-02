@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/file_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -63,6 +64,7 @@ void main() {
     const vlinker = BondedDevice(
       name: 'vLinker MC+',
       address: '00:1D:A5:68:98:8B',
+      type: AdapterType.classic,
     );
 
     Future<ProviderContainer> start(AppSettings settings) async {

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/bluetooth/device_kind.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
@@ -10,10 +11,18 @@ import 'package:pitwall/ui/ui.dart';
 
 import '../../helpers/fakes.dart';
 
-const _adapter = BondedDevice(name: 'vLinker MC+', address: 'A');
+const _adapter = BondedDevice(
+  name: 'vLinker MC+',
+  address: 'A',
+  type: AdapterType.classic,
+);
 
-BondedDevice _audio(int i) =>
-    BondedDevice(name: 'Earbuds $i', address: 'E$i', kind: DeviceKind.audio);
+BondedDevice _audio(int i) => BondedDevice(
+  name: 'Earbuds $i',
+  address: 'E$i',
+  kind: DeviceKind.audio,
+  type: AdapterType.classic,
+);
 
 Future<void> _pump(
   WidgetTester tester,
@@ -130,6 +139,7 @@ void main() {
         name: 'TUCSON BT',
         address: 'B',
         kind: DeviceKind.audio,
+        type: AdapterType.classic,
       ),
     ], role: DeviceRole.headUnit);
     expect(find.text('B'), findsOneWidget);

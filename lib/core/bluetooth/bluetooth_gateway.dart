@@ -21,7 +21,7 @@ class BondedDevice {
     required this.name,
     required this.address,
     this.kind = DeviceKind.uncategorized,
-    this.type = AdapterType.classic,
+    required this.type,
   });
 
   final String name;

@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
-import '../../common/vehicle_need_text.dart';
+import '../../common/vehicle_text.dart';
 
 enum VehicleBadge { none, connected, onHome }
 
@@ -26,7 +26,7 @@ class VehicleRow extends StatelessWidget {
 
   /// What the vehicle needs before it works on its own, if anything.
   static String? _problem(Vehicle vehicle) => switch (vehicle.needs) {
-    [final need, ...] => VehicleNeedText.label(need),
+    [final need, ...] => need.label,
     [] => null,
   };
 

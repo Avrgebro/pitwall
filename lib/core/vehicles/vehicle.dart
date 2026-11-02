@@ -3,8 +3,6 @@ import 'dart:math';
 import '../bluetooth/adapter_type.dart';
 import 'device_id.dart';
 
-export '../bluetooth/adapter_type.dart';
-
 /// What starts a trip in a vehicle.
 enum TripStart {
   /// The phone connecting to the car's own Bluetooth (head unit).

@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../../core/bluetooth/adapter_type.dart';
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
 import '../../../core/format/text_query.dart';
 import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
+import '../vehicle_text.dart';
 
 /// The paired devices as a single-choice list, used to pick an OBD
 /// adapter or the car's head unit. Devices that suit the [role] come first;
@@ -142,8 +142,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
               title: device.name,
               // How it connects matters for an adapter, not a stereo.
               subtitle: switch (widget.role) {
-                DeviceRole.adapter =>
-                  '${_typeLabel(device.type)}, ${device.address}',
+                DeviceRole.adapter => '${device.type.label}, ${device.address}',
                 DeviceRole.headUnit => device.address,
               },
             ),
@@ -174,11 +173,6 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       ],
     );
   }
-
-  static String _typeLabel(AdapterType type) => switch (type) {
-    AdapterType.classic => 'Classic',
-    AdapterType.ble => 'Bluetooth LE',
-  };
 
   static String _describe(Object error) => switch (error) {
     BluetoothPermissionDenied() =>
