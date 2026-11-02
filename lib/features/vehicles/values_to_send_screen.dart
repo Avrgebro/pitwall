@@ -20,6 +20,15 @@ class ValuesToSendScreen extends ConsumerStatefulWidget {
 class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   bool _showOthers = false;
 
+  /// Whether the search bar is open, and what's typed in it.
+  bool _searching = false;
+  String _query = '';
+
+  void _closeSearch() => setState(() {
+    _searching = false;
+    _query = '';
+  });
+
   @override
   Widget build(BuildContext context) {
     final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
@@ -29,13 +38,15 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final profile = ref.watch(vehicleProfileProvider(widget.vehicleId)).value;
     final options = valueOptions(profile, vehicle.modelYear);
     final selected = vehicle.selectedKeys ?? defaultKeys(options);
-    final standard = options.where((o) => !o.fromProfile).toList();
-    final recognised = options
+    // While searching, every section keeps only the values that match.
+    final query = _query.trim().toLowerCase();
+    final filtering = _searching && query.isNotEmpty;
+    final shown = filtering ? _matching(options, query) : options;
+    final standard = shown.where((o) => !o.fromProfile).toList();
+    final recognised = shown
         .where((o) => o.fromProfile && o.recommended)
         .toList();
-    final others = options
-        .where((o) => o.fromProfile && !o.recommended)
-        .toList();
+    final others = shown.where((o) => o.fromProfile && !o.recommended).toList();
     final defaults = defaultKeys(options);
     Widget row(ValueOption option) => _SignalToggle(
       vehicleId: vehicle.id,
@@ -43,92 +54,102 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       defaults: defaults,
     );
 
-    return AppPage(
-      title: 'Values to send',
-      subtitle: '${vehicle.name}, ${selected.length} selected',
-      actions: [
-        // Material 3 search: the icon opens a full-screen search view over
-        // every value, standard and profile alike.
-        SearchAnchor(
-          viewHintText: 'Search values',
-          builder: (context, controller) => IconButton(
-            icon: const Icon(Symbols.search_rounded),
-            tooltip: 'Search values',
-            onPressed: controller.openView,
+    // Back closes the search before leaving the page.
+    return PopScope(
+      canPop: !_searching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closeSearch();
+      },
+      child: AppPage(
+        title: 'Values to send',
+        subtitle: '${vehicle.name}, ${selected.length} selected',
+        actions: [
+          IconButton(
+            icon: Icon(
+              _searching ? Symbols.close_rounded : Symbols.search_rounded,
+            ),
+            tooltip: _searching ? 'Close search' : 'Search values',
+            onPressed: _searching
+                ? _closeSearch
+                : () => setState(() => _searching = true),
           ),
-          suggestionsBuilder: (context, controller) {
-            final matches = _matching(options, controller.text);
-            if (matches.isEmpty) {
-              return [
-                InfoNote(
-                  padding: Insets.card,
-                  text: TextSpan(
-                    text: 'No values match "${controller.text.trim()}".',
-                  ),
-                ),
-              ];
-            }
-            return [for (final option in matches) row(option)];
-          },
-        ),
-        const SizedBox(width: Insets.s),
-      ],
-      children: [
-        _IntroPanel(
-          canReset: vehicle.selectedKeys != null,
-          onReset: () => ref
-              .read(appSettingsProvider.notifier)
-              .saveVehicle(vehicle.copyWith(selectedKeys: null)),
-        ),
-        const SectionHeader('Standard', trailing: 'Works on most cars'),
-        RowGroup(children: [for (final option in standard) row(option)]),
-        if (recognised.isNotEmpty) ...[
-          SectionHeader(
-            'From vehicle profile',
-            trailing: _profileLabel(vehicle),
-          ),
-          RowGroup(children: [for (final option in recognised) row(option)]),
+          const SizedBox(width: Insets.s),
         ],
-        if (others.isNotEmpty) ...[
-          const SectionHeader('Other profile signals'),
-          RowGroup(
-            children: [
-              GroupTile(
-                icon: Symbols.manage_search_rounded,
-                title: _showOthers
-                    ? 'Hide ${others.length} signals'
-                    : 'Show ${others.length} signals',
-                subtitle:
-                    'Mostly diagnostic. Each one costs an extra request every '
-                    'reading.',
-                trailing: Icon(
-                  _showOthers ? Icons.expand_less : Icons.expand_more,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                onTap: () => setState(() => _showOthers = !_showOthers),
-              ),
-            ],
-          ),
-          if (_showOthers) ...[
+        children: [
+          if (_searching)
+            SearchBar(
+              autoFocus: true,
+              hintText: 'Search values',
+              leading: const Icon(Symbols.search_rounded),
+              onChanged: (text) => setState(() => _query = text),
+            )
+          else
+            _IntroPanel(
+              canReset: vehicle.selectedKeys != null,
+              onReset: () => ref
+                  .read(appSettingsProvider.notifier)
+                  .saveVehicle(vehicle.copyWith(selectedKeys: null)),
+            ),
+          if (shown.isEmpty) ...[
             const SizedBox(height: Insets.m),
+            InfoNote(
+              text: TextSpan(text: 'No values match "${_query.trim()}".'),
+            ),
+          ],
+          if (standard.isNotEmpty) ...[
+            const SectionHeader('Standard', trailing: 'Works on most cars'),
+            RowGroup(children: [for (final option in standard) row(option)]),
+          ],
+          if (recognised.isNotEmpty) ...[
+            SectionHeader(
+              'From vehicle profile',
+              trailing: _profileLabel(vehicle),
+            ),
+            RowGroup(children: [for (final option in recognised) row(option)]),
+          ],
+          if (others.isNotEmpty && filtering) ...[
+            // Matches are what was searched for; no need to expand them.
+            const SectionHeader('Other profile signals'),
             RowGroup(children: [for (final option in others) row(option)]),
+          ] else if (others.isNotEmpty) ...[
+            const SectionHeader('Other profile signals'),
+            RowGroup(
+              children: [
+                GroupTile(
+                  icon: Symbols.manage_search_rounded,
+                  title: _showOthers
+                      ? 'Hide ${others.length} signals'
+                      : 'Show ${others.length} signals',
+                  subtitle:
+                      'Mostly diagnostic. Each one costs an extra request every '
+                      'reading.',
+                  trailing: Icon(
+                    _showOthers ? Icons.expand_less : Icons.expand_more,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  onTap: () => setState(() => _showOthers = !_showOthers),
+                ),
+              ],
+            ),
+            if (_showOthers) ...[
+              const SizedBox(height: Insets.m),
+              RowGroup(children: [for (final option in others) row(option)]),
+            ],
           ],
         ],
-      ],
+      ),
     );
   }
 
-  /// Values whose name or payload key contains [text], ignoring case.
-  static List<ValueOption> _matching(List<ValueOption> options, String text) {
-    final query = text.trim().toLowerCase();
-    if (query.isEmpty) return options;
-    return [
-      for (final option in options)
-        if (option.name.toLowerCase().contains(query) ||
-            option.key.contains(query))
-          option,
-    ];
-  }
+  /// Values whose name or payload key contains [query], which is
+  /// lowercase.
+  static List<ValueOption> _matching(List<ValueOption> options, String query) =>
+      [
+        for (final option in options)
+          if (option.name.toLowerCase().contains(query) ||
+              option.key.contains(query))
+            option,
+      ];
 
   static String _profileLabel(Vehicle vehicle) => switch (vehicle.modelYear) {
     final year? => '$year profile',
@@ -176,7 +197,7 @@ class _IntroPanel extends StatelessWidget {
 }
 
 /// One value with its on/off switch. Reads the vehicle's selection itself,
-/// so it stays current wherever it's shown, the search view included.
+/// so only the row that changed rebuilds.
 class _SignalToggle extends ConsumerWidget {
   const _SignalToggle({
     required this.vehicleId,

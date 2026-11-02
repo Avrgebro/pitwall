@@ -322,14 +322,23 @@ void main() {
     await tester.enterText(find.byType(TextField).last, 'coolant');
     await tester.pumpAndSettle();
 
-    // The page stays underneath the search view, so each value appears
-    // once there, and once more in the view when it matches.
-    expect(find.text('coolant_temp_c'), findsNWidgets(2));
-    expect(find.text('rpm'), findsOneWidget);
+    // The sections filter in place.
+    expect(find.text('coolant_temp_c'), findsOneWidget);
+    expect(find.text('rpm'), findsNothing);
 
     await tester.enterText(find.byType(TextField).last, 'zzz');
     await tester.pumpAndSettle();
     expect(find.text('No values match "zzz".'), findsOneWidget);
+
+    // Back closes the search first, then leaves the page.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchBar), findsNothing);
+    expect(find.text('rpm'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Values to send'), findsOneWidget);
+    expect(find.text('rpm'), findsNothing);
   });
 
   testWidgets('a pinned action stays above the keyboard', (tester) async {
