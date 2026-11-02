@@ -10,6 +10,27 @@ enum WebhookUrlProblem {
   unsupportedScheme,
 }
 
+/// Why readings can't be sent to a webhook target.
+sealed class WebhookProblem {
+  const WebhookProblem();
+}
+
+final class NoWebhookUrl extends WebhookProblem {
+  const NoWebhookUrl();
+}
+
+final class BadWebhookUrl extends WebhookProblem {
+  const BadWebhookUrl(this.problem);
+
+  final WebhookUrlProblem problem;
+}
+
+final class IncompleteWebhookAuth extends WebhookProblem {
+  const IncompleteWebhookAuth(this.problem);
+
+  final AuthProblem problem;
+}
+
 /// Where readings go: the webhook URL and its credentials. Kept together in
 /// secure storage, and checked here, the one place that decides whether
 /// they can be used.
@@ -40,8 +61,15 @@ class WebhookTarget {
   /// Plain http: readings, and any credentials, travel unencrypted.
   bool get isInsecure => urlProblem == null && Uri.parse(url).scheme == 'http';
 
-  /// Whether readings can be sent: a valid URL and usable credentials.
-  bool get isUsable => hasUrl && urlProblem == null && auth.problem == null;
+  /// Why readings can't be sent here, or null if they can.
+  WebhookProblem? get problem {
+    if (!hasUrl) return const NoWebhookUrl();
+    if (urlProblem case final problem?) return BadWebhookUrl(problem);
+    if (auth.problem case final problem?) return IncompleteWebhookAuth(problem);
+    return null;
+  }
+
+  bool get isUsable => problem == null;
 
   WebhookTarget copyWith({String? url, WebhookAuth? auth}) =>
       WebhookTarget(url ?? this.url, auth ?? this.auth);

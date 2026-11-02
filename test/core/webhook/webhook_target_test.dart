@@ -55,4 +55,24 @@ void main() {
     );
     expect(WebhookTarget.fromJson(target.toJson()), target);
   });
+
+  test('the problem says why it can\'t be sent to, first one first', () {
+    expect(WebhookTarget.none.problem, isA<NoWebhookUrl>());
+    expect(
+      const WebhookTarget('example.com/hook').problem,
+      isA<BadWebhookUrl>().having(
+        (p) => p.problem,
+        'problem',
+        WebhookUrlProblem.incomplete,
+      ),
+    );
+    expect(
+      const WebhookTarget(
+        'https://example.com/x',
+        WebhookAuth(type: WebhookAuthType.bearer),
+      ).problem,
+      isA<IncompleteWebhookAuth>(),
+    );
+    expect(const WebhookTarget('https://example.com/x').problem, isNull);
+  });
 }

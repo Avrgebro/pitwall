@@ -205,20 +205,17 @@ class WebhookSender {
     return (error: error, elapsed: stopwatch.elapsed);
   }
 
-  /// Why [target] can't be sent to, as [WebhookTarget] decides, or null.
-  static DeliveryError? _unusable(WebhookTarget target) {
-    if (!target.hasUrl) return const DeliveryError(DeliveryErrorKind.noUrl);
-    if (target.urlProblem != null) {
-      return const DeliveryError(DeliveryErrorKind.invalidUrl);
-    }
-    if (target.auth.problem case final problem?) {
-      return DeliveryError(
-        DeliveryErrorKind.authIncomplete,
-        authProblem: problem,
-      );
-    }
-    return null;
-  }
+  /// Why [target] can't be sent to, as [WebhookTarget.problem] decides.
+  static DeliveryError? _unusable(WebhookTarget target) =>
+      switch (target.problem) {
+        null => null,
+        NoWebhookUrl() => const DeliveryError(DeliveryErrorKind.noUrl),
+        BadWebhookUrl() => const DeliveryError(DeliveryErrorKind.invalidUrl),
+        IncompleteWebhookAuth(:final problem) => DeliveryError(
+          DeliveryErrorKind.authIncomplete,
+          authProblem: problem,
+        ),
+      };
 
   static DeliveryError? _errorFor(int statusCode) => switch (statusCode) {
     >= 200 && < 300 => null,
