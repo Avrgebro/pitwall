@@ -5,7 +5,7 @@ import 'small_parts.dart';
 
 /// A card's details as rows on a soft panel: icon, label, and the value at
 /// the full width of the card, so nothing gets squeezed. Takes its text
-/// colours from the card; see `GlassInk`.
+/// colours from the theme, which a tinted `GlassSurface` sets.
 class DetailRows extends StatelessWidget {
   const DetailRows({super.key, required this.rows});
 

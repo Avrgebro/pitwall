@@ -16,19 +16,26 @@ class VehicleHeroCard extends StatelessWidget {
   final VoidCallback? onSwitch;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => GlassSurface(
+    borderRadius: Corners.heroRadius,
     // Running tints the glass in the accent; otherwise it's neutral glass.
-    return GlassSurface(
-      borderRadius: Corners.heroRadius,
-      tone: model.state == HeroState.running ? StatusTone.active : null,
-      // Below the surface, so the text takes its colours.
-      child: Builder(builder: _content),
-    );
-  }
+    tone: model.state == HeroState.running ? StatusTone.active : null,
+    child: _HeroContent(model: model, onSwitch: onSwitch),
+  );
+}
 
-  Widget _content(BuildContext context) {
+/// What's on the card. Its own widget, so it reads the colours the tinted
+/// glass sets.
+class _HeroContent extends StatelessWidget {
+  const _HeroContent({required this.model, required this.onSwitch});
+
+  final HeroModel model;
+  final VoidCallback? onSwitch;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final foreground = GlassInk.of(context).strong;
+    final foreground = theme.colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.all(Insets.lPlus),
       child: Column(

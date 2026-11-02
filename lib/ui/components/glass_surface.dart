@@ -22,11 +22,9 @@ class GlassSurface extends StatelessWidget {
   final BorderRadius borderRadius;
 
   /// Tints the glass in the tone's colour, e.g. for a running state or a
-  /// problem, and sets the text colours inside to match; see [GlassInk].
+  /// problem. The theme inside then has the tone's text colours as
+  /// `onSurface` and `onSurfaceVariant`, so whatever sits on it reads right.
   final StatusTone? tone;
-
-  /// How much of a tint shows; the rest is the blurred page behind.
-  static const _tintOpacity = 0.7;
 
   @override
   Widget build(BuildContext context) {
@@ -40,47 +38,36 @@ class GlassSurface extends StatelessWidget {
         filter: GlassFilters.card,
         child: Material(
           color:
-              colors?.container.withValues(alpha: _tintOpacity) ?? glass.fill,
+              colors?.container.withValues(alpha: glass.tintOpacity) ??
+              glass.fill,
           shape: RoundedRectangleBorder(
             borderRadius: borderRadius,
             side: BorderSide(color: glass.edge),
           ),
           clipBehavior: Clip.antiAlias,
-          child: colors == null
-              ? child
-              : GlassInk(
-                  strong: colors.onContainer,
-                  muted: colors.onContainer.withValues(alpha: 0.75),
-                  child: child,
-                ),
+          child: colors == null ? child : _tinted(context, colors, child),
         ),
       ),
     );
   }
-}
 
-/// The text colours on the surface a widget sits on: [strong] for titles
-/// and values, [muted] for labels and explanations. A tinted
-/// [GlassSurface] sets them; elsewhere they're the theme's.
-class GlassInk extends InheritedWidget {
-  const GlassInk({
-    super.key,
-    required this.strong,
-    required this.muted,
-    required super.child,
-  });
-
-  final Color strong;
-  final Color muted;
-
-  static ({Color strong, Color muted}) of(BuildContext context) {
-    final ink = context.dependOnInheritedWidgetOfExactType<GlassInk>();
-    if (ink != null) return (strong: ink.strong, muted: ink.muted);
-    final scheme = Theme.of(context).colorScheme;
-    return (strong: scheme.onSurface, muted: scheme.onSurfaceVariant);
+  static Widget _tinted(BuildContext context, ToneColors colors, Widget child) {
+    final theme = Theme.of(context);
+    final strong = colors.onContainer;
+    return Theme(
+      data: theme.copyWith(
+        colorScheme: theme.colorScheme.copyWith(
+          onSurface: strong,
+          onSurfaceVariant: strong.withValues(alpha: 0.75),
+        ),
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(color: strong),
+        child: IconTheme.merge(
+          data: IconThemeData(color: strong),
+          child: child,
+        ),
+      ),
+    );
   }
-
-  @override
-  bool updateShouldNotify(GlassInk oldWidget) =>
-      strong != oldWidget.strong || muted != oldWidget.muted;
 }

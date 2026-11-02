@@ -2,7 +2,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
-import 'glass_surface.dart';
 import 'line_icon.dart';
 
 /// Monospace text on a soft background: payload samples, raw traffic.
@@ -66,12 +65,11 @@ class SummaryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ink = GlassInk.of(context);
-    final muted = ink.muted;
+    final muted = theme.colorScheme.onSurfaceVariant;
     final valueText = Text(
       value,
       style: theme.textTheme.bodyMedium?.copyWith(
-        color: valueColor ?? ink.strong,
+        color: valueColor ?? theme.colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
     );

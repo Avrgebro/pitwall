@@ -266,7 +266,9 @@ class SessionController extends Notifier<SessionState> {
   /// network doesn't hold it, and a failure there can't leave it busy.
   Future<ReadOutcome> readAndSend() async {
     final vehicle = switch (state) {
-      SessionConnected(:final vehicleId) => ref.read(vehicleProvider(vehicleId)),
+      SessionConnected(:final vehicleId) => ref.read(
+        vehicleProvider(vehicleId),
+      ),
       _ => null,
     };
     if (vehicle == null) {

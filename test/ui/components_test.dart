@@ -267,4 +267,22 @@ void main() {
       expect(corners(2).bottomLeft, outer);
     });
   });
+
+  testWidgets('anything on tinted glass takes the tint\'s text colours', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _frame(
+        const GlassSurface(
+          tone: StatusTone.error,
+          child: InfoNote(text: TextSpan(text: 'Check the token')),
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(InfoNote));
+    final onContainer = context.tone(StatusTone.error).onContainer;
+    final text = tester.widget<Text>(find.text('Check the token'));
+    expect(text.style?.color, onContainer.withValues(alpha: 0.75));
+  });
 }

@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
-import 'glass_surface.dart';
 
 /// A card's heading: an icon badge, a title and an optional line under it,
 /// and an optional widget at the end, such as a button.
@@ -23,7 +22,7 @@ class CardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final ink = GlassInk.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final subtitle = this.subtitle;
     final trailing = this.trailing;
     return Row(
@@ -38,14 +37,16 @@ class CardHeader extends StatelessWidget {
               Text(
                 title,
                 style: text.titleMedium?.copyWith(
-                  color: ink.strong,
+                  color: scheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               if (subtitle != null)
                 Text(
                   subtitle,
-                  style: text.bodyMedium?.copyWith(color: ink.muted),
+                  style: text.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
             ],
           ),

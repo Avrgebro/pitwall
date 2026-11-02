@@ -1,3 +1,5 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:material_ui/material_ui.dart';
 
 /// Colours for the frosted look: the soft glows behind pages and the
@@ -7,6 +9,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
   const GlassColors({
     required this.fill,
     required this.barFill,
+    required this.tintOpacity,
     required this.tintFill,
     required this.onTint,
     required this.edge,
@@ -16,11 +19,14 @@ class GlassColors extends ThemeExtension<GlassColors> {
 
   factory GlassColors.from(ColorScheme scheme) {
     final dark = scheme.brightness == Brightness.dark;
+    // Translucent enough to see the page through, opaque enough to read on.
+    final tintOpacity = dark ? 0.6 : 0.65;
     return dark
         ? GlassColors(
             fill: scheme.surfaceContainerLow.withValues(alpha: 0.5),
             barFill: scheme.surfaceContainer.withValues(alpha: 0.5),
-            tintFill: scheme.primaryContainer.withValues(alpha: 0.6),
+            tintOpacity: tintOpacity,
+            tintFill: scheme.primaryContainer.withValues(alpha: tintOpacity),
             onTint: scheme.onPrimaryContainer,
             edge: Colors.white.withValues(alpha: 0.1),
             glow: scheme.primary.withValues(alpha: 0.34),
@@ -29,7 +35,8 @@ class GlassColors extends ThemeExtension<GlassColors> {
         : GlassColors(
             fill: scheme.surfaceContainerLowest.withValues(alpha: 0.55),
             barFill: scheme.surfaceContainerLowest.withValues(alpha: 0.6),
-            tintFill: scheme.primaryContainer.withValues(alpha: 0.65),
+            tintOpacity: tintOpacity,
+            tintFill: scheme.primaryContainer.withValues(alpha: tintOpacity),
             onTint: scheme.onPrimaryContainer,
             edge: scheme.outlineVariant.withValues(alpha: 0.6),
             glow: scheme.primary.withValues(alpha: 0.26),
@@ -43,6 +50,9 @@ class GlassColors extends ThemeExtension<GlassColors> {
   /// Background of bars over scrolling content: the top bar and the
   /// navigation bar.
   final Color barFill;
+
+  /// How opaque a tint on glass is: [tintFill], and tinted cards.
+  final double tintOpacity;
 
   /// Accent-tinted glass, for a main action floating over content. The
   /// container colour, close to the background in brightness, keeps
@@ -65,6 +75,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
   GlassColors copyWith({
     Color? fill,
     Color? barFill,
+    double? tintOpacity,
     Color? tintFill,
     Color? onTint,
     Color? edge,
@@ -73,6 +84,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
   }) => GlassColors(
     fill: fill ?? this.fill,
     barFill: barFill ?? this.barFill,
+    tintOpacity: tintOpacity ?? this.tintOpacity,
     tintFill: tintFill ?? this.tintFill,
     onTint: onTint ?? this.onTint,
     edge: edge ?? this.edge,
@@ -86,6 +98,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
     return GlassColors(
       fill: Color.lerp(fill, other.fill, t)!,
       barFill: Color.lerp(barFill, other.barFill, t)!,
+      tintOpacity: lerpDouble(tintOpacity, other.tintOpacity, t)!,
       tintFill: Color.lerp(tintFill, other.tintFill, t)!,
       onTint: Color.lerp(onTint, other.onTint, t)!,
       edge: Color.lerp(edge, other.edge, t)!,
