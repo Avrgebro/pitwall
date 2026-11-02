@@ -7,7 +7,6 @@ import '../../core/logging/adapter_log.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
-import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/vehicle_picker_sheet.dart';
 import 'widgets/log_view.dart';
@@ -45,9 +44,7 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
   Widget build(BuildContext context) {
     final log = ref.watch(adapterLogProvider);
     final session = ref.watch(sessionProvider);
-    final vehicleCount = ref.watch(
-      appSettingsProvider.select((s) => s.value?.vehicles.length ?? 0),
-    );
+    final canPick = ref.watch(canPickVehicleProvider);
 
     return ValueListenableBuilder<List<LogEntry>>(
       valueListenable: log.entries,
@@ -62,7 +59,7 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
           const SectionHeader('Session', padding: SectionHeader.firstPadding),
           SessionPanel(
             vehicle: ref.watch(focusedVehicleProvider),
-            onChooseVehicle: vehicleCount > 1
+            onChooseVehicle: canPick
                 ? () => VehiclePickerSheet.show(context, title: 'Connect to')
                 : null,
           ),

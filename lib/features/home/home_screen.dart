@@ -7,9 +7,8 @@ import '../../core/readings/readings.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/last_values_state.dart';
+import '../../state/live_activity_state.dart';
 import '../../state/permissions_state.dart';
-import '../../state/session_state.dart';
-import '../../state/trip_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/webhook_state.dart';
 import '../../ui/ui.dart';
@@ -32,7 +31,6 @@ class HomeScreen extends ConsumerWidget {
     if (settings == null || webhook == null) {
       return const AppPage.loading(title: 'Pitwall');
     }
-    final session = ref.watch(sessionProvider);
     final vehicle = ref.watch(focusedVehicleProvider);
 
     // Before the first vehicle, Home walks through setup. After, problems
@@ -56,8 +54,7 @@ class HomeScreen extends ConsumerWidget {
     final model = HomeViewModel.build(
       vehicle: vehicle,
       settings: settings,
-      session: session,
-      trip: ref.watch(tripProvider),
+      activity: ref.watch(liveActivityProvider),
       delivery: ref.watch(deliveryStatusProvider),
       hasWebhook: webhook.hasUrl,
       options: valueOptions(profile, vehicle.modelYear),
@@ -77,7 +74,7 @@ class HomeScreen extends ConsumerWidget {
         VehicleHeroCard(
           model: model.hero,
           // With more than one vehicle, its name switches between them.
-          onSwitch: settings.vehicles.length > 1
+          onSwitch: ref.watch(canPickVehicleProvider)
               ? () => VehiclePickerSheet.show(context, title: 'Show on Home')
               : null,
         ),

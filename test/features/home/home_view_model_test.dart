@@ -6,8 +6,7 @@ import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/delivery_status.dart';
 import 'package:pitwall/features/home/home_view_model.dart';
-import 'package:pitwall/state/session_state.dart';
-import 'package:pitwall/state/trip_state.dart';
+import 'package:pitwall/state/live_activity_state.dart';
 
 /// The four Home states from the mockups (1a–1d), plus first use.
 void main() {
@@ -20,9 +19,9 @@ void main() {
   );
   const settings = AppSettings();
   final options = valueOptions(null, null);
-  final driving = SessionConnected(
+  final driving = LiveConnected(
     vehicleId: 'tucson',
-    connectedAt: now.subtract(const Duration(minutes: 24)),
+    since: now.subtract(const Duration(minutes: 24)),
     carState: CarState.engineRunning,
   );
   Reading reading({required bool delivered, DateTime? at}) => Reading(
@@ -41,8 +40,7 @@ void main() {
   /// Without [lastValues], this car's last values are those of the
   /// delivery's latest reading, when it's this car's.
   HomeViewModel build({
-    SessionState session = const SessionIdle(),
-    TripState trip = const TripIdle(),
+    LiveActivity activity = const NoActivity(),
     DeliveryStatus delivery = const DeliveryStatus(),
     bool hasWebhook = true,
     Map<String, LastValue>? lastValues,
@@ -51,8 +49,7 @@ void main() {
     return HomeViewModel.build(
       vehicle: vehicle,
       settings: settings,
-      session: session,
-      trip: trip,
+      activity: activity,
       delivery: delivery,
       hasWebhook: hasWebhook,
       options: options,
@@ -69,7 +66,7 @@ void main() {
 
   test('1a driving, all healthy', () {
     final model = build(
-      session: driving,
+      activity: driving,
       delivery: DeliveryStatus(
         lastSuccess: now.subtract(const Duration(seconds: 40)),
         latest: reading(delivered: true),
@@ -186,7 +183,7 @@ void main() {
 
   test('1c no signal: readings queued, nothing to do', () {
     final model = build(
-      session: driving,
+      activity: driving,
       delivery: DeliveryStatus(
         queued: 3,
         failedAttempts: 4,
@@ -209,7 +206,7 @@ void main() {
 
   test('1d webhook refusing readings: needs the user', () {
     final model = build(
-      session: driving,
+      activity: driving,
       delivery: DeliveryStatus(
         queued: 12,
         failedAttempts: 12,
@@ -268,26 +265,20 @@ void main() {
     expect(model.delivery.stats.single.value, '2');
   });
 
-  test('a reconnect mid-trip doesn\'t restart the trip clock', () {
-    final model = build(
-      // The adapter came back a minute ago, 24 minutes into the trip.
-      session: SessionConnected(
-        vehicleId: 'tucson',
-        connectedAt: now.subtract(const Duration(minutes: 1)),
-        carState: CarState.engineRunning,
-      ),
-      trip: TripRunning(
-        vehicleId: 'tucson',
-        since: now.subtract(const Duration(minutes: 24)),
-      ),
-    );
+  test('a reconnecting trip says so', () {
+    final model = build(activity: const LiveReconnecting('tucson'));
 
-    expect(model.hero.stats.last.value, '24 min');
+    expect(model.hero.state, HeroState.connecting);
+    expect(model.hero.subtitle, 'Reconnecting to vLinker MC+…');
   });
 
-  test('another car\'s session doesn\'t show on this one', () {
+  test('another car\'s activity doesn\'t show on this one', () {
     final model = build(
-      session: SessionConnected(vehicleId: 'mazda', connectedAt: now),
+      activity: LiveConnected(
+        vehicleId: 'mazda',
+        since: now,
+        carState: CarState.engineRunning,
+      ),
     );
 
     expect(model.hero.state, HeroState.waiting);

@@ -6,7 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../app/routes.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
-import '../../state/session_state.dart';
+import '../../state/live_activity_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import 'widgets/no_vehicles_card.dart';
@@ -21,7 +21,8 @@ class VehiclesScreen extends ConsumerWidget {
     if (settings == null) {
       return const AppPage.loading(title: 'Vehicles');
     }
-    final session = ref.watch(sessionProvider);
+    final activity = ref.watch(liveActivityProvider);
+    final canPick = ref.watch(canPickVehicleProvider);
     final now = ref.watch(nowProvider);
     final vehicles = settings.vehicles;
     final homeVehicle = ref.watch(focusedVehicleProvider);
@@ -36,10 +37,10 @@ class VehiclesScreen extends ConsumerWidget {
     }
 
     VehicleBadge badgeFor(String id) {
-      if (session.isConnected && session.vehicleId == id) {
+      if (activity.forVehicle(id) is LiveConnected) {
         return VehicleBadge.connected;
       }
-      if (vehicles.length > 1 && homeVehicle?.id == id) {
+      if (canPick && homeVehicle?.id == id) {
         return VehicleBadge.onHome;
       }
       return VehicleBadge.none;

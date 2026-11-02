@@ -85,16 +85,6 @@ final class ReadNotDone extends ReadOutcome {
 @immutable
 sealed class SessionState {
   const SessionState();
-
-  /// The vehicle being connected to or connected, if any.
-  String? get vehicleId => null;
-
-  bool get isConnected => this is SessionConnected;
-
-  /// This session if it's [id]'s, or idle otherwise: what a screen about
-  /// one vehicle should show.
-  SessionState forVehicle(String id) =>
-      vehicleId == id ? this : const SessionIdle();
 }
 
 final class SessionIdle extends SessionState {
@@ -107,7 +97,6 @@ final class SessionIdle extends SessionState {
 final class SessionConnecting extends SessionState {
   const SessionConnecting(this.vehicleId);
 
-  @override
   final String vehicleId;
 }
 
@@ -121,7 +110,6 @@ final class SessionConnected extends SessionState {
     this.busy = false,
   });
 
-  @override
   final String vehicleId;
   final DateTime connectedAt;
   final String? adapterVersion;
@@ -277,10 +265,10 @@ class SessionController extends Notifier<SessionState> {
   /// read holds the adapter; keeping and sending happen after, so a slow
   /// network doesn't hold it, and a failure there can't leave it busy.
   Future<ReadOutcome> readAndSend() async {
-    final vehicleId = state.vehicleId;
-    final vehicle = vehicleId == null
-        ? null
-        : ref.read(vehicleProvider(vehicleId));
+    final vehicle = switch (state) {
+      SessionConnected(:final vehicleId) => ref.read(vehicleProvider(vehicleId)),
+      _ => null,
+    };
     if (vehicle == null) {
       return const ReadNotDone(SessionProblem.notConnected);
     }

@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../state/focus_state.dart';
 import '../../../state/infrastructure.dart';
-import '../../../state/session_state.dart';
+import '../../../state/live_activity_state.dart';
 import '../../../state/settings_state.dart';
 import '../../../ui/ui.dart';
 
@@ -33,15 +33,18 @@ class _Choices extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicles = ref.watch(appSettingsProvider).value?.vehicles ?? [];
     final focused = ref.watch(focusedVehicleProvider);
-    final liveId = ref.watch(liveVehicleIdProvider);
-    final connected = ref.watch(sessionProvider).isConnected;
+    final activity = ref.watch(liveActivityProvider);
     final now = ref.watch(nowProvider);
-    final live = vehicles.where((v) => v.id == liveId).firstOrNull;
+    final live = vehicles.where((v) => v.id == activity.vehicleId).firstOrNull;
 
-    String state(Vehicle vehicle) => switch (vehicle.lastSeen) {
-      _ when vehicle.id == live?.id => connected ? 'Connected' : 'Connecting',
-      final seen? => 'Last seen ${Formatters.ago(seen, now)}',
-      null => 'Never connected',
+    String state(Vehicle vehicle) => switch (activity.forVehicle(vehicle.id)) {
+      LiveConnected() => 'Connected',
+      LiveConnecting() => 'Connecting',
+      LiveReconnecting() => 'Reconnecting',
+      NoActivity() => switch (vehicle.lastSeen) {
+        final seen? => 'Last seen ${Formatters.ago(seen, now)}',
+        null => 'Never connected',
+      },
     };
 
     return Column(

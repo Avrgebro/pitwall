@@ -17,8 +17,8 @@ class SessionPanel extends ConsumerWidget {
   /// The vehicle to connect to, or null if there's none.
   final Vehicle? vehicle;
 
-  /// Picks another vehicle; null when there's no choice, or while a session
-  /// or trip is in progress.
+  /// Picks another vehicle; null with only one. While one is live, the
+  /// picker keeps the others unavailable.
   final VoidCallback? onChooseVehicle;
 
   @override
