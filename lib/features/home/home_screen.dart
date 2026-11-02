@@ -9,6 +9,7 @@ import '../../state/infrastructure.dart';
 import '../../state/last_values_state.dart';
 import '../../state/permissions_state.dart';
 import '../../state/session_state.dart';
+import '../../state/trip_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/webhook_state.dart';
 import '../../ui/ui.dart';
@@ -56,6 +57,7 @@ class HomeScreen extends ConsumerWidget {
       vehicle: vehicle,
       settings: settings,
       session: session,
+      trip: ref.watch(tripProvider),
       delivery: ref.watch(deliveryStatusProvider),
       hasWebhook: webhook.hasUrl,
       options: valueOptions(profile, vehicle.modelYear),

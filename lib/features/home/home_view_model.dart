@@ -7,6 +7,7 @@ import '../../core/settings/settings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../state/session_state.dart';
+import '../../state/trip_state.dart';
 import '../../ui/components/value_tile_data.dart';
 import '../../core/format/formatters.dart';
 import '../../ui/theme/status_tone.dart';
@@ -110,14 +111,13 @@ class HomeViewModel {
     required Vehicle vehicle,
     required AppSettings settings,
     required SessionState session,
+    required TripState trip,
     required DeliveryStatus delivery,
     required bool hasWebhook,
     required List<ValueOption> options,
     required Map<String, LastValue> lastValues,
     required DateTime now,
   }) {
-    final ownSession = session.vehicleId == vehicle.id;
-    final connected = ownSession && session.isConnected;
     final card = _delivery(delivery, hasWebhook, now);
     final lastReading = lastValues.values
         .map((value) => value.readAt)
@@ -129,9 +129,15 @@ class HomeViewModel {
       hero: _hero(
         vehicle: vehicle,
         settings: settings,
-        session: session,
-        connected: connected,
-        connecting: ownSession && session.phase == SessionPhase.connecting,
+        session: session.forVehicle(vehicle.id),
+        // A trip's clock runs from when it first reached the car, so a
+        // reconnect mid-drive doesn't restart it.
+        tripSince: switch (trip) {
+          TripRunning(:final vehicleId, :final since)
+              when vehicleId == vehicle.id =>
+            since,
+          _ => null,
+        },
         deliveryHealthy: !card.isProblem,
         lastReading: lastReading,
         now: now,
@@ -158,8 +164,7 @@ class HomeViewModel {
     required Vehicle vehicle,
     required AppSettings settings,
     required SessionState session,
-    required bool connected,
-    required bool connecting,
+    required DateTime? tripSince,
     required bool deliveryHealthy,
     required DateTime? lastReading,
     required DateTime now,
@@ -173,7 +178,7 @@ class HomeViewModel {
         null => 'Never',
       },
     );
-    if (connected) {
+    if (session case SessionConnected(:final carState, :final connectedAt)) {
       return HeroModel(
         state: HeroState.running,
         title: vehicle.name,
@@ -183,21 +188,23 @@ class HomeViewModel {
         stats: [
           (kind: HeroStatKind.adapter, label: 'Adapter', value: 'Connected'),
           (
-            kind: session.carState == CarState.off
+            kind: carState == CarState.off
                 ? HeroStatKind.carOff
                 : HeroStatKind.car,
             label: 'Car',
-            value: _carState(session.carState),
+            value: _carState(carState),
           ),
           (
             kind: HeroStatKind.trip,
             label: 'Trip',
-            value: Formatters.duration(now.difference(session.connectedAt!)),
+            value: Formatters.duration(
+              now.difference(tripSince ?? connectedAt),
+            ),
           ),
         ],
       );
     }
-    if (connecting) {
+    if (session is SessionConnecting) {
       return HeroModel(
         state: HeroState.connecting,
         title: vehicle.name,

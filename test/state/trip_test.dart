@@ -128,20 +128,21 @@ void main() {
   }
 
   /// Waits until the trip is running, connected to a vehicle.
-  Future<TripState> running(ProviderContainer c) async {
+  Future<TripRunning> running(ProviderContainer c) async {
     for (var i = 0; i < 200; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 5));
-      final trip = c.read(tripProvider);
-      if (trip.phase == TripPhase.running) return trip;
+      if (c.read(tripProvider) case final TripRunning trip) return trip;
     }
     fail('The trip did not start');
   }
 
-  Future<TripState> ended(ProviderContainer c) async {
+  Future<TripIdle> ended(ProviderContainer c) async {
     for (var i = 0; i < 200; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 5));
-      final trip = c.read(tripProvider);
-      if (trip.phase == TripPhase.idle && trip.lastEnd != null) return trip;
+      if (c.read(tripProvider) case final TripIdle trip
+          when trip.lastEnd != null) {
+        return trip;
+      }
     }
     fail('The trip did not end');
   }
@@ -179,6 +180,11 @@ void main() {
     );
     // What was read is kept for Home, by vehicle.
     expect(lastValues.saved.of(_tucson.id)['battery_v']?.value, 13.6);
+    // Connecting marked the car as seen.
+    expect(
+      c.read(appSettingsProvider).value!.vehicleById(_tucson.id)!.lastSeen,
+      isNotNull,
+    );
   });
 
   test('an unreadable profile still lets standard values go out', () async {

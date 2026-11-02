@@ -144,7 +144,7 @@ class FixedSession extends SessionController {
 /// Provider overrides for an app with no real phone behind it.
 List<Override> testOverrides({
   AppSettings settings = const AppSettings(),
-  SessionState session = const SessionState(),
+  SessionState session = const SessionIdle(),
   Map<AppPermission, bool>? permissions,
   FakeSettingsStore? store,
   FakeBluetoothGateway? bluetooth,

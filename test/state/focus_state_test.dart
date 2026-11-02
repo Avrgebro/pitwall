@@ -51,8 +51,8 @@ void main() {
     expect(container.read(focusPickProvider), 'mazda');
 
     // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
-    container.read(sessionProvider.notifier).state = const SessionState(
-      vehicleId: 'tucson',
+    container.read(sessionProvider.notifier).state = const SessionConnecting(
+      'tucson',
     );
     expect(container.read(focusPickProvider), isNull);
   });

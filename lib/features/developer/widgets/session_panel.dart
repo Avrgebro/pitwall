@@ -33,21 +33,26 @@ class SessionPanel extends ConsumerWidget {
     final canConnect =
         vehicle != null && vehicle.adapterAddress != null && bluetoothOn;
 
-    final (chip, detail) = switch (session.phase) {
-      SessionPhase.connected => (
-        const StatusChip(
-          label: 'Connected',
-          tone: StatusTone.active,
-          emphasis: ChipEmphasis.filled,
-          dot: true,
+    final (chip, detail) = switch (session) {
+      SessionConnected(
+        :final adapterVersion,
+        :final carState,
+        :final supportedPids,
+      ) =>
+        (
+          const StatusChip(
+            label: 'Connected',
+            tone: StatusTone.active,
+            emphasis: ChipEmphasis.filled,
+            dot: true,
+          ),
+          [
+            ?adapterVersion,
+            _carState(carState),
+            '${supportedPids.length} standard values',
+          ].join(', '),
         ),
-        [
-          ?session.adapterVersion,
-          _carState(session.carState),
-          '${session.supportedPids.length} standard values',
-        ].join(', '),
-      ),
-      SessionPhase.connecting => (
+      SessionConnecting() => (
         const StatusChip(
           label: 'Connecting',
           tone: StatusTone.active,
@@ -55,7 +60,7 @@ class SessionPanel extends ConsumerWidget {
         ),
         'Talking to ${vehicle?.adapterName ?? 'the adapter'}…',
       ),
-      SessionPhase.idle => (
+      SessionIdle(:final problem) => (
         const StatusChip(
           label: 'Not connected',
           emphasis: ChipEmphasis.outlined,
@@ -67,7 +72,7 @@ class SessionPanel extends ConsumerWidget {
             'Choose $name\'s adapter first.',
           _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
           final vehicle =>
-            _problem(session.problem) ??
+            _problem(problem) ??
                 'Connect to ${vehicle.adapterName} to read by hand.',
         },
       ),
@@ -86,7 +91,7 @@ class SessionPanel extends ConsumerWidget {
             children: [
               chip,
               const Spacer(),
-              if (session.busy)
+              if (session case SessionConnected(busy: true))
                 const SizedBox.square(
                   dimension: Sizes.iconSmall,
                   child: CircularProgressIndicator(strokeWidth: 2),
@@ -103,20 +108,18 @@ class SessionPanel extends ConsumerWidget {
           Wrap(
             spacing: Insets.s,
             runSpacing: Insets.s,
-            children: switch (session.phase) {
+            children: switch (session) {
               // The trip drives the session; manual controls would fight it.
               _ when trip.isActive => [
                 OutlinedButton.icon(
-                  onPressed: trip.phase == TripPhase.ending
-                      ? null
-                      : tripController.stop,
+                  onPressed: trip is TripEnding ? null : tripController.stop,
                   icon: const Icon(Symbols.stop_circle_rounded),
                   label: const Text('Stop trip'),
                 ),
               ],
-              SessionPhase.connected => [
+              SessionConnected(:final busy) => [
                 FilledButton.icon(
-                  onPressed: session.busy ? null : controller.readAndSend,
+                  onPressed: busy ? null : controller.readAndSend,
                   icon: const Icon(Symbols.send_rounded),
                   label: const Text('Read and send'),
                 ),
@@ -125,8 +128,8 @@ class SessionPanel extends ConsumerWidget {
                   child: const Text('Disconnect'),
                 ),
               ],
-              SessionPhase.connecting => const [],
-              SessionPhase.idle => [
+              SessionConnecting() => const [],
+              SessionIdle() => [
                 FilledButton.icon(
                   onPressed: canConnect
                       ? () => controller.connect(vehicle)
@@ -145,9 +148,7 @@ class SessionPanel extends ConsumerWidget {
               ],
             },
           ),
-          if (session.phase == SessionPhase.idle &&
-              !trip.isActive &&
-              canConnect) ...[
+          if (session is SessionIdle && !trip.isActive && canConnect) ...[
             const SizedBox(height: Insets.m),
             Text(
               'Connect opens a manual session. Simulate auto-start runs the '
@@ -164,14 +165,12 @@ class SessionPanel extends ConsumerWidget {
     );
   }
 
-  static String? _tripLine(TripState trip) => switch (trip.phase) {
-    TripPhase.connecting => 'Background trip: looking for the adapter',
-    TripPhase.running => 'Background trip: running',
-    TripPhase.ending => 'Background trip: sending the last reading',
-    TripPhase.idle => switch (trip.lastEnd) {
-      null => null,
-      final end => 'Last trip ended: ${_tripEnd(end)}',
-    },
+  static String? _tripLine(TripState trip) => switch (trip) {
+    TripConnecting() => 'Background trip: looking for the adapter',
+    TripRunning() => 'Background trip: running',
+    TripEnding() => 'Background trip: sending the last reading',
+    TripIdle(lastEnd: null) => null,
+    TripIdle(:final lastEnd?) => 'Last trip ended: ${_tripEnd(lastEnd)}',
   };
 
   static String _tripEnd(TripEnd end) => switch (end) {

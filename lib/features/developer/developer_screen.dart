@@ -55,7 +55,7 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
         title: 'Developer tools',
         bottom: _CommandBar(
           controller: _command,
-          enabled: session.isConnected && !session.busy,
+          enabled: session is SessionConnected && !session.busy,
           onSend: _send,
         ),
         children: [

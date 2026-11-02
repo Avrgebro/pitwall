@@ -7,6 +7,7 @@ import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/delivery_status.dart';
 import 'package:pitwall/features/home/home_view_model.dart';
 import 'package:pitwall/state/session_state.dart';
+import 'package:pitwall/state/trip_state.dart';
 
 /// The four Home states from the mockups (1a–1d), plus first use.
 void main() {
@@ -19,8 +20,7 @@ void main() {
   );
   const settings = AppSettings();
   final options = valueOptions(null, null);
-  final driving = SessionState(
-    phase: SessionPhase.connected,
+  final driving = SessionConnected(
     vehicleId: 'tucson',
     connectedAt: now.subtract(const Duration(minutes: 24)),
     carState: CarState.engineRunning,
@@ -41,7 +41,8 @@ void main() {
   /// Without [lastValues], this car's last values are those of the
   /// delivery's latest reading, when it's this car's.
   HomeViewModel build({
-    SessionState session = const SessionState(),
+    SessionState session = const SessionIdle(),
+    TripState trip = const TripIdle(),
     DeliveryStatus delivery = const DeliveryStatus(),
     bool hasWebhook = true,
     Map<String, LastValue>? lastValues,
@@ -51,6 +52,7 @@ void main() {
       vehicle: vehicle,
       settings: settings,
       session: session,
+      trip: trip,
       delivery: delivery,
       hasWebhook: hasWebhook,
       options: options,
@@ -264,5 +266,30 @@ void main() {
     expect(model.delivery.actions, {DeliveryAction.setWebhook});
     expect(model.delivery.isProblem, isTrue);
     expect(model.delivery.stats.single.value, '2');
+  });
+
+  test('a reconnect mid-trip doesn\'t restart the trip clock', () {
+    final model = build(
+      // The adapter came back a minute ago, 24 minutes into the trip.
+      session: SessionConnected(
+        vehicleId: 'tucson',
+        connectedAt: now.subtract(const Duration(minutes: 1)),
+        carState: CarState.engineRunning,
+      ),
+      trip: TripRunning(
+        vehicleId: 'tucson',
+        since: now.subtract(const Duration(minutes: 24)),
+      ),
+    );
+
+    expect(model.hero.stats.last.value, '24 min');
+  });
+
+  test('another car\'s session doesn\'t show on this one', () {
+    final model = build(
+      session: SessionConnected(vehicleId: 'mazda', connectedAt: now),
+    );
+
+    expect(model.hero.state, HeroState.waiting);
   });
 }
