@@ -37,11 +37,23 @@ class SignalSet {
     final skipped = <SkippedCommand>[];
     for (final entry in json['commands'] as List) {
       if (entry is! Map) continue;
-      final description = _describe(entry);
+      // Kept for skipped requests too, to say what they would have read.
+      final filter = YearFilter._parse(entry['filter']);
+      final signals = [
+        for (final signal in entry['signals'] as List? ?? const [])
+          if (signal is Map) ?ProfileSignal._parse(signal),
+      ];
       try {
-        commands.add(_parseCommand(entry));
+        commands.add(_parseCommand(entry, filter, signals));
       } on _Unsupported catch (e) {
-        skipped.add(SkippedCommand(description, e.reason));
+        skipped.add(
+          SkippedCommand(
+            _describe(entry),
+            e.reason,
+            filter: filter,
+            signals: signals,
+          ),
+        );
       }
     }
     return SignalSet._(source, commands, skipped);
@@ -54,7 +66,44 @@ class SignalSet {
   Iterable<ProfileCommand> commandsFor(int modelYear) =>
       commands.where((command) => command.filter?.matches(modelYear) ?? true);
 
-  static ProfileCommand _parseCommand(Map entry) {
+  /// Skipped requests that would apply to a car of [modelYear].
+  Iterable<SkippedCommand> skippedFor(int modelYear) =>
+      skipped.where((command) => command.filter?.matches(modelYear) ?? true);
+
+  /// What this profile offers a car of [modelYear]: the values it can read,
+  /// by category, and the ones it can't, by reason.
+  ProfileSummary summaryFor(int modelYear) {
+    final readable = <String, ProfileSignal>{
+      for (final command in commandsFor(modelYear))
+        for (final signal in command.signals) signal.key: signal,
+    };
+    final unreadable = <SkipReason, Map<String, ProfileSignal>>{};
+    final requests = <SkipReason, int>{};
+    for (final command in skippedFor(modelYear)) {
+      requests[command.reason] = (requests[command.reason] ?? 0) + 1;
+      final signals = unreadable[command.reason] ??= {};
+      for (final signal in command.signals) {
+        // Read through another request, so not missing after all.
+        if (!readable.containsKey(signal.key)) signals[signal.key] = signal;
+      }
+    }
+    return ProfileSummary(
+      readable: readable.values.toList(),
+      unreadable: {
+        for (final MapEntry(key: reason, value: count) in requests.entries)
+          reason: (
+            requests: count,
+            signals: unreadable[reason]!.values.toList(),
+          ),
+      },
+    );
+  }
+
+  static ProfileCommand _parseCommand(
+    Map entry,
+    YearFilter? filter,
+    List<ProfileSignal> signals,
+  ) {
     final cmd = entry['cmd'];
     if (cmd is! Map || cmd.length != 1) {
       throw const _Unsupported(SkipReason.unusualRequest);
@@ -82,10 +131,6 @@ class SignalSet {
     if (entry['fcm1'] == true) {
       throw const _Unsupported(SkipReason.specialFlowControl);
     }
-    final signals = [
-      for (final signal in entry['signals'] as List? ?? const [])
-        if (signal is Map) ?ProfileSignal._parse(signal),
-    ];
     if (signals.isEmpty) throw const _Unsupported(SkipReason.noUsableSignals);
     return ProfileCommand(
       header: header,
@@ -95,7 +140,7 @@ class SignalSet {
         for (var i = 0; i < idHex.length; i += 2)
           int.parse(idHex.substring(i, i + 2), radix: 16),
       ],
-      filter: YearFilter._parse(entry['filter']),
+      filter: filter,
       signals: signals,
     );
   }
@@ -151,11 +196,48 @@ enum SkipReason {
 }
 
 class SkippedCommand {
-  const SkippedCommand(this.description, this.reason);
+  const SkippedCommand(
+    this.description,
+    this.reason, {
+    this.filter,
+    this.signals = const [],
+  });
 
   /// The request, like `7E0: 22 0100`.
   final String description;
   final SkipReason reason;
+  final YearFilter? filter;
+
+  /// What it would have read.
+  final List<ProfileSignal> signals;
+}
+
+/// What a profile offers a car of one model year; see
+/// [SignalSet.summaryFor].
+class ProfileSummary {
+  const ProfileSummary({required this.readable, required this.unreadable});
+
+  /// Each value the profile can read, once.
+  final List<ProfileSignal> readable;
+
+  /// Requests that can't be sent, by reason, and the values only they hold.
+  final Map<SkipReason, ({int requests, List<ProfileSignal> signals})>
+  unreadable;
+
+  /// How many values each category has, the largest first.
+  static List<({String category, int count})> byCategory(
+    Iterable<ProfileSignal> signals,
+  ) {
+    final counts = <String, int>{};
+    for (final signal in signals) {
+      counts[signal.category] = (counts[signal.category] ?? 0) + 1;
+    }
+    return [
+      for (final MapEntry(:key, :value)
+          in counts.entries.toList()..sort((a, b) => b.value - a.value))
+        (category: key, count: value),
+    ];
+  }
 }
 
 /// Model years a command applies to. OBDb filters are a union: `to` covers
@@ -192,11 +274,21 @@ class ProfileSignal {
     required this.key,
     required this.unit,
     required this.format,
+    this.path,
   });
 
   /// OBDb's signal id, e.g. `TUCSON_FLI_VOL`.
   final String id;
   final String name;
+
+  /// Where OBDb files the signal, e.g. `Engine.Misfires`.
+  final String? path;
+
+  /// The top level of [path], such as `Engine`, or `Other` without one.
+  String get category => switch (path?.split('.').first) {
+    final top? when top.isNotEmpty => top,
+    _ => 'Other',
+  };
 
   /// Field name in the webhook payload: the OBDb id in lowercase, e.g.
   /// `tucson_fli_vol`. Pitwall doesn't rename signals or convert their
@@ -221,6 +313,10 @@ class ProfileSignal {
       key: id.toLowerCase(),
       unit: format.unit,
       format: format,
+      path: switch (json['path']) {
+        final String path => path,
+        _ => null,
+      },
     );
   }
 }

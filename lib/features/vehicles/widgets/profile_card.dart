@@ -4,11 +4,10 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/profiles/signal_set.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
-import '../../common/profile_text.dart';
 
-/// The vehicle's OBDb profile: what it adds, which model year applies, and
-/// what was skipped. Without a profile, an invitation to import one; with
-/// one that can't be read, a way to replace or remove it.
+/// The vehicle's OBDb profile file and the model year it's read for.
+/// Without a profile, an invitation to import one; with one that can't be
+/// read, a way to replace or remove it.
 class ProfileCard extends StatelessWidget {
   const ProfileCard({
     super.key,
@@ -43,110 +42,54 @@ class ProfileCard extends StatelessWidget {
         onRemove: onRemove,
       );
     }
-    final profile = this.profile;
     if (profile == null) return _Empty(onImport: onImport);
 
-    final theme = Theme.of(context);
-    final year = vehicle.modelYear;
-    final skipped = ProfileText.skippedSummary(profile.skipped);
     final imported = vehicle.profileImportedAt;
-    final healthy = context.tone(StatusTone.healthy);
-
-    return RowGroup(
-      children: [
-        Padding(
-          padding: Insets.card,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CardHeader(
-                badge: const IconBadge(icon: Symbols.data_object_rounded),
-                title: 'OBDb profile',
-                subtitle: [
-                  vehicle.profileName ?? 'profile.json',
-                  if (imported != null) 'imported ${Formatters.date(imported)}',
-                ].join(', '),
-              ),
-              const SizedBox(height: Insets.l),
-              DropdownButtonFormField<int>(
-                initialValue: year,
-                decoration: const InputDecoration(labelText: 'Model year'),
-                hint: const Text('Choose the model year'),
-                items: [
-                  for (final option in years(DateTime.now()))
-                    DropdownMenuItem(value: option, child: Text('$option')),
-                ],
-                onChanged: (value) {
-                  if (value != null) onModelYear(value);
-                },
-              ),
-              InfoNote(
-                icon: year == null ? Icons.info_outline : Icons.check_circle,
-                iconColor: year == null
-                    ? theme.colorScheme.onSurfaceVariant
-                    : healthy.accent,
-                textColor: theme.colorScheme.onSurface,
-                text: TextSpan(
-                  text: year == null
-                      ? 'Choose the year to use this profile'
-                      : ProfileText.applies(profile, year),
-                ),
-                padding: const EdgeInsets.only(top: Insets.m),
-              ),
-            ],
-          ),
-        ),
-        if (skipped.isNotEmpty)
-          ExpansionTile(
-            title: Text('Skipped: ${profile.skipped.length}'),
-            childrenPadding: const EdgeInsets.fromLTRB(
-              Insets.l,
-              0,
-              Insets.l,
-              Insets.m,
+    return ContentCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CardHeader(
+            badge: const IconBadge(icon: Symbols.data_object_rounded),
+            title: 'OBDb profile',
+            subtitle: [
+              vehicle.profileName ?? 'profile.json',
+              if (imported != null) 'imported ${Formatters.date(imported)}',
+            ].join(', '),
+            trailing: PopupMenuButton<VoidCallback>(
+              icon: const Icon(Symbols.more_vert_rounded),
+              tooltip: 'Profile options',
+              onSelected: (action) => action(),
+              itemBuilder: (context) => [
+                PopupMenuItem(value: onImport, child: const Text('Replace')),
+                PopupMenuItem(value: onRemove, child: const Text('Remove')),
+              ],
             ),
-            children: [
-              for (final item in skipped)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: Insets.xs),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: Insets.xl,
-                        child: Text(
-                          '${item.count}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          item.reason,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
           ),
-        Padding(
-          padding: const EdgeInsets.all(Insets.m),
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: onImport,
-                icon: const Icon(Symbols.swap_horiz_rounded),
-                label: const Text('Replace'),
+          const SizedBox(height: Insets.l),
+          DropdownButtonFormField<int>(
+            initialValue: vehicle.modelYear,
+            decoration: const InputDecoration(labelText: 'Model year'),
+            hint: const Text('Choose the model year'),
+            items: [
+              for (final option in years(DateTime.now()))
+                DropdownMenuItem(value: option, child: Text('$option')),
+            ],
+            onChanged: (value) {
+              if (value != null) onModelYear(value);
+            },
+          ),
+          if (vehicle.modelYear == null)
+            const InfoNote(
+              text: TextSpan(
+                text:
+                    'A profile covers several model years. Choose yours to '
+                    'see what it adds.',
               ),
-              const SizedBox(width: Insets.s),
-              TextButton(onPressed: onRemove, child: const Text('Remove')),
-            ],
-          ),
-        ),
-      ],
+              padding: EdgeInsets.only(top: Insets.m),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -111,7 +111,7 @@ class VehicleDetailScreen extends ConsumerWidget {
         (null, _) => 'Standard values only',
         (_, null) => 'OBDb profile: choose the model year',
         (final profile?, final year?) =>
-          'OBDb profile: ${ProfileText.applies(profile, year)}',
+          'OBDb profile: ${ProfileText.forYear(profile, year)}',
       };
 
   Future<void> _delete(

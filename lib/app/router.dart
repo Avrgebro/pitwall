@@ -78,7 +78,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                         ('name', VehicleNameScreen.new),
                         ('adapter', VehicleAdapterScreen.new),
                         ('profile', VehicleProfileScreen.new),
-                        ('values', ValuesToSendScreen.new),
                         ('trip-start', VehicleTripStartScreen.new),
                       ])
                         subScreen(
@@ -86,6 +85,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                           (state) =>
                               screen(vehicleId: state.pathParameters['id']!),
                         ),
+                      subScreen(
+                        'values',
+                        (state) => ValuesToSendScreen(
+                          vehicleId: state.pathParameters['id']!,
+                          category: state.uri.queryParameters['category'],
+                        ),
+                      ),
                     ],
                   ),
                 ],

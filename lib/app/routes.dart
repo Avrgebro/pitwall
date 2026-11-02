@@ -10,7 +10,12 @@ abstract final class Routes {
   static String vehicleName(String id) => '/vehicles/$id/name';
   static String vehicleAdapter(String id) => '/vehicles/$id/adapter';
   static String vehicleProfile(String id) => '/vehicles/$id/profile';
-  static String vehicleValues(String id) => '/vehicles/$id/values';
+
+  /// With a [category], only the profile values filed under it.
+  static String vehicleValues(String id, {String? category}) => Uri(
+    path: '/vehicles/$id/values',
+    queryParameters: category == null ? null : {'category': category},
+  ).toString();
   static String vehicleTripStart(String id) => '/vehicles/$id/trip-start';
 
   static const settings = '/settings';

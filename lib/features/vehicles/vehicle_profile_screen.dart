@@ -1,13 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
+import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/infrastructure.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import 'widgets/profile_card.dart';
+import 'widgets/profile_contents.dart';
 import 'widgets/vehicle_removed_page.dart';
 
 /// The vehicle's optional OBDb profile: import, model year, what applies.
@@ -36,14 +40,27 @@ class VehicleProfileScreen extends ConsumerWidget {
           onModelYear: (year) =>
               notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
         ),
+        if ((profileState.value, vehicle.modelYear) case (
+          final profile?,
+          final year?,
+        ))
+          ProfileContents(
+            summary: profile.summaryFor(year),
+            year: year,
+            selected: keysToSend(vehicle, valueOptions(profile, year)),
+            onOpenValues: (category) => context.push(
+              Routes.vehicleValues(vehicle.id, category: category),
+            ),
+          ),
         const InfoNote(
           icon: Icons.help_outline,
           text: TextSpan(
             text:
-                'Optional. A profile adds values your car only reports '
-                'through manufacturer requests. Download your car\'s '
-                'signalsets/v3/default.json from github.com/OBDb, then import '
-                'it here.',
+                'Optional. Profiles come from OBDb, a community catalogue of '
+                'what each car can report beyond the standard values. '
+                'Download your car\'s signalsets/v3/default.json from '
+                'github.com/OBDb and import it here. Pitwall asks the car in '
+                'requests, and one request can return several values.',
           ),
         ),
       ],
@@ -66,7 +83,7 @@ class VehicleProfileScreen extends ConsumerWidget {
       final year = vehicle.modelYear;
       message = year == null
           ? 'Profile imported. Choose the model year.'
-          : 'Profile imported: ${ProfileText.applies(profile, year)}';
+          : 'Profile imported: ${ProfileText.forYear(profile, year)}';
     } on UnreadableFileException catch (e) {
       message = e.tooLarge
           ? 'That file is too large to be a profile.'

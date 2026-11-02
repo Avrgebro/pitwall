@@ -113,4 +113,96 @@ void main() {
       expect(odometer.decode([0x00, 0x00, 0x00, 0x32, 0xF2]), 13042);
     });
   });
+
+  group('summary for a model year', () {
+    final signalSet = SignalSet.parse(testProfileJson);
+
+    test('readable values, by category', () {
+      final summary = signalSet.summaryFor(2023);
+
+      expect(summary.readable.map((s) => s.key), [
+        'test_fuel_vol',
+        'test_odo_mi',
+      ]);
+      expect(
+        {
+          for (final (:category, :count) in ProfileSummary.byCategory(
+            summary.readable,
+          ))
+            category: count,
+        },
+        {'Fuel': 1, 'Trips': 1},
+      );
+    });
+
+    test('unreadable values by reason; writes are only counted', () {
+      final unreadable = signalSet.summaryFor(2023).unreadable;
+
+      expect(unreadable[SkipReason.notReadOnly]!.requests, 3);
+      expect(unreadable[SkipReason.extendedAddress]!.signals.map((s) => s.id), [
+        'TEST_29BIT',
+      ]);
+      expect(
+        unreadable[SkipReason.specialFlowControl]!.signals.map((s) => s.id),
+        ['TEST_FCM1'],
+      );
+    });
+
+    const flowControlOnly = """
+{"commands": [
+  {"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0001"},
+   "signals": [{"id": "BOTH", "path": "Engine", "name": "Both",
+                "fmt": {"len": 8, "unit": "scalar"}}]},
+  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0002"}, "fcm1": true,
+   "filter": {"to": 2019},
+   "signals": [{"id": "OLD_TRIP", "path": "Trips.Range", "name": "Range",
+                "fmt": {"len": 8, "unit": "kilometers"}}]},
+  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0003"}, "fcm1": true,
+   "signals": [{"id": "BOTH", "path": "Engine", "name": "Both",
+                "fmt": {"len": 8, "unit": "scalar"}}]}
+]}
+""";
+
+    test('skipped requests count only for the years they apply to', () {
+      final profile = SignalSet.parse(flowControlOnly);
+      List<String> unreadable(int year) => [
+        for (final signal
+            in profile
+                    .summaryFor(year)
+                    .unreadable[SkipReason.specialFlowControl]
+                    ?.signals ??
+                const <ProfileSignal>[])
+          signal.id,
+      ];
+
+      expect(unreadable(2018), ['OLD_TRIP']);
+      expect(unreadable(2023), isEmpty);
+    });
+
+    test('a value readable through another request isn\'t missing', () {
+      final summary = SignalSet.parse(flowControlOnly).summaryFor(2023);
+
+      expect(summary.readable.single.id, 'BOTH');
+      expect(
+        summary.unreadable[SkipReason.specialFlowControl]!.signals,
+        isEmpty,
+      );
+    });
+
+    test('a category comes from the top of the path', () {
+      final range = SignalSet.parse(flowControlOnly).skipped
+          .firstWhere((c) => c.signals.single.id == 'OLD_TRIP');
+
+      expect(range.signals.single.category, 'Trips');
+    });
+
+    test('a path that isn\'t text is ignored', () {
+      final profile = SignalSet.parse("""
+{"commands": [{"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0001"},
+  "signals": [{"id": "X", "path": 7, "fmt": {"len": 8, "unit": "scalar"}}]}]}
+""");
+
+      expect(profile.commands.single.signals.single.category, 'Other');
+    });
+  });
 }

@@ -15,6 +15,7 @@ class ValueOption {
     required this.shortName,
     required this.unit,
     this.fromProfile = false,
+    this.category,
   });
 
   final String key;
@@ -27,6 +28,9 @@ class ValueOption {
   /// From the vehicle's profile rather than standard OBD-II. These aren't
   /// sent by default: a profile can have hundreds, mostly diagnostic.
   final bool fromProfile;
+
+  /// For profile values, where OBDb files them, such as `Engine`.
+  final String? category;
 }
 
 /// Every value Pitwall can send for this car: battery voltage, the standard
@@ -59,6 +63,7 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
             shortName: signal.name,
             unit: signal.unit,
             fromProfile: true,
+            category: signal.category,
           ),
         );
       }

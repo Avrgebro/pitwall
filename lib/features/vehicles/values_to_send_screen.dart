@@ -10,9 +10,12 @@ import 'widgets/vehicle_removed_page.dart';
 
 /// Which values go in each reading, grouped by where they come from.
 class ValuesToSendScreen extends ConsumerStatefulWidget {
-  const ValuesToSendScreen({super.key, required this.vehicleId});
+  const ValuesToSendScreen({super.key, required this.vehicleId, this.category});
 
   final String vehicleId;
+
+  /// Shows only the profile values OBDb files under this, such as `Trips`.
+  final String? category;
 
   @override
   ConsumerState<ValuesToSendScreen> createState() => _ValuesToSendScreenState();
@@ -33,19 +36,25 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   @override
   Widget build(BuildContext context) {
     final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
-    if (vehicle == null) {
-      return const VehicleRemovedPage(title: 'Values to send');
-    }
+    final category = widget.category;
+    final title = category ?? 'Values to send';
+    if (vehicle == null) return VehicleRemovedPage(title: title);
     final profile = ref.watch(vehicleProfileProvider(widget.vehicleId)).value;
-    final options = valueOptions(profile, vehicle.modelYear);
-    final selected = keysToSend(vehicle, options);
+    final all = valueOptions(profile, vehicle.modelYear);
+    final selected = keysToSend(vehicle, all);
+    final options = category == null
+        ? all
+        : [
+            for (final option in all)
+              if (option.category == category) option,
+          ];
     // While searching, every section keeps only the values that match.
     final query = _query.trim().toLowerCase();
     final filtering = _searching && query.isNotEmpty;
     final shown = filtering ? _matching(options, query) : options;
     final standard = shown.where((o) => !o.fromProfile).toList();
     final fromProfile = shown.where((o) => o.fromProfile).toList();
-    final defaults = defaultKeys(options);
+    final defaults = defaultKeys(all);
     Widget row(ValueOption option) => _SignalToggle(
       vehicleId: vehicle.id,
       option: option,
@@ -61,8 +70,12 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       // Slivers, so a profile's hundreds of signals build only as they
       // scroll into view.
       child: AppPage.slivers(
-        title: 'Values to send',
-        subtitle: '${vehicle.name}, ${selected.length} selected',
+        title: title,
+        subtitle: category == null
+            ? '${vehicle.name}, ${selected.length} selected'
+            : '${vehicle.name}, '
+                  '${options.where((o) => selected.contains(o.key)).length} '
+                  'of ${options.length} on',
         actions: [
           IconButton(
             icon: Icon(
@@ -110,8 +123,9 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                   trailing: _profileLabel(vehicle),
                 ),
               ],
-              // Matches are what was searched for; no need to expand them.
-              if (fromProfile.isNotEmpty && !filtering)
+              // Matches are what was searched for, and a category is what was
+              // asked for; no need to expand either.
+              if (fromProfile.isNotEmpty && !filtering && category == null)
                 DisclosureGroup(
                   open: _showProfile,
                   icon: Symbols.manage_search_rounded,
@@ -125,7 +139,8 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                 ),
             ],
           ),
-          if (fromProfile.isNotEmpty && (filtering || _showProfile))
+          if (fromProfile.isNotEmpty &&
+              (filtering || _showProfile || category != null))
             SliverRowGroup(
               itemCount: fromProfile.length,
               itemBuilder: (context, index) => row(fromProfile[index]),
