@@ -38,7 +38,7 @@ class DeliveryStatusCard extends StatelessWidget {
           (icon: _icon(stat.kind), label: stat.label, value: stat.value),
       ],
       actions: [
-        if (model.canSetWebhook)
+        if (model.actions.contains(DeliveryAction.setWebhook))
           FilledButton.icon(
             onPressed: onSetWebhook,
             style: FilledButton.styleFrom(
@@ -48,7 +48,7 @@ class DeliveryStatusCard extends StatelessWidget {
             icon: const Icon(Symbols.webhook_rounded),
             label: const Text('Set webhook'),
           ),
-        if (model.canOpenSettings)
+        if (model.actions.contains(DeliveryAction.openSettings))
           FilledButton.icon(
             onPressed: onOpenSettings,
             style: FilledButton.styleFrom(
@@ -58,7 +58,7 @@ class DeliveryStatusCard extends StatelessWidget {
             icon: const Icon(Symbols.settings_rounded),
             label: const Text('Check Settings'),
           ),
-        if (model.canRetry && model.kind == DeliveryCardKind.failing)
+        if (model.actions.contains(DeliveryAction.retry))
           TextButton(
             onPressed: onRetry,
             style: TextButton.styleFrom(foregroundColor: colors.onContainer),

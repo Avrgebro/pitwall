@@ -28,6 +28,9 @@ enum DeliveryCardKind { healthy, queued, failing, noWebhook }
 
 enum DeliveryStatKind { lastSent, failed, queued }
 
+/// What the delivery card offers; it shows exactly these.
+enum DeliveryAction { setWebhook, openSettings, retry }
+
 @immutable
 class HeroModel {
   const HeroModel({
@@ -56,9 +59,7 @@ class DeliveryCardModel {
     required this.title,
     this.message,
     required this.stats,
-    this.canOpenSettings = false,
-    this.canRetry = false,
-    this.canSetWebhook = false,
+    this.actions = const {},
   });
 
   final DeliveryCardKind kind;
@@ -68,9 +69,7 @@ class DeliveryCardModel {
   /// healthy, an explanation when something's wrong.
   final String? message;
   final List<({DeliveryStatKind kind, String label, String value})> stats;
-  final bool canOpenSettings;
-  final bool canRetry;
-  final bool canSetWebhook;
+  final Set<DeliveryAction> actions;
 
   StatusTone get tone => switch (kind) {
     DeliveryCardKind.healthy => StatusTone.healthy,
@@ -117,7 +116,7 @@ class HomeViewModel {
   }) {
     final ownSession = session.vehicleId == vehicle.id;
     final connected = ownSession && session.isConnected;
-    final card = _delivery(delivery, hasWebhook, connected, now);
+    final card = _delivery(delivery, hasWebhook, now);
     // Only the newest reading is kept, so this car's last one is known only
     // when the newest came from it.
     final latest = delivery.latest;
@@ -233,14 +232,28 @@ class HomeViewModel {
   static DeliveryCardModel _delivery(
     DeliveryStatus status,
     bool hasWebhook,
-    bool connected,
     DateTime now,
   ) {
     String count(int n) => n == 0 ? 'None' : '$n';
-    String ago(DateTime? time) =>
-        time == null ? 'Never' : Formatters.ago(time, now);
     final queued = status.queued;
     final error = status.lastError;
+    final lastSuccess = status.lastSuccess;
+    // The same three facts on every card that has sent or tried to.
+    List<({DeliveryStatKind kind, String label, String value})> stats({
+      String lastSentLabel = 'Last sent',
+    }) => [
+      (
+        kind: DeliveryStatKind.lastSent,
+        label: lastSentLabel,
+        value: lastSuccess == null ? 'Never' : Formatters.ago(lastSuccess, now),
+      ),
+      (
+        kind: DeliveryStatKind.failed,
+        label: 'Failed',
+        value: count(status.failedAttempts),
+      ),
+      (kind: DeliveryStatKind.queued, label: 'Queued', value: count(queued)),
+    ];
 
     if (!hasWebhook) {
       return DeliveryCardModel(
@@ -255,7 +268,7 @@ class HomeViewModel {
               value: count(queued),
             ),
         ],
-        canSetWebhook: true,
+        actions: const {DeliveryAction.setWebhook},
       );
     }
 
@@ -265,36 +278,17 @@ class HomeViewModel {
           kind: DeliveryCardKind.queued,
           title: queued == 1 ? '1 reading waiting' : '$queued readings waiting',
           message: 'Sending now.',
-          stats: [
-            (
-              kind: DeliveryStatKind.lastSent,
-              label: 'Last sent',
-              value: ago(status.lastSuccess),
-            ),
-            (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
-            (
-              kind: DeliveryStatKind.queued,
-              label: 'Queued',
-              value: count(queued),
-            ),
-          ],
+          stats: stats(),
         );
       }
       return DeliveryCardModel(
         kind: DeliveryCardKind.healthy,
         title: status.latest == null ? 'Ready to send' : 'Delivery healthy',
-        stats: [
-          (
-            kind: DeliveryStatKind.lastSent,
-            label: 'Last sent',
-            value: ago(status.lastSuccess),
-          ),
-          (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
-          (kind: DeliveryStatKind.queued, label: 'Queued', value: 'None'),
-        ],
+        stats: stats(),
       );
     }
 
+    // Retried on its own, so there's nothing to offer.
     if (error.isTransient) {
       final readings = queued == 1 ? '1 reading' : '$queued readings';
       return DeliveryCardModel(
@@ -308,46 +302,25 @@ class HomeViewModel {
             ? 'They\'ll be sent automatically when the phone is back '
                   'online. Nothing to do.'
             : DeliveryText.error(error).message,
-        stats: [
-          (
-            kind: DeliveryStatKind.lastSent,
-            label: 'Last sent',
-            value: ago(status.lastSuccess),
-          ),
-          (kind: DeliveryStatKind.failed, label: 'Failed', value: 'None'),
-          (
-            kind: DeliveryStatKind.queued,
-            label: 'Queued',
-            value: count(queued),
-          ),
-        ],
-        canRetry: true,
+        stats: stats(),
       );
     }
 
+    // Not retried on its own. Retry helps once the server side is fixed;
+    // without a URL or complete credentials, only Settings can.
     final text = DeliveryText.error(error);
-    final userMustAct =
+    final settingsOnly =
         error.kind == DeliveryErrorKind.noUrl ||
         error.kind == DeliveryErrorKind.authIncomplete;
     return DeliveryCardModel(
       kind: DeliveryCardKind.failing,
       title: text.title,
       message: text.message,
-      stats: [
-        (
-          kind: DeliveryStatKind.lastSent,
-          label: 'Last success',
-          value: ago(status.lastSuccess),
-        ),
-        (
-          kind: DeliveryStatKind.failed,
-          label: 'Failed',
-          value: count(status.failedAttempts),
-        ),
-        (kind: DeliveryStatKind.queued, label: 'Queued', value: count(queued)),
-      ],
-      canOpenSettings: true,
-      canRetry: !userMustAct,
+      stats: stats(lastSentLabel: 'Last success'),
+      actions: {
+        DeliveryAction.openSettings,
+        if (!settingsOnly) DeliveryAction.retry,
+      },
     );
   }
 

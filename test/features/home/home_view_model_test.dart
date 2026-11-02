@@ -125,6 +125,7 @@ void main() {
       session: driving,
       delivery: DeliveryStatus(
         queued: 3,
+        failedAttempts: 4,
         lastSuccess: now.subtract(const Duration(minutes: 3)),
         lastError: const DeliveryError(DeliveryErrorKind.unreachable),
         latest: reading(delivered: false),
@@ -135,10 +136,11 @@ void main() {
     expect(model.delivery.kind, DeliveryCardKind.queued);
     expect(model.delivery.title, 'No signal, 3 readings queued');
     expect(model.delivery.isProblem, isTrue);
-    expect(model.delivery.canOpenSettings, isFalse);
+    expect(model.delivery.actions, isEmpty);
+    // Failed attempts show even while they're retried on their own.
     expect(model.delivery.stats.map((s) => s.value), [
       '3 min ago',
-      'None',
+      '4',
       '3',
     ]);
     expect(model.values!.title, 'Latest readings');
@@ -163,8 +165,10 @@ void main() {
     expect(model.delivery.kind, DeliveryCardKind.failing);
     expect(model.delivery.title, 'The webhook is refusing readings');
     expect(model.delivery.message, contains('(HTTP 401)'));
-    expect(model.delivery.canOpenSettings, isTrue);
-    expect(model.delivery.canRetry, isTrue);
+    expect(model.delivery.actions, {
+      DeliveryAction.openSettings,
+      DeliveryAction.retry,
+    });
     expect(model.delivery.stats.map((s) => s.value), ['yesterday', '12', '12']);
     expect(model.values!.meta, 'Read 40 s ago, not delivered');
   });
@@ -199,7 +203,7 @@ void main() {
 
     expect(model.delivery.kind, DeliveryCardKind.noWebhook);
     expect(model.delivery.title, 'No webhook yet');
-    expect(model.delivery.canSetWebhook, isTrue);
+    expect(model.delivery.actions, {DeliveryAction.setWebhook});
     expect(model.delivery.isProblem, isTrue);
     expect(model.delivery.stats.single.value, '2');
   });
