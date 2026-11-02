@@ -20,9 +20,9 @@ class WebhookSettings {
   /// What readings are sent to.
   final WebhookTarget saved;
 
-  /// What the form shows. A part that can't be used yet, such as a
-  /// half-typed URL or token, stays here unsaved, so it never replaces a
-  /// working one.
+  /// What the form shows. Typing changes only this; [WebhookNotifier.save]
+  /// keeps the parts that can be used, so a half-typed URL or token never
+  /// replaces a working one or receives readings.
   final WebhookTarget draft;
 
   /// The last test send, of [saved]. Any edit clears it.
@@ -30,8 +30,11 @@ class WebhookSettings {
 
   bool get hasUrl => saved.hasUrl;
 
-  /// Only what's saved is tested, so the result says what readings get.
-  bool get canTest => draft == saved && saved.isUsable;
+  /// Whether the draft has a URL that saving would keep.
+  bool get draftHasUrl => draft.hasUrl && draft.urlProblem == null;
+
+  /// A test saves the draft first, so the result says what readings get.
+  bool get canTest => draft.isUsable;
 
   bool get testPassed => lastTest?.result.succeeded ?? false;
 }
@@ -48,56 +51,57 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
 
   WebhookSettings get _current => state.value ?? const WebhookSettings();
 
-  /// Edits the URL; it's saved once valid, or empty to remove it.
-  Future<void> editUrl(String text) async {
-    final current = _current;
-    final draft = current.draft.copyWith(url: text.trim());
-    await _edit(
-      draft: draft,
-      saved: draft.urlProblem == null
-          ? current.saved.copyWith(url: draft.url)
-          : current.saved,
-    );
-  }
+  /// Changes the URL being typed; see [save].
+  void editUrl(String text) =>
+      _setDraft(_current.draft.copyWith(url: text.trim()));
 
-  /// Edits the credentials; they're saved once usable.
+  /// Changes the credentials. Picking another kind applies at once, like
+  /// any choice; typing in their fields waits for [save].
   Future<void> editAuth(WebhookAuth auth) async {
-    final current = _current;
-    await _edit(
-      draft: current.draft.copyWith(auth: auth),
-      saved: auth.problem == null
-          ? current.saved.copyWith(auth: auth)
-          : current.saved,
-    );
+    final typeChanged = auth.type != _current.draft.auth.type;
+    _setDraft(_current.draft.copyWith(auth: auth));
+    if (typeChanged) await save();
   }
 
-  /// Sends a test reading to the saved webhook.
+  /// Saves the parts of the draft that can be used: a valid URL, or none to
+  /// remove it, and complete credentials. Called when typing is done: on
+  /// Done, leaving the form, going back, or before a test.
+  Future<void> save() async {
+    final current = _current;
+    final draft = current.draft;
+    final saved = current.saved.copyWith(
+      url: draft.urlProblem == null ? draft.url : null,
+      auth: draft.auth.problem == null ? draft.auth : null,
+    );
+    if (saved == current.saved) return;
+    state = AsyncData(WebhookSettings(saved: saved, draft: draft));
+    await ref.read(settingsStoreProvider).saveWebhook(saved);
+    // A fixed URL or token should deliver what's queued without waiting
+    // for the next retry; saving doesn't wait for it.
+    unawaited(ref.read(webhookSenderProvider).flush());
+  }
+
+  /// Saves the draft and sends a test reading to it.
   Future<void> sendTest() async {
-    final tested = _current;
-    if (!tested.canTest) return;
-    final result = await ref.read(webhookSenderProvider).sendTest(tested.saved);
+    if (!_current.canTest) return;
+    await save();
+    final tested = _current.saved;
+    final result = await ref.read(webhookSenderProvider).sendTest(tested);
     // An edit while it was on its way makes the result stale.
-    if (_current.saved != tested.saved) return;
+    if (_current.saved != tested || _current.draft != tested) return;
     state = AsyncData(
       WebhookSettings(
-        saved: tested.saved,
-        draft: _current.draft,
+        saved: tested,
+        draft: tested,
         lastTest: (result: result, at: DateTime.now()),
       ),
     );
   }
 
-  Future<void> _edit({
-    required WebhookTarget draft,
-    required WebhookTarget saved,
-  }) async {
-    final changed = saved != _current.saved;
-    state = AsyncData(WebhookSettings(saved: saved, draft: draft));
-    if (!changed) return;
-    await ref.read(settingsStoreProvider).saveWebhook(saved);
-    // A fixed URL or token should deliver what's queued without waiting
-    // for the next retry; the edit doesn't wait for it.
-    unawaited(ref.read(webhookSenderProvider).flush());
+  /// Any edit makes the last test stale.
+  void _setDraft(WebhookTarget draft) {
+    if (draft == _current.draft) return;
+    state = AsyncData(WebhookSettings(saved: _current.saved, draft: draft));
   }
 }
 

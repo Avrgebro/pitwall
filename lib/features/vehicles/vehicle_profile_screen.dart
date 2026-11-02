@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
+import '../../core/profiles/signal_set.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/infrastructure.dart';
@@ -36,7 +37,7 @@ class VehicleProfileScreen extends ConsumerWidget {
           profile: profileState.value,
           unreadable: profileState.hasError,
           onImport: () => _import(context, ref, vehicle),
-          onRemove: () => notifier.removeProfile(vehicle.id),
+          onRemove: () => _remove(context, ref, vehicle, profileState.value),
           onModelYear: (year) =>
               notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
         ),
@@ -64,6 +65,30 @@ class VehicleProfileScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// Removes the profile at once, with Undo while the message shows. A
+  /// profile that couldn't be read has nothing to put back.
+  Future<void> _remove(
+    BuildContext context,
+    WidgetRef ref,
+    Vehicle vehicle,
+    SignalSet? profile,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(appSettingsProvider.notifier);
+    await notifier.removeProfile(vehicle.id);
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Profile removed'),
+        action: profile == null
+            ? null
+            : SnackBarAction(
+                label: 'Undo',
+                onPressed: () => notifier.restoreProfile(vehicle, profile),
+              ),
+      ),
     );
   }
 

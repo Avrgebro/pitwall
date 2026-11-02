@@ -95,4 +95,63 @@ void main() {
       expect(find.text('rpm'), findsNothing);
     });
   });
+
+  group('saving', () {
+    Future<FakeSettingsStore> pump(WidgetTester tester, Widget screen) async {
+      final store = FakeSettingsStore(
+        settings: const AppSettings(
+          vehicles: [
+            Vehicle(
+              id: 'tucson',
+              name: 'Tucson',
+              modelYear: 2023,
+              profileName: 'default.json',
+            ),
+          ],
+        ),
+      )..profiles['tucson'] = testProfileJson;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: testOverrides(store: store),
+          child: MaterialApp(theme: AppTheme.light(), home: screen),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return store;
+    }
+
+    testWidgets('a name is saved when typing is done, not on each key', (
+      tester,
+    ) async {
+      final store = await pump(
+        tester,
+        const VehicleNameScreen(vehicleId: 'tucson'),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Hyundai Tucson');
+      await tester.pump();
+      expect(store.settings.vehicles.single.name, 'Tucson');
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(store.settings.vehicles.single.name, 'Hyundai Tucson');
+    });
+
+    testWidgets('a removed profile comes back with Undo', (tester) async {
+      final store = await pump(
+        tester,
+        const VehicleProfileScreen(vehicleId: 'tucson'),
+      );
+
+      await tester.tap(find.byTooltip('Remove profile'));
+      await tester.pumpAndSettle();
+      expect(store.profiles, isEmpty);
+      expect(find.text('Profile removed'), findsOneWidget);
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.settings.vehicles.single.modelYear, 2023);
+    });
+  });
 }

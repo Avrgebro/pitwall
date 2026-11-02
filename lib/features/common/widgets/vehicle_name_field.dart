@@ -10,12 +10,17 @@ class VehicleNameField extends StatefulWidget {
     super.key,
     required this.initialName,
     required this.onChanged,
+    this.onDone,
     this.note,
     this.autofocus = false,
   });
 
   final String initialName;
   final ValueChanged<String> onChanged;
+
+  /// Called when typing is done: Done on the keyboard, or leaving the
+  /// field.
+  final ValueChanged<String>? onDone;
 
   /// An extra sentence after the id, like "You can change it later."
   final String? note;
@@ -34,6 +39,8 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
     super.dispose();
   }
 
+  void _done() => widget.onDone?.call(_controller.text);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -45,15 +52,23 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          controller: _controller,
-          autofocus: widget.autofocus,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Vehicle name'),
-          onChanged: (text) {
-            setState(() {});
-            widget.onChanged(text);
+        Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (focused) {
+            if (!focused) _done();
           },
+          child: TextField(
+            controller: _controller,
+            autofocus: widget.autofocus,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(labelText: 'Vehicle name'),
+            onChanged: (text) {
+              setState(() {});
+              widget.onChanged(text);
+            },
+          ),
         ),
         Padding(
           // Lined up with the field's edge, like the other field notes.

@@ -126,6 +126,21 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     return profile;
   }
 
+  /// Puts back the profile [before] had, after it was removed: the file,
+  /// its name, when it was imported, and the model year.
+  Future<void> restoreProfile(Vehicle before, SignalSet profile) async {
+    final vehicle = _current.vehicleById(before.id);
+    if (vehicle == null) return;
+    await ref.read(settingsStoreProvider).saveProfile(before.id, profile);
+    await saveVehicle(
+      vehicle.copyWith(
+        profileName: before.profileName,
+        profileImportedAt: before.profileImportedAt,
+        modelYear: before.modelYear,
+      ),
+    );
+  }
+
   Future<void> removeProfile(String vehicleId) async {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) return;

@@ -197,5 +197,23 @@ void main() {
       // It only chose which of the profile's requests apply.
       expect(vehicle.modelYear, isNull);
     });
+
+    test('a removed profile can be put back', () async {
+      final (container, store) = await start(profileName: 'default.json');
+      store.profiles['tucson'] = testProfileJson;
+      final notifier = container.read(appSettingsProvider.notifier);
+      final before = container.read(vehicleProvider('tucson'))!;
+      final profile = (await container.read(
+        vehicleProfileProvider('tucson').future,
+      ))!;
+
+      await notifier.removeProfile('tucson');
+      await notifier.restoreProfile(before, profile);
+
+      expect(store.profiles['tucson'], testProfileJson);
+      final vehicle = container.read(vehicleProvider('tucson'))!;
+      expect(vehicle.profileName, 'default.json');
+      expect(vehicle.modelYear, 2023);
+    });
   });
 }
