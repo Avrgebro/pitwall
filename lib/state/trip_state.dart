@@ -32,6 +32,9 @@ enum TripEnd {
 
   /// The adapter dropped and didn't come back.
   adapterLost,
+
+  /// Something unexpected went wrong; the adapter log says what.
+  failed,
 }
 
 /// A background trip: none, looking for the adapter, running, or ending.
@@ -72,6 +75,9 @@ final class TripEnding extends TripState {
   @override
   final String? vehicleId;
 }
+
+/// A vehicle whose adapter answered, and the session with it.
+typedef _Reached = ({Vehicle vehicle, SessionConnected session});
 
 /// One trip's own state, so nothing carries over to the next.
 class _TripRun {
@@ -180,32 +186,48 @@ class TripController extends Notifier<TripState> {
   void stop() => _current?.stop();
 
   /// Runs a trip for the vehicle [target] names, or whichever vehicle's
-  /// adapter answers.
+  /// adapter answers. However it ends, even by an error, it finishes, so
+  /// the next trip can start.
   Future<void> _run(TripTarget target) async {
     if (_current != null) return;
     final run = _current = _TripRun();
-    state = const TripConnecting();
-    final settings = await ref.read(appSettingsProvider.future);
-    final candidates = settings.tripCandidates(target);
-    if (candidates.isEmpty) return _finish(run, TripEnd.noVehicle);
-
-    final (vehicle, problem) = await _connect(run, candidates);
-    if (vehicle == null) return _finish(run, problem!);
-
-    state = TripRunning(
-      vehicleId: vehicle.id,
-      since: switch (_sessionState) {
-        SessionConnected(:final connectedAt) => connectedAt,
-        _ => DateTime.now(),
-      },
-    );
-    final end = await _readLoop(run, vehicle, settings.interval);
-    await _finish(run, end, vehicle: vehicle);
+    var end = TripEnd.stopped;
+    Vehicle? vehicle;
+    try {
+      state = const TripConnecting();
+      final settings = await ref.read(appSettingsProvider.future);
+      final candidates = settings.tripCandidates(target);
+      if (candidates.isEmpty) {
+        end = TripEnd.noVehicle;
+        return;
+      }
+      final (reached, problem) = await _connect(run, candidates);
+      if (reached == null) {
+        end = problem!;
+        return;
+      }
+      vehicle = reached.vehicle;
+      state = TripRunning(
+        vehicleId: reached.vehicle.id,
+        since: reached.session.connectedAt,
+      );
+      end = await _readLoop(run, reached, settings.interval);
+    } on Object catch (error, stack) {
+      // Nothing awaits a trip, so it's reported here: in the adapter log for
+      // the user, and as an error in the system log.
+      end = TripEnd.failed;
+      ref.read(adapterLogProvider).note('Trip failed: $error', warning: true);
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack, library: 'trip'),
+      );
+    } finally {
+      await _finish(run, end, vehicle: vehicle);
+    }
   }
 
   /// Tries each candidate's adapter until one connects, within the connect
-  /// window.
-  Future<(Vehicle?, TripEnd?)> _connect(
+  /// window. Returns the vehicle reached and its session, or why none was.
+  Future<(_Reached?, TripEnd?)> _connect(
     _TripRun run,
     List<Vehicle> candidates,
   ) async {
@@ -215,11 +237,11 @@ class TripController extends Notifier<TripState> {
         if (run.stopRequested) break;
         await _notify(TripNotificationText.connecting(vehicle));
         switch (await _session.connect(vehicle, askPermission: false)) {
-          case null:
-            return (vehicle, null);
-          case SessionProblem.permissionDenied:
+          case Connected(:final session):
+            return ((vehicle: vehicle, session: session), null);
+          case NotConnected(problem: SessionProblem.permissionDenied):
             return (null, TripEnd.permissionMissing);
-          case _:
+          case NotConnected():
             break;
         }
       }
@@ -232,36 +254,55 @@ class TripController extends Notifier<TripState> {
   }
 
   /// Reads and sends every [interval] until asked to stop, the car stays
-  /// quiet too long, or the adapter can't be reached again.
+  /// quiet too long, or the adapter can't be reached again. While the car
+  /// is silent, it only checks whether it answers again.
   Future<TripEnd> _readLoop(
     _TripRun run,
-    Vehicle vehicle,
+    _Reached reached,
     Duration interval,
   ) async {
+    final vehicle = reached.vehicle;
+    var silent = reached.session.carState == CarState.off;
+    var lost = false;
     DateTime? quietSince;
     while (!run.stopRequested) {
-      if (!_sessionState.isConnected) {
-        final (reconnected, _) = await _connect(run, [vehicle]);
-        if (reconnected == null) {
+      if (lost) {
+        final (again, _) = await _connect(run, [vehicle]);
+        if (again == null) {
           return run.stopRequested ? TripEnd.stopped : TripEnd.adapterLost;
         }
+        lost = false;
+        silent = again.session.carState == CarState.off;
       }
-      if (_sessionState case SessionConnected(carState: CarState.off)) {
+      if (silent) {
         quietSince ??= DateTime.now();
         if (DateTime.now().difference(quietSince) > _timing.carOffWindow) {
           return TripEnd.carOff;
         }
         await _notify(TripNotificationText.waitingForCar(vehicle));
-        await _session.checkCar();
-      } else {
-        final reading = await _session.readAndSend();
-        if (reading case CarAnswered(:final values) when values.isNotEmpty) {
-          quietSince = null;
-          run.sentReadings = true;
-          await _notify(TripNotificationText.reading(vehicle, interval));
-        }
       }
-      if (_sessionState.isConnected) await run.sleep(interval);
+      final outcome = silent
+          ? await _session.checkCar()
+          : await _session.readAndSend();
+      switch (outcome) {
+        // Someone else is using the adapter, as from Developer tools; try
+        // again after the interval.
+        case ReadNotDone(problem: SessionProblem.busy):
+          break;
+        case ReadNotDone():
+          lost = true;
+        case ReadDone(reading: CarSilent()):
+          silent = true;
+        case ReadDone(reading: CarAnswered(:final values)):
+          silent = false;
+          if (values.isNotEmpty) {
+            quietSince = null;
+            run.sentReadings = true;
+            await _notify(TripNotificationText.reading(vehicle, interval));
+          }
+      }
+      // Reconnecting doesn't wait.
+      if (!lost) await run.sleep(interval);
     }
     return TripEnd.stopped;
   }
@@ -280,16 +321,20 @@ class TripController extends Notifier<TripState> {
     }
   }
 
+  /// Closes the trip. The trip is over even if a step here fails.
   Future<void> _finish(_TripRun run, TripEnd end, {Vehicle? vehicle}) async {
-    state = TripEnding(vehicleId: vehicle?.id);
-    // Mark the end, but only after readings: a trip that never sent one,
-    // like a stereo waking with the car parked, has nothing to close.
-    if (vehicle != null) await _close(run, vehicle);
-    if (_sessionState is! SessionIdle) await _session.disconnect();
-    ref.read(adapterLogProvider).note('Trip ended: ${end.name}');
-    await _gateway.stopService();
-    _current = null;
-    state = TripIdle(lastEnd: end);
+    try {
+      state = TripEnding(vehicleId: vehicle?.id);
+      // Mark the end, but only after readings: a trip that never sent one,
+      // like a stereo waking with the car parked, has nothing to close.
+      if (vehicle != null) await _close(run, vehicle);
+      if (_sessionState is! SessionIdle) await _session.disconnect();
+      ref.read(adapterLogProvider).note('Trip ended: ${end.name}');
+      await _gateway.stopService();
+    } finally {
+      _current = null;
+      state = TripIdle(lastEnd: end);
+    }
   }
 
   Future<void> _notify(String text) => _gateway.updateNotification(text);

@@ -28,6 +28,15 @@ class PermissionsNotifier extends AsyncNotifier<Map<AppPermission, bool>> {
     return granted;
   }
 
+  /// Checks [permission] without asking, for when there's no screen to
+  /// ask on, and returns whether it's granted.
+  Future<bool> check(AppPermission permission) async {
+    await future;
+    final granted = await _gateway.isGranted(permission);
+    state = AsyncData({...?state.value, permission: granted});
+    return granted;
+  }
+
   Future<void> refresh() async => state = AsyncData(await build());
 }
 

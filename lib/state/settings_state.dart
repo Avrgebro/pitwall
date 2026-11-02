@@ -68,7 +68,10 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await _save(_current.withoutVehicle(id));
   }
 
+  /// Called by a listener as a connection is made, which can be before
+  /// the settings have loaded.
   Future<void> markSeen(String id, DateTime time) async {
+    await future;
     final vehicle = _current.vehicleById(id);
     if (vehicle != null) await saveVehicle(vehicle.copyWith(lastSeen: time));
   }

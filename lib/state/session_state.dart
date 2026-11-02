@@ -30,6 +30,54 @@ enum SessionProblem {
 
   /// The adapter reported an error or stopped answering.
   adapterError,
+
+  /// The vehicle has no adapter chosen.
+  noAdapter,
+
+  /// Another connection is being made or is open.
+  inUse,
+
+  /// Not connected, so nothing could be asked.
+  notConnected,
+
+  /// Another operation is running on the adapter.
+  busy,
+}
+
+/// How a connection attempt ended.
+sealed class ConnectResult {
+  const ConnectResult();
+}
+
+final class Connected extends ConnectResult {
+  const Connected(this.session);
+
+  final SessionConnected session;
+}
+
+final class NotConnected extends ConnectResult {
+  const NotConnected(this.problem);
+
+  final SessionProblem problem;
+}
+
+/// How asking the car something ended.
+sealed class ReadOutcome {
+  const ReadOutcome();
+}
+
+/// The adapter answered, with what the car said.
+final class ReadDone extends ReadOutcome {
+  const ReadDone(this.reading);
+
+  final CarReading reading;
+}
+
+/// Nothing was asked, or the adapter failed: [problem] says which.
+final class ReadNotDone extends ReadOutcome {
+  const ReadNotDone(this.problem);
+
+  final SessionProblem problem;
 }
 
 /// A connection to a vehicle's adapter: none, being made, or live. Each
@@ -141,41 +189,37 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Connects to the vehicle's adapter and checks whether the car answers.
-  /// Returns null once connected, or why it couldn't; the state says the
-  /// same.
   ///
   /// With [askPermission] false (during a trip, with no screen to ask on),
   /// a missing Bluetooth permission fails instead of prompting.
-  Future<SessionProblem?> connect(
+  Future<ConnectResult> connect(
     Vehicle vehicle, {
     bool askPermission = true,
   }) async {
     final address = vehicle.adapterAddress;
-    if (state is! SessionIdle || address == null) {
-      return state is SessionConnected && state.vehicleId == vehicle.id
-          ? null
-          : SessionProblem.connectFailed;
+    switch (state) {
+      case final SessionConnected live when live.vehicleId == vehicle.id:
+        return Connected(live);
+      case SessionConnecting() || SessionConnected():
+        return const NotConnected(SessionProblem.inUse);
+      case SessionIdle() when address == null:
+        return const NotConnected(SessionProblem.noAdapter);
+      case SessionIdle():
+        break;
     }
     final log = ref.read(adapterLogProvider);
+    final permissions = ref.read(permissionsProvider.notifier);
     final granted = askPermission
-        ? await ref
-              .read(permissionsProvider.notifier)
-              .request(AppPermission.bluetooth)
-        : await ref
-              .read(permissionGatewayProvider)
-              .isGranted(AppPermission.bluetooth);
-    if (!granted) {
-      state = const SessionIdle(problem: SessionProblem.permissionDenied);
-      return SessionProblem.permissionDenied;
-    }
+        ? await permissions.request(AppPermission.bluetooth)
+        : await permissions.check(AppPermission.bluetooth);
+    if (!granted) return _notConnected(SessionProblem.permissionDenied);
     state = SessionConnecting(vehicle.id);
     final ClosableTransport transport;
     try {
-      transport = await ref.read(bluetoothGatewayProvider).connect(address);
+      transport = await ref.read(bluetoothGatewayProvider).connect(address!);
     } on PlatformException {
       log.note('Couldn\'t connect to the adapter', warning: true);
-      state = const SessionIdle(problem: SessionProblem.connectFailed);
-      return SessionProblem.connectFailed;
+      return _notConnected(SessionProblem.connectFailed);
     }
     final link = _Link(transport, Elm327(transport, log: log.exchange));
     try {
@@ -188,76 +232,99 @@ class SessionController extends Notifier<SessionState> {
       );
     } on ElmException catch (e) {
       await link.close();
-      return _failed(e);
+      return NotConnected(await _failed(e));
     }
-    await checkCar();
-    return switch (state) {
-      SessionIdle(:final problem) => problem ?? SessionProblem.adapterError,
-      _ => null,
+    return switch (await checkCar()) {
+      ReadNotDone(:final problem) => NotConnected(problem),
+      ReadDone() => switch (state) {
+        final SessionConnected live => Connected(live),
+        _ => const NotConnected(SessionProblem.disconnected),
+      },
     };
   }
 
-  /// Asks the car again whether it answers, e.g. after the ignition was off.
-  Future<void> checkCar() => _exclusive((session, elm) async {
-    final log = ref.read(adapterLogProvider);
-    try {
-      final supported = await elm.supportedPids();
-      log.note('Car answered, ${supported.length} values supported');
-      _update(
-        (live) => live.copyWith(
-          carState: CarState.ignitionOn,
-          supportedPids: supported,
-        ),
-      );
-    } on ElmException catch (e) {
-      if (e.error != ElmError.unableToConnect) rethrow;
-      log.note('Car didn\'t answer: ignition off?', warning: true);
-      _update((live) => live.copyWith(carState: CarState.off));
-    }
-  });
+  ConnectResult _notConnected(SessionProblem problem) {
+    state = SessionIdle(problem: problem);
+    return NotConnected(problem);
+  }
 
-  /// Reads the vehicle's chosen values and sends them to the webhook.
-  /// Returns what the car said, or null if the session couldn't read; the
-  /// state then says why.
-  Future<CarReading?> readAndSend() =>
-      _exclusive<CarReading?>((session, elm) async {
-        final vehicle = ref.read(vehicleProvider(session.vehicleId));
-        if (vehicle == null) return null;
-        final log = ref.read(adapterLogProvider);
-        final profile = await _profileFor(vehicle.id);
-        final reading = await readCar(
-          elm,
-          keys: keysToSend(vehicle, valueOptions(profile, vehicle.modelYear)),
-          supportedPids: session.supportedPids,
-          profile: profile,
-          modelYear: vehicle.modelYear,
+  /// Asks the car again whether it answers, e.g. after the ignition was off.
+  /// Answering reads nothing yet, so its values are empty.
+  Future<ReadOutcome> checkCar() async {
+    final log = ref.read(adapterLogProvider);
+    final (reading, problem) = await _exclusive((session, elm) async {
+      try {
+        final supported = await elm.supportedPids();
+        log.note('Car answered, ${supported.length} values supported');
+        _update(
+          (live) => live.copyWith(
+            carState: CarState.ignitionOn,
+            supportedPids: supported,
+          ),
         );
-        switch (reading) {
-          case CarSilent():
-            // The ignition went off; the adapter is still there.
-            log.note('Car stopped answering', warning: true);
-            _update((live) => live.copyWith(carState: CarState.off));
-          case CarAnswered(:final values, :final carState):
-            values.forEach(log.value);
-            _update((live) => live.copyWith(carState: carState));
-            await ref
+        return const CarAnswered({}, CarState.ignitionOn);
+      } on ElmException catch (e) {
+        if (e.error != ElmError.unableToConnect) rethrow;
+        log.note('Car didn\'t answer: ignition off?', warning: true);
+        _update((live) => live.copyWith(carState: CarState.off));
+        return const CarSilent();
+      }
+    });
+    return reading == null ? ReadNotDone(problem!) : ReadDone(reading);
+  }
+
+  /// Reads the vehicle's chosen values, then keeps and sends them. Only the
+  /// read holds the adapter; keeping and sending happen after, so a slow
+  /// network doesn't hold it, and a failure there can't leave it busy.
+  Future<ReadOutcome> readAndSend() async {
+    final vehicleId = state.vehicleId;
+    final vehicle = vehicleId == null
+        ? null
+        : ref.read(vehicleProvider(vehicleId));
+    if (vehicle == null) {
+      return const ReadNotDone(SessionProblem.notConnected);
+    }
+    final log = ref.read(adapterLogProvider);
+    final profile = await _profileFor(vehicle.id);
+    final (reading, problem) = await _exclusive(
+      (session, elm) => readCar(
+        elm,
+        keys: keysToSend(vehicle, valueOptions(profile, vehicle.modelYear)),
+        supportedPids: session.supportedPids,
+        profile: profile,
+        modelYear: vehicle.modelYear,
+      ),
+    );
+    switch (reading) {
+      case null:
+        return ReadNotDone(problem!);
+      case CarSilent():
+        // The ignition went off; the adapter is still there.
+        log.note('Car stopped answering', warning: true);
+        _update((live) => live.copyWith(carState: CarState.off));
+      case CarAnswered(:final values, :final carState):
+        values.forEach(log.value);
+        _update((live) => live.copyWith(carState: carState));
+        if (values.isEmpty) {
+          log.note('Nothing to send: the car reported none of the values');
+        } else {
+          await Future.wait([
+            ref
                 .read(lastValuesProvider.notifier)
-                .record(vehicle.id, values, DateTime.now());
-            if (values.isEmpty) {
-              log.note('Nothing to send: the car reported none of the values');
-            } else {
-              await ref
-                  .read(webhookSenderProvider)
-                  .send(
-                    device: vehicle.deviceId,
-                    values: values,
-                    connected: true,
-                    engineRunning: carState == CarState.engineRunning,
-                  );
-            }
+                .record(vehicle.id, values, DateTime.now()),
+            ref
+                .read(webhookSenderProvider)
+                .send(
+                  device: vehicle.deviceId,
+                  values: values,
+                  connected: true,
+                  engineRunning: carState == CarState.engineRunning,
+                ),
+          ]);
         }
-        return reading;
-      });
+    }
+    return ReadDone(reading);
+  }
 
   /// The vehicle's profile, or none if its file can't be read: standard
   /// values still go out, and the vehicle's page shows the problem.
@@ -292,25 +359,24 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionIdle();
   }
 
-  /// Runs [operation] on the adapter, one at a time. Returns null when the
-  /// session isn't connected or is busy, or the adapter failed; the state
-  /// then says why.
-  Future<T?> _exclusive<T>(
+  /// Runs [operation] on the adapter, one at a time: its result, or why it
+  /// didn't run or failed. Busy is cleared however it ends.
+  Future<(T?, SessionProblem?)> _exclusive<T>(
     Future<T> Function(SessionConnected session, Elm327 elm) operation,
   ) async {
     final link = _link;
     final session = state;
-    if (link == null || session is! SessionConnected || session.busy) {
-      return null;
+    if (link == null || session is! SessionConnected) {
+      return (null, SessionProblem.notConnected);
     }
+    if (session.busy) return (null, SessionProblem.busy);
     state = session.copyWith(busy: true);
     try {
-      final result = await operation(session, link.elm);
-      _update((live) => live.copyWith(busy: false));
-      return result;
+      return (await operation(session, link.elm), null);
     } on ElmException catch (e) {
-      await _failed(e);
-      return null;
+      return (null, await _failed(e));
+    } finally {
+      _update((live) => live.copyWith(busy: false));
     }
   }
 

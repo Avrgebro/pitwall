@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
+import 'package:pitwall/state/session_state.dart';
 import 'package:pitwall/state/settings_state.dart';
 import 'package:pitwall/state/trip_state.dart';
 
@@ -202,6 +204,43 @@ void main() {
     await ended(c);
 
     expect(received.first['values'], {'battery_v': 13.6});
+  });
+
+  test('a failure while sending doesn\'t leave the adapter busy', () async {
+    final c = container(adapter: (_) => _Adapter());
+    await c.read(appSettingsProvider.future);
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson, askPermission: false);
+    lastValues.failing = true;
+
+    await expectLater(
+      session.readAndSend(),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    // The read itself finished, so the adapter is free again.
+    expect(c.read(sessionProvider), isA<SessionConnected>());
+    expect((c.read(sessionProvider) as SessionConnected).busy, isFalse);
+    lastValues.failing = false;
+    expect(await session.readAndSend(), isA<ReadDone>());
+    await session.disconnect();
+  });
+
+  test('a trip that fails still lets the next one start', () async {
+    final c = container(adapter: (_) => _Adapter());
+    c.read(tripProvider);
+    lastValues.failing = true;
+
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    final failed = await ended(c);
+    expect(failed.lastEnd, TripEnd.failed);
+    expect(service.calls, contains('stopService'));
+
+    lastValues.failing = false;
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    await running(c);
+    c.read(tripProvider.notifier).stop();
+    expect((await ended(c)).lastEnd, TripEnd.stopped);
   });
 
   test('a request made before Dart was ready still starts a trip', () async {

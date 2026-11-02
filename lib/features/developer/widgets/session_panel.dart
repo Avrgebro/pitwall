@@ -179,6 +179,7 @@ class SessionPanel extends ConsumerWidget {
     TripEnd.adapterNotFound => 'the adapter didn\'t answer',
     TripEnd.carOff => 'the car stopped answering',
     TripEnd.adapterLost => 'the adapter dropped',
+    TripEnd.failed => 'something went wrong (see the log)',
   };
 
   static String _carState(CarState state) => switch (state) {
@@ -196,7 +197,10 @@ class SessionPanel extends ConsumerWidget {
     SessionProblem.disconnected => 'The adapter disconnected.',
     SessionProblem.adapterError =>
       'The adapter stopped answering. Connect again.',
-    null => null,
+    SessionProblem.noAdapter => 'Choose the vehicle\'s adapter first.',
+    SessionProblem.inUse => 'Another connection is open.',
+    // Only ever the outcome of a step, never why the session is idle.
+    SessionProblem.notConnected || SessionProblem.busy || null => null,
   };
 }
 

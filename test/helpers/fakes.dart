@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -124,11 +126,17 @@ class FakeTripServiceGateway implements TripServiceGateway {
 class FakeLastValuesStorage implements LastValuesStorage {
   LastValues saved = const LastValues();
 
+  /// Makes saving fail, like a full disk.
+  bool failing = false;
+
   @override
   Future<LastValues> load() async => saved;
 
   @override
-  Future<void> save(LastValues values) async => saved = values;
+  Future<void> save(LastValues values) async {
+    if (failing) throw const FileSystemException('No space left on device');
+    saved = values;
+  }
 }
 
 /// A session that stays in the given state.
