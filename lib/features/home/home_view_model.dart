@@ -11,7 +11,7 @@ import '../../ui/components/value_tile_data.dart';
 import '../../core/format/formatters.dart';
 import '../../ui/theme/status_tone.dart';
 import '../common/delivery_text.dart';
-import '../common/value_display.dart';
+import 'value_display.dart';
 
 enum HeroState { running, connecting, waiting }
 
@@ -112,17 +112,16 @@ class HomeViewModel {
     required LiveActivity activity,
     required DeliveryStatus delivery,
     required bool hasWebhook,
-    required List<ValueOption> options,
+    required VehicleValues values,
     required Map<String, LastValue> lastValues,
     required DateTime now,
   }) {
     final card = _delivery(delivery, hasWebhook, now);
     // Only the values it still sends: one that's no longer sent says nothing
     // about the car now.
-    final keys = keysToSend(vehicle, options);
     final sent = {
       for (final MapEntry(:key, :value) in lastValues.entries)
-        if (keys.contains(key)) key: value,
+        if (values.sent.contains(key)) key: value,
     };
     final newest = sent.values.fold<LastValue?>(
       null,
@@ -144,7 +143,7 @@ class HomeViewModel {
         sent: sent,
         newest: newest,
         status: delivery,
-        options: options,
+        options: values.options,
         now: now,
       ),
     );

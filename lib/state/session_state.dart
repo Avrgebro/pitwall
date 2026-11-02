@@ -8,7 +8,6 @@ import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/obd/elm327.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/platform/permission_gateway.dart';
-import '../core/readings/readings.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
 import '../core/settings/settings_store.dart';
@@ -279,10 +278,9 @@ class SessionController extends Notifier<SessionState> {
     final (reading, problem) = await _exclusive(
       (session, elm) => readCar(
         elm,
-        keys: keysToSend(vehicle, valueOptions(profile, vehicle.modelYear)),
-        supportedPids: session.supportedPids,
+        vehicle: vehicle,
         profile: profile,
-        modelYear: vehicle.modelYear,
+        supportedPids: session.supportedPids,
       ),
     );
     switch (reading) {

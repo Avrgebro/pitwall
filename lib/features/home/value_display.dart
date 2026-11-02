@@ -40,13 +40,13 @@ abstract final class ValueDisplay {
         // seconds.
         if (key == _runTime)
           ValueTileData(
-            label: byKey[key]?.shortName ?? key,
+            label: byKey[key]?.label ?? key,
             value: Formatters.duration(Duration(seconds: values[key]!.round())),
             note: notes[key],
           )
         else
           ValueTileData(
-            label: byKey[key]?.shortName ?? key,
+            label: byKey[key]?.label ?? key,
             value: format(values[key]!),
             unit: byKey[key]?.unit,
             note: notes[key],

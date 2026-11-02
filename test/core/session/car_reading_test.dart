@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/elm327.dart';
 import 'package:pitwall/core/session/car_reading.dart';
 import 'package:pitwall/core/session/car_state.dart';
+import 'package:pitwall/core/vehicles/vehicle.dart';
 
 import '../obd/fake_transport.dart';
 
@@ -9,7 +10,8 @@ void main() {
   Future<CarReading> read(Map<String, String> replies, Set<String> keys) =>
       readCar(
         Elm327(FakeTransport(replies)),
-        keys: keys,
+        vehicle: Vehicle(id: 'tucson', selectedKeys: keys),
+        profile: null,
         supportedPids: {0x0C},
       );
 

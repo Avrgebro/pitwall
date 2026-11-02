@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/elm327.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
 import 'package:pitwall/core/readings/readings.dart';
+import 'package:pitwall/core/vehicles/vehicle.dart';
 
 import '../obd/fake_transport.dart';
 import '../profiles/test_profile.dart';
@@ -34,8 +35,12 @@ void main() {
       expect(profileKeys, ['test_fuel_vol', 'test_odo_mi', 'test_old_only']);
       // A tagged odometer doesn't take over the standard one.
       expect(options.where((o) => o.key == 'odometer_km'), hasLength(1));
-      expect(defaultKeys(options), isNot(contains('test_fuel_vol')));
-      expect(defaultKeys(options), contains('odometer_km'));
+      final sent = VehicleValues.of(
+        const Vehicle(id: 'tucson', modelYear: 2018),
+        profile,
+      ).sent;
+      expect(sent, isNot(contains('test_fuel_vol')));
+      expect(sent, contains('odometer_km'));
     });
   });
 
@@ -66,5 +71,25 @@ void main() {
     expect(transport.sent, isNot(contains('ATRV')));
     expect(transport.sent, isNot(contains('010D')));
     expect(transport.sent, contains('221234'));
+  });
+
+  group('vehicle values', () {
+    test('until chosen, the standard values are sent', () {
+      final values = VehicleValues.of(const Vehicle(id: 'tucson'), null);
+
+      expect(values.customised, isFalse);
+      expect(values.sent, contains('rpm'));
+    });
+
+    test('turning one on or off gives the choice to save', () {
+      final values = VehicleValues.of(
+        const Vehicle(id: 'tucson', selectedKeys: {'rpm'}),
+        null,
+      );
+
+      expect(values.customised, isTrue);
+      expect(values.withSent('speed_kmh', on: true), {'rpm', 'speed_kmh'});
+      expect(values.withSent('rpm', on: false), isEmpty);
+    });
   });
 }

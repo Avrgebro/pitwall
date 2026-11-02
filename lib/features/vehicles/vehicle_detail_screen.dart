@@ -25,8 +25,7 @@ class VehicleDetailScreen extends ConsumerWidget {
     if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
     final profileState = ref.watch(vehicleProfileProvider(vehicleId));
     final profile = profileState.value;
-    final options = valueOptions(profile, vehicle.modelYear);
-    final selected = keysToSend(vehicle, options);
+    final selected = VehicleValues.of(vehicle, profile).sent;
     final tripStart = TripStartText.summary(vehicle);
 
     return AppPage(

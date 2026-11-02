@@ -1,3 +1,4 @@
+import '../obd/pids.dart';
 import '../readings/readings.dart';
 
 enum CarState {
@@ -19,7 +20,7 @@ const chargingVoltage = 13.2;
 
 /// Works out the car's state from values read while it answers.
 CarState carStateFrom(Map<String, num> values) {
-  final rpm = values['rpm'];
+  final rpm = values[rpmKey];
   final voltage = values[batteryVoltageKey];
   if ((rpm != null && rpm > 0) ||
       (voltage != null && voltage >= chargingVoltage)) {

@@ -39,13 +39,12 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final category = widget.category;
     final title = category ?? 'Values to send';
     if (vehicle == null) return VehicleRemovedPage(title: title);
-    final profile = ref.watch(vehicleProfileProvider(widget.vehicleId)).value;
-    final all = valueOptions(profile, vehicle.modelYear);
-    final selected = keysToSend(vehicle, all);
+    final values = ref.watch(vehicleValuesProvider(widget.vehicleId))!;
+    final selected = values.sent;
     final options = category == null
-        ? all
+        ? values.options
         : [
-            for (final option in all)
+            for (final option in values.options)
               if (option.category == category) option,
           ];
     // While searching, every section keeps only the values that match.
@@ -54,12 +53,8 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final shown = filtering ? _matching(options, query) : options;
     final standard = shown.where((o) => !o.fromProfile).toList();
     final fromProfile = shown.where((o) => o.fromProfile).toList();
-    final defaults = defaultKeys(all);
-    Widget row(ValueOption option) => _SignalToggle(
-      vehicleId: vehicle.id,
-      option: option,
-      defaults: defaults,
-    );
+    Widget row(ValueOption option) =>
+        _SignalToggle(vehicleId: vehicle.id, option: option);
 
     // Back closes the search before leaving the page.
     return PopScope(
@@ -100,10 +95,10 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                 )
               else
                 _IntroPanel(
-                  canReset: vehicle.selectedKeys != null,
+                  canReset: values.customised,
                   onReset: () => ref
                       .read(appSettingsProvider.notifier)
-                      .saveVehicle(vehicle.copyWith(selectedKeys: null)),
+                      .resetValues(vehicle.id),
                 ),
               if (shown.isEmpty) ...[
                 const SizedBox(height: Insets.m),
@@ -205,41 +200,33 @@ class _IntroPanel extends StatelessWidget {
   );
 }
 
-/// One value with its on/off switch. Reads the vehicle's selection itself,
-/// so only the row that changed rebuilds.
+/// One value with its on/off switch. Watches only whether its own value is
+/// sent, so only the row that changed rebuilds.
 class _SignalToggle extends ConsumerWidget {
-  const _SignalToggle({
-    required this.vehicleId,
-    required this.option,
-    required this.defaults,
-  });
+  const _SignalToggle({required this.vehicleId, required this.option});
 
   final String vehicleId;
   final ValueOption option;
 
-  /// The selection while the vehicle still uses the recommended values.
-  final Set<String> defaults;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) return const SizedBox.shrink();
-    final selected = vehicle.selectedKeys ?? defaults;
+    final sent = ref.watch(
+      vehicleValuesProvider(vehicleId)
+          .select((values) => values?.sent.contains(option.key) ?? false),
+    );
     return ToggleRow(
       title: option.unit.isEmpty
           ? option.name
           : '${option.name} (${option.unit})',
       caption: option.key,
-      value: selected.contains(option.key),
-      onChanged: (on) => ref
-          .read(appSettingsProvider.notifier)
-          .saveVehicle(
-            vehicle.copyWith(
-              selectedKeys: on
-                  ? {...selected, option.key}
-                  : ({...selected}..remove(option.key)),
-            ),
-          ),
+      value: sent,
+      onChanged: (on) {
+        final values = ref.read(vehicleValuesProvider(vehicleId));
+        if (values == null) return;
+        ref
+            .read(appSettingsProvider.notifier)
+            .setSentValues(vehicleId, values.withSent(option.key, on: on));
+      },
     );
   }
 }

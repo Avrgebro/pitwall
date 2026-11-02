@@ -2,6 +2,9 @@
 ///
 /// Formulas follow SAE J1979. `data` is the reply payload after the
 /// `41 <pid>` header, one int per byte.
+/// Payload key for engine speed, which also tells whether the engine runs.
+const rpmKey = 'rpm';
+
 class PidDefinition {
   const PidDefinition({
     required this.pid,
@@ -44,7 +47,7 @@ final List<PidDefinition> standardPids = [
   ),
   PidDefinition(
     pid: 0x0C,
-    key: 'rpm',
+    key: rpmKey,
     name: 'Engine speed',
     shortName: 'RPM',
     unit: 'rpm',

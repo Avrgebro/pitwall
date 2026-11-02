@@ -48,7 +48,7 @@ class VehicleProfileScreen extends ConsumerWidget {
           ProfileContents(
             summary: profile.summaryFor(year),
             year: year,
-            selected: keysToSend(vehicle, valueOptions(profile, year)),
+            selected: VehicleValues.of(vehicle, profile).sent,
             onOpenValues: (category) => context.push(
               Routes.vehicleValues(vehicle.id, category: category),
             ),

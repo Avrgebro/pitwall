@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/readings/readings.dart';
-import 'package:pitwall/features/common/value_display.dart';
+import 'package:pitwall/features/home/value_display.dart';
 
 void main() {
   test('run time reads as a duration, other values with their unit', () {

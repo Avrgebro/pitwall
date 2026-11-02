@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/profiles/signal_set.dart';
+import '../core/readings/readings.dart';
 import '../core/settings/settings.dart';
 import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
@@ -128,6 +129,21 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     return profile;
   }
 
+  /// Makes [keys] the values the vehicle sends; see
+  /// [VehicleValues.withSent].
+  Future<void> setSentValues(String vehicleId, Set<String> keys) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null) return;
+    await saveVehicle(vehicle.copyWith(selectedKeys: keys));
+  }
+
+  /// Goes back to sending the standard values.
+  Future<void> resetValues(String vehicleId) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null) return;
+    await saveVehicle(vehicle.copyWith(selectedKeys: null));
+  }
+
   /// Puts back the profile [before] had, after it was removed: the file,
   /// its name, when it was imported, and the model year.
   Future<void> restoreProfile(Vehicle before, SignalSet profile) async {
@@ -185,3 +201,14 @@ final vehicleProfileProvider = FutureProvider.family<SignalSet?, String>(
         : ref.read(settingsStoreProvider).loadProfile(vehicle);
   },
 );
+
+/// A vehicle's values: what it can send, and what it does. Null while
+/// the vehicle doesn't exist; profile values join once the profile loads.
+final vehicleValuesProvider = Provider.family<VehicleValues?, String>((
+  ref,
+  id,
+) {
+  final vehicle = ref.watch(vehicleProvider(id));
+  if (vehicle == null) return null;
+  return VehicleValues.of(vehicle, ref.watch(vehicleProfileProvider(id)).value);
+});

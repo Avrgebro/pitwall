@@ -1,6 +1,7 @@
 import '../obd/elm327.dart';
 import '../profiles/signal_set.dart';
 import '../readings/readings.dart';
+import '../vehicles/vehicle.dart';
 import 'car_state.dart';
 
 /// What one read of the car found.
@@ -22,24 +23,24 @@ final class CarSilent extends CarReading {
   const CarSilent();
 }
 
-/// Reads [keys] from the car through [elm] and works out its state.
+/// Reads the values [vehicle] sends from the car through [elm], and works
+/// out its state.
 ///
 /// Throws [ElmException] for adapter failures; the car not answering isn't
 /// one, it's [CarSilent].
 Future<CarReading> readCar(
   Elm327 elm, {
-  required Set<String> keys,
+  required Vehicle vehicle,
+  required SignalSet? profile,
   required Set<int> supportedPids,
-  SignalSet? profile,
-  int? modelYear,
 }) async {
   try {
     final values = await readValues(
       elm,
-      keys: keys,
+      keys: VehicleValues.of(vehicle, profile).sent,
       supportedPids: supportedPids,
       profile: profile,
-      modelYear: modelYear,
+      modelYear: vehicle.modelYear,
     );
     // Values the adapter measures itself come back with the car switched
     // off too; without any from the car, make sure it still answers.

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
-import '../../core/readings/readings.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/last_values_state.dart';
@@ -50,14 +49,13 @@ class HomeScreen extends ConsumerWidget {
       );
     }
 
-    final profile = ref.watch(vehicleProfileProvider(vehicle.id)).value;
     final model = HomeViewModel.build(
       vehicle: vehicle,
       settings: settings,
       activity: ref.watch(liveActivityProvider),
       delivery: ref.watch(deliveryStatusProvider),
       hasWebhook: webhook.hasUrl,
-      options: valueOptions(profile, vehicle.modelYear),
+      values: ref.watch(vehicleValuesProvider(vehicle.id))!,
       lastValues: ref.watch(lastValuesProvider).value?.of(vehicle.id) ?? {},
       now: ref.watch(nowProvider),
     );

@@ -18,7 +18,6 @@ void main() {
     lastSeen: DateTime(2026, 10, 31, 8, 24),
   );
   const settings = AppSettings();
-  final options = valueOptions(null, null);
   final driving = LiveConnected(
     vehicleId: 'tucson',
     since: now.subtract(const Duration(minutes: 24)),
@@ -52,7 +51,7 @@ void main() {
     activity: activity,
     delivery: delivery,
     hasWebhook: hasWebhook,
-    options: options,
+    values: VehicleValues.of(vehicle, null),
     lastValues: lastValues,
     now: now,
   );

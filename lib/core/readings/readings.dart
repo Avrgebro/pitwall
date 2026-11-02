@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../obd/elm327.dart';
 import '../obd/pids.dart';
 import '../profiles/profile_reader.dart';
@@ -12,8 +14,8 @@ class ValueOption {
   const ValueOption({
     required this.key,
     required this.name,
-    required this.shortName,
     required this.unit,
+    this.shortName,
     this.fromProfile = false,
     this.category,
   });
@@ -21,8 +23,11 @@ class ValueOption {
   final String key;
   final String name;
 
-  /// Compact label for tiles, e.g. "Fuel".
-  final String shortName;
+  /// A compact label for tiles, e.g. "Fuel", when [name] is long.
+  final String? shortName;
+
+  /// What a tile says.
+  String get label => shortName ?? name;
   final String unit;
 
   /// From the vehicle's profile rather than standard OBD-II. These aren't
@@ -60,7 +65,6 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
           () => ValueOption(
             key: signal.key,
             name: signal.name,
-            shortName: signal.name,
             unit: signal.unit,
             fromProfile: true,
             category: signal.category,
@@ -72,15 +76,38 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
   return options.values.toList();
 }
 
-/// The keys [vehicle] sends: the ones the user chose, or the defaults.
-Set<String> keysToSend(Vehicle vehicle, List<ValueOption> options) =>
-    vehicle.selectedKeys ?? defaultKeys(options);
+/// A vehicle's values: every one it can send, and the ones it does.
+@immutable
+class VehicleValues {
+  const VehicleValues._(this.options, this.sent, {required this.customised});
 
-/// The keys sent when the user hasn't chosen any: the standard ones.
-Set<String> defaultKeys(List<ValueOption> options) => {
-  for (final option in options)
-    if (!option.fromProfile) option.key,
-};
+  factory VehicleValues.of(Vehicle vehicle, SignalSet? profile) {
+    final options = valueOptions(profile, vehicle.modelYear);
+    final chosen = vehicle.selectedKeys;
+    return VehicleValues._(
+      options,
+      chosen ??
+          {
+            // Until the user chooses: the standard ones.
+            for (final option in options)
+              if (!option.fromProfile) option.key,
+          },
+      customised: chosen != null,
+    );
+  }
+
+  final List<ValueOption> options;
+
+  /// The keys it sends.
+  final Set<String> sent;
+
+  /// Whether the user chose them, so there's a choice to reset.
+  final bool customised;
+
+  /// What's sent with [key] turned [on] or off, to save as the choice.
+  Set<String> withSent(String key, {required bool on}) =>
+      on ? {...sent, key} : ({...sent}..remove(key));
+}
 
 /// Reads the values in [keys]: battery voltage from the adapter, standard
 /// PIDs the car supports, and profile signals for [modelYear]. Only the
