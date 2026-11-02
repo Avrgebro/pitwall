@@ -8,6 +8,7 @@ import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import 'widgets/profile_card.dart';
+import 'widgets/vehicle_removed_page.dart';
 
 /// The vehicle's optional OBDb profile: import, model year, what applies.
 class VehicleProfileScreen extends ConsumerWidget {
@@ -19,7 +20,7 @@ class VehicleProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
     if (vehicle == null) {
-      return const AppPage(title: 'Vehicle profile', children: []);
+      return const VehicleRemovedPage(title: 'Vehicle profile');
     }
     final profileState = ref.watch(vehicleProfileProvider(vehicleId));
     final notifier = ref.read(appSettingsProvider.notifier);

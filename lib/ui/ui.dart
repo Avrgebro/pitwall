@@ -19,6 +19,7 @@ export 'components/row_group.dart';
 export 'components/icon_badge.dart';
 export 'components/info_note.dart';
 export 'components/line_icon.dart';
+export 'components/loading_indicator.dart';
 export 'components/numbered_steps.dart';
 export 'components/secret_text_field.dart';
 export 'components/section_header.dart';

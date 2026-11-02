@@ -11,6 +11,7 @@ import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import '../common/trip_start_text.dart';
+import 'widgets/vehicle_removed_page.dart';
 
 /// One vehicle's overview: a row per setting, each opening its own page.
 class VehicleDetailScreen extends ConsumerWidget {
@@ -21,12 +22,7 @@ class VehicleDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) {
-      return const AppPage(
-        title: 'Vehicle',
-        children: [InfoNote(text: TextSpan(text: 'This vehicle was removed.'))],
-      );
-    }
+    if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
     final profileState = ref.watch(vehicleProfileProvider(vehicleId));
     final profile = profileState.value;
     final options = valueOptions(profile, vehicle.modelYear);

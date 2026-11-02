@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../theme/glass_colors.dart';
 import '../theme/glass_filters.dart';
 import '../theme/tokens.dart';
+import '../components/loading_indicator.dart';
 import 'page_frame.dart';
 
 /// The frame of every screen: a title (with a back button on sub-screens),
@@ -24,6 +25,15 @@ class AppPage extends StatelessWidget {
     this.floatingActionButton,
     this.bottom,
   }) : slivers = null;
+
+  /// A page still loading what it shows: its title, and a spinner.
+  const AppPage.loading({super.key, required this.title})
+    : children = const [LoadingIndicator()],
+      slivers = null,
+      subtitle = null,
+      actions = null,
+      floatingActionButton = null,
+      bottom = null;
 
   /// A page whose content is slivers, such as a `SliverRowGroup`, mixed
   /// with `SliverList.list` for ordinary content.

@@ -21,7 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider).value;
     final webhook = ref.watch(webhookProvider).value;
     if (settings == null || webhook == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const AppPage.loading(title: 'Settings');
     }
     final now = ref.watch(nowProvider);
     final info = ref.watch(packageInfoProvider).value;

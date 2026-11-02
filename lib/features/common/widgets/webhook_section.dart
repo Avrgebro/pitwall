@@ -22,7 +22,7 @@ class WebhookSection extends ConsumerWidget {
           icon: Icons.error_outline,
           text: TextSpan(text: 'Couldn\'t read the saved webhook.'),
         ),
-        _ => const Center(child: CircularProgressIndicator()),
+        _ => const LoadingIndicator(),
       };
 }
 

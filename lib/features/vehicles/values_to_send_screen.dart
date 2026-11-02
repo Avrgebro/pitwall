@@ -6,6 +6,7 @@ import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
+import 'widgets/vehicle_removed_page.dart';
 
 /// Which values go in each reading, grouped by where they come from.
 class ValuesToSendScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   Widget build(BuildContext context) {
     final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
     if (vehicle == null) {
-      return const AppPage(title: 'Values to send', children: []);
+      return const VehicleRemovedPage(title: 'Values to send');
     }
     final profile = ref.watch(vehicleProfileProvider(widget.vehicleId)).value;
     final options = valueOptions(profile, vehicle.modelYear);

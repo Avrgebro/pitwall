@@ -82,10 +82,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
             icon: Icons.error_outline,
             text: TextSpan(text: _describe(error)),
           ),
-          _ => const Padding(
-            padding: EdgeInsets.all(Insets.xl),
-            child: Center(child: CircularProgressIndicator()),
-          ),
+          _ => const LoadingIndicator(),
         },
         Align(
           alignment: Alignment.centerLeft,

@@ -34,12 +34,7 @@ class LicencesScreen extends ConsumerWidget {
           text: TextSpan(text: 'Couldn\'t read the licences.'),
         ),
       ],
-      _ => const [
-        Padding(
-          padding: EdgeInsets.all(Insets.xxl),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ],
+      _ => const [LoadingIndicator()],
     },
   );
 

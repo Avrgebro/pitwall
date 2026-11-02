@@ -30,7 +30,7 @@ class HomeScreen extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider).value;
     final webhook = ref.watch(webhookProvider).value;
     if (settings == null || webhook == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const AppPage.loading(title: 'Pitwall');
     }
     final session = ref.watch(sessionProvider);
     final vehicle = ref.watch(focusedVehicleProvider);

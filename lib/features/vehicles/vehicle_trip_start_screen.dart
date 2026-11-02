@@ -9,6 +9,7 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
+import 'widgets/vehicle_removed_page.dart';
 
 /// What starts the vehicle's trips: its head unit connecting, for now.
 class VehicleTripStartScreen extends ConsumerWidget {
@@ -19,10 +20,9 @@ class VehicleTripStartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(appSettingsProvider).value;
-    final vehicle = settings?.vehicleById(vehicleId);
-    if (settings == null || vehicle == null) {
-      return const AppPage(title: 'Trip start', children: []);
-    }
+    if (settings == null) return const AppPage.loading(title: 'Trip start');
+    final vehicle = settings.vehicleById(vehicleId);
+    if (vehicle == null) return const VehicleRemovedPage(title: 'Trip start');
     final notifier = ref.read(appSettingsProvider.notifier);
     final headUnit = vehicle.headUnitName;
 

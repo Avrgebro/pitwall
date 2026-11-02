@@ -19,7 +19,7 @@ class VehiclesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(appSettingsProvider).value;
     if (settings == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const AppPage.loading(title: 'Vehicles');
     }
     final session = ref.watch(sessionProvider);
     final now = ref.watch(nowProvider);

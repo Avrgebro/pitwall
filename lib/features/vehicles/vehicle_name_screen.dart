@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/vehicle_name_field.dart';
+import 'widgets/vehicle_removed_page.dart';
 
 class VehicleNameScreen extends ConsumerWidget {
   const VehicleNameScreen({super.key, required this.vehicleId});
@@ -13,7 +14,7 @@ class VehicleNameScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) return const AppPage(title: 'Name', children: []);
+    if (vehicle == null) return const VehicleRemovedPage(title: 'Name');
     return AppPage(
       title: 'Name',
       children: [
