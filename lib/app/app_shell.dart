@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../state/permissions_state.dart';
+import '../state/settings_state.dart';
 import '../state/webhook_state.dart';
 import '../ui/ui.dart';
 
@@ -47,6 +48,13 @@ class _AppShellState extends ConsumerState<AppShell> {
     final settingsNeedAttention =
         (deliveryError != null && !deliveryError.isTransient) ||
         ref.watch(missingPermissionsProvider) > 0;
+    // A vehicle that won't start sending on its own.
+    final vehiclesNeedAttention = ref.watch(
+      appSettingsProvider.select(
+        (settings) =>
+            settings.value?.vehicles.any((v) => !v.hasTripStart) ?? false,
+      ),
+    );
 
     return Scaffold(
       // Content scrolls behind the floating bar.
@@ -59,9 +67,10 @@ class _AppShellState extends ConsumerState<AppShell> {
           initialLocation: index == navigationShell.currentIndex,
         ),
         destinations: [
-          const FloatingNavDestination(
+          FloatingNavDestination(
             icon: Symbols.directions_car_rounded,
             label: 'Vehicles',
+            showBadge: vehiclesNeedAttention,
           ),
           const FloatingNavDestination(
             icon: Symbols.home_rounded,

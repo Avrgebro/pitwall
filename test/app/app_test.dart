@@ -37,6 +37,13 @@ Future<void> _pumpApp(
   await tester.pumpAndSettle();
 }
 
+/// Whether the navigation bar's [label] tab shows its dot.
+bool _badge(WidgetTester tester, String label) => tester
+    .widget<FloatingNavBar>(find.byType(FloatingNavBar))
+    .destinations
+    .firstWhere((d) => d.label == label)
+    .showBadge;
+
 void main() {
   testWidgets('before setup, the app opens on the welcome step', (
     tester,
@@ -64,17 +71,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Waiting for the car'), findsOneWidget);
-    // The webhook and head unit aren't set yet.
-    expect(find.text('Finish setting up'), findsOneWidget);
+    // With a vehicle, setup no longer shows on Home; what's missing shows
+    // where it belongs, like the webhook on the delivery card.
+    expect(find.text('Finish setting up'), findsNothing);
+    expect(find.text('No webhook yet'), findsOneWidget);
     expect(find.byType(FloatingNavBar), findsOneWidget);
-
-    // Below the checklist and the vehicle, on the small test screen.
-    await tester.scrollUntilVisible(
-      find.text('Ready to send'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Ready to send'), findsOneWidget);
   });
 
   testWidgets('tabs switch between Home, Vehicles and Settings', (
@@ -87,7 +88,7 @@ void main() {
 
     await tester.tap(find.text('Vehicles'));
     await tester.pumpAndSettle();
-    expect(find.text('vLinker MC+'), findsOneWidget);
+    expect(find.text('Tucson'), findsOneWidget);
 
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
@@ -126,8 +127,36 @@ void main() {
       },
     );
 
-    final badges = tester.widgetList<Badge>(find.byType(Badge));
-    expect(badges.any((badge) => badge.isLabelVisible), isTrue);
+    expect(_badge(tester, 'Settings'), isTrue);
+  });
+
+  testWidgets('a vehicle without a trip start puts a dot on Vehicles', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    );
+    expect(_badge(tester, 'Vehicles'), isTrue);
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Choose the car\'s Bluetooth for trip start'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('vehicles that start on their own leave Vehicles quiet', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: AppSettings(
+        vehicles: [_tucson.copyWith(headUnitAddress: 'AA', headUnitName: 'T')],
+        setupDone: true,
+      ),
+    );
+    expect(_badge(tester, 'Vehicles'), isFalse);
   });
 
   testWidgets('without vehicles, Vehicles invites adding one', (tester) async {
@@ -462,4 +491,29 @@ void main() {
     expect(connect.onPressed, isNull);
     expect(simulate.onPressed, isNull);
   });
+
+  testWidgets('a vehicle row shows its state, not its setup details', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: AppSettings(
+        vehicles: [
+          _tucson.copyWith(
+            headUnitAddress: 'AA',
+            headUnitName: 'T',
+            lastSeen: testNow.subtract(const Duration(hours: 2)),
+          ),
+        ],
+        setupDone: true,
+      ),
+    );
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Last seen 2 h ago'), findsOneWidget);
+    // The adapter is on the vehicle's page, not the list.
+    expect(find.text('vLinker MC+'), findsNothing);
+  });
+
 }

@@ -10,7 +10,7 @@ import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import 'widgets/no_vehicles_card.dart';
-import 'widgets/vehicle_card.dart';
+import 'widgets/vehicle_row.dart';
 
 class VehiclesScreen extends ConsumerWidget {
   const VehiclesScreen({super.key});
@@ -48,15 +48,18 @@ class VehiclesScreen extends ConsumerWidget {
     return AppPage(
       title: 'Vehicles',
       children: [
-        for (final vehicle in vehicles) ...[
-          VehicleCard(
-            vehicle: vehicle,
-            now: now,
-            badge: badgeFor(vehicle.id),
-            onTap: () => context.push(Routes.vehicle(vehicle.id)),
-          ),
-          const SizedBox(height: Insets.m),
-        ],
+        RowGroup(
+          children: [
+            for (final vehicle in vehicles)
+              VehicleRow(
+                vehicle: vehicle,
+                now: now,
+                badge: badgeFor(vehicle.id),
+                onTap: () => context.push(Routes.vehicle(vehicle.id)),
+              ),
+          ],
+        ),
+        const SizedBox(height: Insets.m),
         _AddVehicleCard(onTap: () => context.push(Routes.addVehicle)),
         if (vehicles.length == 1)
           const InfoNote(

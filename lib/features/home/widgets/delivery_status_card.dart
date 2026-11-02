@@ -4,18 +4,20 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../ui/ui.dart';
 import '../home_view_model.dart';
 
-/// Delivery health on Home: healthy, queued (nothing to do) or failing
-/// (needs the user), with the actions that help.
+/// Delivery health on Home: healthy, queued (nothing to do), failing
+/// (needs the user) or not set up, with the actions that help.
 class DeliveryStatusCard extends StatelessWidget {
   const DeliveryStatusCard({
     super.key,
     required this.model,
     required this.onOpenSettings,
+    required this.onSetWebhook,
     required this.onRetry,
   });
 
   final DeliveryCardModel model;
   final VoidCallback onOpenSettings;
+  final VoidCallback onSetWebhook;
   final VoidCallback onRetry;
 
   @override
@@ -27,6 +29,7 @@ class DeliveryStatusCard extends StatelessWidget {
         DeliveryCardKind.healthy => Symbols.cloud_done_rounded,
         DeliveryCardKind.queued => Symbols.cloud_off_rounded,
         DeliveryCardKind.failing => Symbols.error_rounded,
+        DeliveryCardKind.noWebhook => Symbols.webhook_rounded,
       },
       title: model.title,
       message: model.message,
@@ -35,6 +38,16 @@ class DeliveryStatusCard extends StatelessWidget {
           (icon: _icon(stat.kind), label: stat.label, value: stat.value),
       ],
       actions: [
+        if (model.canSetWebhook)
+          FilledButton.icon(
+            onPressed: onSetWebhook,
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.accent,
+              foregroundColor: colors.onAccent,
+            ),
+            icon: const Icon(Symbols.webhook_rounded),
+            label: const Text('Set webhook'),
+          ),
         if (model.canOpenSettings)
           FilledButton.icon(
             onPressed: onOpenSettings,

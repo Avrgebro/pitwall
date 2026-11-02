@@ -29,15 +29,23 @@ class TagLabel extends StatelessWidget {
 
 /// A small icon and a line of text, for detail lines in list items.
 class IconText extends StatelessWidget {
-  const IconText({super.key, required this.icon, required this.text});
+  const IconText({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.color,
+  });
 
   final IconData icon;
   final String text;
 
+  /// Instead of the muted default, e.g. the error colour for a problem.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
+    final color = this.color ?? theme.colorScheme.onSurfaceVariant;
     return Row(
       children: [
         Icon(icon, size: Sizes.iconSmall - 2, color: color),

@@ -40,11 +40,13 @@ void main() {
   HomeViewModel build({
     SessionState session = const SessionState(),
     DeliveryStatus delivery = const DeliveryStatus(),
+    bool hasWebhook = true,
   }) => HomeViewModel.build(
     vehicle: vehicle,
     settings: settings,
     session: session,
     delivery: delivery,
+    hasWebhook: hasWebhook,
     options: options,
     now: now,
   );
@@ -187,5 +189,18 @@ void main() {
     );
 
     expect(model.values, isNull);
+  });
+
+  test('without a webhook the delivery card asks for one', () {
+    final model = build(
+      hasWebhook: false,
+      delivery: const DeliveryStatus(queued: 2),
+    );
+
+    expect(model.delivery.kind, DeliveryCardKind.noWebhook);
+    expect(model.delivery.title, 'No webhook yet');
+    expect(model.delivery.canSetWebhook, isTrue);
+    expect(model.delivery.isProblem, isTrue);
+    expect(model.delivery.stats.single.value, '2');
   });
 }

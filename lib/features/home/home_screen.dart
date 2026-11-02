@@ -30,20 +30,24 @@ class HomeScreen extends ConsumerWidget {
     if (settings == null || webhook == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final checklist = SetupChecklist.from(
-      settings: settings,
-      hasWebhook: webhook.hasUrl,
-      missingPermissions: ref.watch(missingPermissionsProvider),
-    );
-    final setup = checklist.complete
-        ? null
-        : SetupChecklistCard(checklist: checklist);
     final session = ref.watch(sessionProvider);
     final vehicle = ref.watch(homeVehicleProvider);
 
+    // Before the first vehicle, Home walks through setup. After, problems
+    // show where they belong: the vehicle, the delivery card, Settings.
     if (vehicle == null) {
-      // Adding a vehicle is one of the steps, so setup is never complete.
-      return AppPage(title: 'Pitwall', children: [?setup]);
+      return AppPage(
+        title: 'Pitwall',
+        children: [
+          SetupChecklistCard(
+            checklist: SetupChecklist.from(
+              settings: settings,
+              hasWebhook: webhook.hasUrl,
+              missingPermissions: ref.watch(missingPermissionsProvider),
+            ),
+          ),
+        ],
+      );
     }
 
     final profile = ref.watch(vehicleProfileProvider(vehicle.id)).value;
@@ -52,19 +56,20 @@ class HomeScreen extends ConsumerWidget {
       settings: settings,
       session: session,
       delivery: ref.watch(deliveryStatusProvider),
+      hasWebhook: webhook.hasUrl,
       options: valueOptions(profile, vehicle.modelYear),
       now: ref.watch(nowProvider),
     );
     final delivery = DeliveryStatusCard(
       model: model.delivery,
       onOpenSettings: () => context.go(Routes.settings),
+      onSetWebhook: () => context.push(Routes.webhookSettings),
       onRetry: () => ref.read(deliveryStatusProvider.notifier).retryNow(),
     );
 
     return AppPage(
       title: 'Pitwall',
       children: [
-        if (setup != null) ...[setup, const SizedBox(height: Insets.xl)],
         VehicleHeroCard(
           model: model.hero,
           // With more than one vehicle, its name switches between them.

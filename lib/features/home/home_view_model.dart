@@ -24,7 +24,7 @@ enum HeroStatKind {
   lastReading,
 }
 
-enum DeliveryCardKind { healthy, queued, failing }
+enum DeliveryCardKind { healthy, queued, failing, noWebhook }
 
 enum DeliveryStatKind { lastSent, failed, queued }
 
@@ -58,6 +58,7 @@ class DeliveryCardModel {
     required this.stats,
     this.canOpenSettings = false,
     this.canRetry = false,
+    this.canSetWebhook = false,
   });
 
   final DeliveryCardKind kind;
@@ -69,11 +70,13 @@ class DeliveryCardModel {
   final List<({DeliveryStatKind kind, String label, String value})> stats;
   final bool canOpenSettings;
   final bool canRetry;
+  final bool canSetWebhook;
 
   StatusTone get tone => switch (kind) {
     DeliveryCardKind.healthy => StatusTone.healthy,
     DeliveryCardKind.queued => StatusTone.warning,
     DeliveryCardKind.failing => StatusTone.error,
+    DeliveryCardKind.noWebhook => StatusTone.warning,
   };
 
   /// Problems rise to the top, above the values.
@@ -108,12 +111,13 @@ class HomeViewModel {
     required AppSettings settings,
     required SessionState session,
     required DeliveryStatus delivery,
+    required bool hasWebhook,
     required List<ValueOption> options,
     required DateTime now,
   }) {
     final ownSession = session.vehicleId == vehicle.id;
     final connected = ownSession && session.isConnected;
-    final card = _delivery(delivery, connected, now);
+    final card = _delivery(delivery, hasWebhook, connected, now);
     // Only the newest reading is kept, so this car's last one is known only
     // when the newest came from it.
     final latest = delivery.latest;
@@ -228,6 +232,7 @@ class HomeViewModel {
 
   static DeliveryCardModel _delivery(
     DeliveryStatus status,
+    bool hasWebhook,
     bool connected,
     DateTime now,
   ) {
@@ -236,6 +241,23 @@ class HomeViewModel {
         time == null ? 'Never' : Formatters.ago(time, now);
     final queued = status.queued;
     final error = status.lastError;
+
+    if (!hasWebhook) {
+      return DeliveryCardModel(
+        kind: DeliveryCardKind.noWebhook,
+        title: 'No webhook yet',
+        message: 'Readings have nowhere to go until you set one.',
+        stats: [
+          if (queued > 0)
+            (
+              kind: DeliveryStatKind.queued,
+              label: 'Queued',
+              value: count(queued),
+            ),
+        ],
+        canSetWebhook: true,
+      );
+    }
 
     if (error == null) {
       if (queued > 0) {
