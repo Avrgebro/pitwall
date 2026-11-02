@@ -9,5 +9,5 @@ class WebhookScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const AppPage(title: 'Webhook', children: [WebhookSection()]);
+      AppPage(title: 'Webhook', children: const [WebhookSection()]);
 }

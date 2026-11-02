@@ -16,19 +16,18 @@ import 'page_frame.dart';
 /// the page and fills in, frosted and with rounded bottom corners, once
 /// content passes beneath it.
 class AppPage extends StatelessWidget {
-  const AppPage({
+  AppPage({
     super.key,
     required this.title,
-    required List<Widget> this.children,
+    required List<Widget> children,
     this.subtitle,
     this.actions,
     this.bottom,
-  }) : slivers = null;
+  }) : slivers = [SliverList.list(children: children)];
 
   /// A page still loading what it shows: its title, and a spinner.
   const AppPage.loading({super.key, required this.title})
-    : children = const [LoadingIndicator()],
-      slivers = null,
+    : slivers = const [SliverToBoxAdapter(child: LoadingIndicator())],
       subtitle = null,
       actions = null,
       bottom = null;
@@ -38,16 +37,15 @@ class AppPage extends StatelessWidget {
   const AppPage.slivers({
     super.key,
     required this.title,
-    required List<Widget> this.slivers,
+    required this.slivers,
     this.subtitle,
     this.actions,
     this.bottom,
-  }) : children = null;
+  });
 
   final String title;
   final String? subtitle;
-  final List<Widget>? children;
-  final List<Widget>? slivers;
+  final List<Widget> slivers;
   final List<Widget>? actions;
 
   /// Pinned over the bottom of the content, such as [PinnedActions] or a
@@ -77,7 +75,7 @@ class AppPage extends StatelessWidget {
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
     final subtitle = this.subtitle;
 
-    return PageFrame(
+    return PageFrame.slivers(
       appBar: AppBar(
         toolbarHeight: _barHeight,
         automaticallyImplyLeading: false,
@@ -126,36 +124,9 @@ class AppPage extends StatelessWidget {
         actions: actions,
       ),
       bottom: bottom,
-      body: _content(),
+      slivers: slivers,
     );
   }
-
-  /// The scrolling content. Inside the body, the scaffolds report what
-  /// overlaps it: the top bar above, and below either the floating
-  /// navigation bar on tab pages or the pinned [bottom].
-  Widget _content() => Builder(
-    builder: (context) {
-      final overlap = MediaQuery.paddingOf(context);
-      final padding = EdgeInsets.fromLTRB(
-        Insets.l,
-        overlap.top + Insets.s,
-        Insets.l,
-        overlap.bottom + Insets.l,
-      );
-      return switch ((children, slivers)) {
-        (final children?, _) => ListView(padding: padding, children: children),
-        (_, final slivers?) => CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: padding,
-              sliver: SliverMainAxisGroup(slivers: slivers),
-            ),
-          ],
-        ),
-        _ => throw StateError('AppPage needs children or slivers'),
-      };
-    },
-  );
 }
 
 /// Frosts whatever scrolls behind the top bar. Follows the same scroll

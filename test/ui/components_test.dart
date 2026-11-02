@@ -204,9 +204,11 @@ void main() {
         theme: AppTheme.light(),
         home: PageFrame(
           bottom: GlassButton(onPressed: () {}, child: const Text('Pinned')),
-          body: Center(
-            child: GlassButton(onPressed: () {}, child: const Text('Inline')),
-          ),
+          children: [
+            Center(
+              child: GlassButton(onPressed: () {}, child: const Text('Inline')),
+            ),
+          ],
         ),
       ),
     );

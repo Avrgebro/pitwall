@@ -281,7 +281,7 @@ void main() {
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView).last, const Offset(0, -2000));
+    await tester.drag(find.byType(CustomScrollView).last, const Offset(0, -2000));
     await tester.pumpAndSettle();
 
     final last = tester.getRect(find.text('Developer tools'));
@@ -347,7 +347,7 @@ void main() {
     await tester.pumpAndSettle();
     // On the small test screen the card's button starts under the floating
     // navigation bar; scroll it into view, as a person would.
-    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add vehicle'));
     await tester.pumpAndSettle();
@@ -436,7 +436,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vehicles'));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add vehicle'));
     await tester.pumpAndSettle();

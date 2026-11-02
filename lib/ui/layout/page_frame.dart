@@ -5,28 +5,93 @@ import 'page_backdrop.dart';
 import 'pinned_bottom.dart';
 
 /// The ground of every screen: the glowing backdrop, an optional top bar
-/// that content scrolls under, and an optional [bottom] pinned over the
-/// content. `AppPage` and setup's steps build on it.
+/// that content scrolls under, an optional [header] that stays put above
+/// the content, the scrolling content, and an optional [bottom] pinned
+/// over it. `AppPage` and setup's steps build on it.
 class PageFrame extends StatelessWidget {
-  const PageFrame({super.key, required this.body, this.appBar, this.bottom});
+  /// A frame whose content is a list of [children].
+  PageFrame({
+    super.key,
+    required List<Widget> children,
+    this.appBar,
+    this.header,
+    this.bottom,
+    this.padding = defaultPadding,
+  }) : slivers = [SliverList.list(children: children)];
 
-  final Widget body;
+  /// A frame whose content is slivers, for long lists that should only
+  /// build what's on screen.
+  const PageFrame.slivers({
+    super.key,
+    required this.slivers,
+    this.appBar,
+    this.header,
+    this.bottom,
+    this.padding = defaultPadding,
+  });
+
+  final List<Widget> slivers;
   final PreferredSizeWidget? appBar;
 
-  /// Pinned over the bottom of [body]; see [PinnedBottom].
+  /// Above the content, below the status bar, and not scrolled.
+  final Widget? header;
+
+  /// Pinned over the bottom of the content; see [PinnedBottom].
   final Widget? bottom;
+
+  /// Around the content, inside what overlaps it.
+  final EdgeInsets padding;
+
+  static const defaultPadding = EdgeInsets.fromLTRB(
+    Insets.l,
+    Insets.s,
+    Insets.l,
+    Insets.l,
+  );
 
   @override
   Widget build(BuildContext context) {
     final bottom = this.bottom;
+    final content = Builder(builder: _content);
     return Scaffold(
       extendBodyBehindAppBar: appBar != null,
       appBar: appBar,
       body: PageBackdrop(
         child: bottom == null
-            ? body
-            : PinnedBottom(bottom: bottom, child: body),
+            ? content
+            : PinnedBottom(bottom: bottom, child: content),
       ),
+    );
+  }
+
+  /// Inside the body, the scaffolds report what overlaps it: the top bar
+  /// or status bar above, and below either the floating navigation bar on
+  /// tab pages or the pinned [bottom]. The content keeps clear of both,
+  /// and scrolls under them.
+  Widget _content(BuildContext context) {
+    final overlap = MediaQuery.paddingOf(context);
+    final header = this.header;
+    final scrollView = CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: padding.copyWith(
+            top: (header == null ? overlap.top : 0) + padding.top,
+            bottom: overlap.bottom + padding.bottom,
+          ),
+          sliver: SliverMainAxisGroup(slivers: slivers),
+        ),
+      ],
+    );
+    if (header == null) return scrollView;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(top: overlap.top),
+          child: header,
+        ),
+        Expanded(child: scrollView),
+      ],
     );
   }
 }

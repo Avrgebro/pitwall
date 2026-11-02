@@ -41,6 +41,11 @@ class StepScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return PageFrame(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(Insets.xl, Insets.l, Insets.xl, 0),
+        child: _Progress(step: step, steps: steps),
+      ),
+      padding: const EdgeInsets.all(Insets.xl),
       bottom: PinnedActions(
         // Lined up with the step's content.
         padding: const EdgeInsets.fromLTRB(
@@ -51,62 +56,30 @@ class StepScaffold extends StatelessWidget {
         ),
         child: _buttons(),
       ),
-      // The bottom padding is the pinned buttons', for the list.
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Insets.xl,
-                Insets.l,
-                Insets.xl,
-                0,
-              ),
-              child: _Progress(step: step, steps: steps),
+      children: [
+        if (title != null) Text(title!, style: theme.textTheme.headlineMedium),
+        if (message != null) ...[
+          const SizedBox(height: Insets.s),
+          Text(
+            message!,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            Expanded(
-              child: Builder(
-                builder: (context) => ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    Insets.xl,
-                    Insets.xl,
-                    Insets.xl,
-                    MediaQuery.paddingOf(context).bottom + Insets.xl,
-                  ),
-                  children: [
-                    if (title != null)
-                      Text(title!, style: theme.textTheme.headlineMedium),
-                    if (message != null) ...[
-                      const SizedBox(height: Insets.s),
-                      Text(
-                        message!,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if (title != null || message != null)
-                      const SizedBox(height: Insets.xl),
-                    ...children,
-                    if (footnote != null) ...[
-                      const SizedBox(height: Insets.xl),
-                      Text(
-                        footnote!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+          ),
+        ],
+        if (title != null || message != null) const SizedBox(height: Insets.xl),
+        ...children,
+        if (footnote != null) ...[
+          const SizedBox(height: Insets.xl),
+          Text(
+            footnote!,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
