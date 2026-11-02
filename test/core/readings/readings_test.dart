@@ -18,6 +18,7 @@ void main() {
         'coolant_temp_c',
         'rpm',
         'speed_kmh',
+        'engine_run_time_s',
         'fuel_level_pct',
         'odometer_km',
       ]);

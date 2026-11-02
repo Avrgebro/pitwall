@@ -24,6 +24,10 @@ void main() {
     expect(decode(0xA6, [0x00, 0x02, 0xD0, 0x40]), 18438.4);
   });
 
+  test('run time is two bytes of seconds', () {
+    expect(decode(0x1F, [0x05, 0x8C]), 1420);
+  });
+
   test('payload keys are unique', () {
     final keys = standardPids.map((d) => d.key);
     expect(keys.toSet().length, keys.length);

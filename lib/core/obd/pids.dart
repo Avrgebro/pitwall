@@ -61,6 +61,15 @@ final List<PidDefinition> standardPids = [
     decode: (d) => d[0].toDouble(),
   ),
   PidDefinition(
+    pid: 0x1F,
+    key: 'engine_run_time_s',
+    name: 'Run time since engine start',
+    shortName: 'Run time',
+    unit: 's',
+    length: 2,
+    decode: (d) => (d[0] * 256 + d[1]).toDouble(),
+  ),
+  PidDefinition(
     pid: 0x2F,
     key: 'fuel_level_pct',
     name: 'Fuel level',

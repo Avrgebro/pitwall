@@ -12,6 +12,7 @@ abstract final class ValueDisplay {
     'coolant_temp_c',
     'speed_kmh',
     'rpm',
+    'engine_run_time_s',
   ];
   static const _last = 'odometer_km';
 
@@ -34,13 +35,23 @@ abstract final class ValueDisplay {
       });
     return [
       for (final key in keys)
-        ValueTileData(
-          label: byKey[key]?.shortName ?? key,
-          value: format(values[key]!),
-          unit: byKey[key]?.unit,
-        ),
+        // Seconds read better as a duration ("24 min"); the payload keeps
+        // seconds.
+        if (key == _runTime)
+          ValueTileData(
+            label: byKey[key]?.shortName ?? key,
+            value: Formatters.duration(Duration(seconds: values[key]!.round())),
+          )
+        else
+          ValueTileData(
+            label: byKey[key]?.shortName ?? key,
+            value: format(values[key]!),
+            unit: byKey[key]?.unit,
+          ),
     ];
   }
+
+  static const _runTime = 'engine_run_time_s';
 
   /// One decimal for small values; none from 1,000 up (`33,999 km`).
   static String format(num value) =>
