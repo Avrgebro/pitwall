@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
+import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
@@ -118,6 +119,17 @@ class FakeTripServiceGateway implements TripServiceGateway {
   Future<void> updateNotification(String text) async => notifications.add(text);
 }
 
+/// Keeps the last values in memory.
+class FakeLastValuesStorage implements LastValuesStorage {
+  LastValues saved = const LastValues();
+
+  @override
+  Future<LastValues> load() async => saved;
+
+  @override
+  Future<void> save(LastValues values) async => saved = values;
+}
+
 /// A session that stays in the given state.
 class FixedSession extends SessionController {
   FixedSession(this.initial);
@@ -146,6 +158,7 @@ List<Override> testOverrides({
       store ?? FakeSettingsStore(settings: settings),
     ),
     webhookSenderProvider.overrideWithValue(sender),
+    lastValuesStorageProvider.overrideWithValue(FakeLastValuesStorage()),
     permissionGatewayProvider.overrideWithValue(
       FakePermissionGateway(permissions),
     ),

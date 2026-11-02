@@ -29,7 +29,7 @@ class VehicleDetailScreen extends ConsumerWidget {
     }
     final profile = ref.watch(vehicleProfileProvider(vehicleId)).value;
     final options = valueOptions(profile, vehicle.modelYear);
-    final selected = vehicle.selectedKeys ?? defaultKeys(options);
+    final selected = keysToSend(vehicle, options);
     final tripStart = TripStartText.summary(vehicle);
 
     return AppPage(

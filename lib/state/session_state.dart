@@ -9,6 +9,7 @@ import '../core/readings/readings.dart';
 import '../core/session/car_state.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
+import 'last_values_state.dart';
 import 'permissions_state.dart';
 import 'settings_state.dart';
 
@@ -183,14 +184,15 @@ class SessionController extends Notifier<SessionState> {
       final profile = await ref.read(vehicleProfileProvider(vehicleId).future);
       final values = await readValues(
         elm,
-        keys:
-            vehicle.selectedKeys ??
-            defaultKeys(valueOptions(profile, vehicle.modelYear)),
+        keys: keysToSend(vehicle, valueOptions(profile, vehicle.modelYear)),
         supportedPids: state.supportedPids,
         profile: profile,
         modelYear: vehicle.modelYear,
       );
       values.forEach(log.value);
+      await ref
+          .read(lastValuesProvider.notifier)
+          .record(vehicleId, values, DateTime.now());
       // Values the adapter measures itself come back with the car switched
       // off too; without any from the car, make sure it still answers.
       if (values.keys.every((key) => key == batteryVoltageKey)) {

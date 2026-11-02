@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/readings/readings.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -37,19 +38,32 @@ void main() {
     delivered: delivered,
   );
 
+  /// Without [lastValues], this car's last values are those of the
+  /// delivery's latest reading, when it's this car's.
   HomeViewModel build({
     SessionState session = const SessionState(),
     DeliveryStatus delivery = const DeliveryStatus(),
     bool hasWebhook = true,
-  }) => HomeViewModel.build(
-    vehicle: vehicle,
-    settings: settings,
-    session: session,
-    delivery: delivery,
-    hasWebhook: hasWebhook,
-    options: options,
-    now: now,
-  );
+    Map<String, LastValue>? lastValues,
+  }) {
+    final latest = delivery.latest;
+    return HomeViewModel.build(
+      vehicle: vehicle,
+      settings: settings,
+      session: session,
+      delivery: delivery,
+      hasWebhook: hasWebhook,
+      options: options,
+      lastValues:
+          lastValues ??
+          {
+            if (latest != null && latest.device == vehicle.deviceId)
+              for (final MapEntry(:key, :value) in latest.values.entries)
+                key: LastValue(value, latest.timestamp),
+          },
+      now: now,
+    );
+  }
 
   test('1a driving, all healthy', () {
     final model = build(
@@ -104,7 +118,7 @@ void main() {
     expect(model.values!.meta, 'Updated 2 h ago');
   });
 
-  test('parked after another car sent the latest reading', () {
+  test('another car\'s newer reading doesn\'t hide this car\'s values', () {
     final model = build(
       delivery: DeliveryStatus(
         latest: Reading(
@@ -114,10 +128,58 @@ void main() {
           delivered: true,
         ),
       ),
+      lastValues: {
+        'odometer_km': LastValue(
+          33999.7,
+          now.subtract(const Duration(hours: 1)),
+        ),
+      },
     );
 
-    // This car's last reading isn't known, so the row is left out.
-    expect(model.hero.stats.map((s) => s.label), ['Adapter', 'Last connected']);
+    expect(model.hero.stats.last, (
+      kind: HeroStatKind.lastReading,
+      label: 'Last reading',
+      value: '1 h ago',
+    ));
+    expect(model.values!.title, 'Last values');
+    expect(model.values!.meta, 'Read 1 h ago');
+    expect(model.values!.tiles.single.value, '34,000');
+  });
+
+  test('values the car stopped reporting keep their own time', () {
+    // Switching off: the last reading had only the battery voltage.
+    final model = build(
+      lastValues: {
+        'battery_v': LastValue(12.4, now.subtract(const Duration(minutes: 2))),
+        'odometer_km': LastValue(
+          33999.7,
+          now.subtract(const Duration(minutes: 6)),
+        ),
+        'coolant_temp_c': LastValue(
+          89,
+          now.subtract(const Duration(minutes: 2, seconds: 30)),
+        ),
+      },
+    );
+
+    expect(model.values!.meta, 'Read 2 min ago');
+    final notes = {for (final t in model.values!.tiles) t.label: t.note};
+    expect(notes['Battery'], isNull);
+    // Within a minute of the newest: no need to say.
+    expect(notes['Coolant'], isNull);
+    expect(notes['Odometer'], 'Read 6 min ago');
+  });
+
+  test('values no longer sent aren\'t shown', () {
+    final model = build(
+      lastValues: {
+        'battery_v': LastValue(12.4, now),
+        'tucson_fli_vol': LastValue(47.5, now),
+      },
+    );
+
+    // tucson_fli_vol is a profile key, off unless chosen.
+    expect(model.values!.tiles.map((t) => t.label), ['Battery']);
   });
 
   test('1c no signal: readings queued, nothing to do', () {
@@ -138,11 +200,7 @@ void main() {
     expect(model.delivery.isProblem, isTrue);
     expect(model.delivery.actions, isEmpty);
     // Failed attempts show even while they're retried on their own.
-    expect(model.delivery.stats.map((s) => s.value), [
-      '3 min ago',
-      '4',
-      '3',
-    ]);
+    expect(model.delivery.stats.map((s) => s.value), ['3 min ago', '4', '3']);
     expect(model.values!.title, 'Latest readings');
     expect(model.values!.meta, 'Read 40 s ago, not sent yet');
   });

@@ -6,6 +6,7 @@ import '../core/profiles/signal_set.dart';
 import '../core/settings/settings.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
+import 'last_values_state.dart';
 
 /// The user's settings and vehicles. Every change is saved right away.
 final appSettingsProvider =
@@ -57,11 +58,12 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
         adapterType: AdapterType.classic,
       );
 
-  /// Removes the vehicle and its profile file.
+  /// Removes the vehicle, its profile file and its last values.
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await ref.read(settingsStoreProvider).deleteProfile(vehicle);
+    await ref.read(lastValuesProvider.notifier).forget(id);
     await _save(_current.withoutVehicle(id));
   }
 

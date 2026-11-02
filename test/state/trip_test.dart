@@ -70,6 +70,7 @@ const _fast = TripTiming(
 void main() {
   late FakeTripServiceGateway service;
   late List<Map<String, Object?>> received;
+  late FakeLastValuesStorage lastValues;
 
   ProviderContainer container({
     ClosableTransport? Function(String)? adapter,
@@ -80,6 +81,7 @@ void main() {
   }) {
     service = FakeTripServiceGateway(pendingRequest: pendingRequest);
     received = [];
+    lastValues = FakeLastValuesStorage();
     final store = FakeSettingsStore(
       settings: AppSettings(
         vehicles: vehicles,
@@ -100,6 +102,7 @@ void main() {
       overrides: [
         settingsStoreProvider.overrideWithValue(store),
         webhookSenderProvider.overrideWithValue(sender),
+        lastValuesStorageProvider.overrideWithValue(lastValues),
         permissionGatewayProvider.overrideWithValue(
           permissions ?? FakePermissionGateway(),
         ),
@@ -171,6 +174,8 @@ void main() {
     expect(service.calls, contains('stopService'));
     expect(service.notifications.first, 'Connecting to vLinker MC+…');
     expect(service.notifications, contains('Reading Hyundai Tucson every 0 s'));
+    // What was read is kept for Home, by vehicle.
+    expect(lastValues.saved.of(_tucson.id)['battery_v']?.value, 13.6);
   });
 
   test('a request made before Dart was ready still starts a trip', () async {

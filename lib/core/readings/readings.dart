@@ -2,6 +2,7 @@ import '../obd/elm327.dart';
 import '../obd/pids.dart';
 import '../profiles/profile_reader.dart';
 import '../profiles/signal_set.dart';
+import '../vehicles/vehicle.dart';
 
 /// Payload key for the voltage the adapter measures (`ATRV`).
 const batteryVoltageKey = 'battery_v';
@@ -65,6 +66,10 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
   }
   return options.values.toList();
 }
+
+/// The keys [vehicle] sends: the ones the user chose, or the defaults.
+Set<String> keysToSend(Vehicle vehicle, List<ValueOption> options) =>
+    vehicle.selectedKeys ?? defaultKeys(options);
 
 /// The keys sent when the user hasn't chosen any: the standard ones.
 Set<String> defaultKeys(List<ValueOption> options) => {

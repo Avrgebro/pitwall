@@ -15,11 +15,13 @@ abstract final class ValueDisplay {
   ];
   static const _last = 'odometer_km';
 
-  /// Tiles for [values], labelled with [options] where known.
+  /// Tiles for [values], labelled with [options] where known, with
+  /// [notes] under the values they're keyed by.
   static List<ValueTileData> tiles(
     Map<String, num> values,
-    List<ValueOption> options,
-  ) {
+    List<ValueOption> options, {
+    Map<String, String> notes = const {},
+  }) {
     final byKey = {for (final option in options) option.key: option};
     int rank(String key) {
       if (key == _last) return 1000;
@@ -40,12 +42,14 @@ abstract final class ValueDisplay {
           ValueTileData(
             label: byKey[key]?.shortName ?? key,
             value: Formatters.duration(Duration(seconds: values[key]!.round())),
+            note: notes[key],
           )
         else
           ValueTileData(
             label: byKey[key]?.shortName ?? key,
             value: format(values[key]!),
             unit: byKey[key]?.unit,
+            note: notes[key],
           ),
     ];
   }

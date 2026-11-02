@@ -37,7 +37,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     }
     final profile = ref.watch(vehicleProfileProvider(widget.vehicleId)).value;
     final options = valueOptions(profile, vehicle.modelYear);
-    final selected = vehicle.selectedKeys ?? defaultKeys(options);
+    final selected = keysToSend(vehicle, options);
     // While searching, every section keeps only the values that match.
     final query = _query.trim().toLowerCase();
     final filtering = _searching && query.isNotEmpty;

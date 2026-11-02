@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../core/readings/readings.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
+import '../../state/last_values_state.dart';
 import '../../state/permissions_state.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
@@ -58,6 +59,7 @@ class HomeScreen extends ConsumerWidget {
       delivery: ref.watch(deliveryStatusProvider),
       hasWebhook: webhook.hasUrl,
       options: valueOptions(profile, vehicle.modelYear),
+      lastValues: ref.watch(lastValuesProvider).value?.of(vehicle.id) ?? {},
       now: ref.watch(nowProvider),
     );
     final delivery = DeliveryStatusCard(

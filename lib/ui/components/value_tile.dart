@@ -6,13 +6,21 @@ import '../theme/tokens.dart';
 /// One value to show in a [ValueGrid].
 @immutable
 class ValueTileData {
-  const ValueTileData({required this.label, required this.value, this.unit});
+  const ValueTileData({
+    required this.label,
+    required this.value,
+    this.unit,
+    this.note,
+  });
 
   final String label;
 
   /// The formatted value, or null if the car didn't report it.
   final String? value;
   final String? unit;
+
+  /// A short line under the value, such as when it was read.
+  final String? note;
 }
 
 /// A value with its label and unit. Values are the biggest type on screen;
@@ -84,7 +92,7 @@ class _Value extends StatelessWidget {
         ],
       );
     }
-    return Text.rich(
+    final reading = Text.rich(
       TextSpan(
         children: [
           TextSpan(
@@ -100,6 +108,15 @@ class _Value extends StatelessWidget {
             ),
         ],
       ),
+    );
+    final note = data.note;
+    if (note == null) return reading;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        reading,
+        Text(note, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+      ],
     );
   }
 }

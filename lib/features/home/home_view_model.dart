@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/readings/last_values.dart';
 import '../../core/readings/readings.dart';
 import '../../core/session/car_state.dart';
 import '../../core/settings/settings.dart';
@@ -112,17 +113,18 @@ class HomeViewModel {
     required DeliveryStatus delivery,
     required bool hasWebhook,
     required List<ValueOption> options,
+    required Map<String, LastValue> lastValues,
     required DateTime now,
   }) {
     final ownSession = session.vehicleId == vehicle.id;
     final connected = ownSession && session.isConnected;
     final card = _delivery(delivery, hasWebhook, now);
-    // Only the newest reading is kept, so this car's last one is known only
-    // when the newest came from it.
-    final latest = delivery.latest;
-    final lastReading = latest?.device == vehicle.deviceId
-        ? latest?.timestamp
-        : null;
+    final lastReading = lastValues.values
+        .map((value) => value.readAt)
+        .fold<DateTime?>(
+          null,
+          (newest, at) => newest == null || at.isAfter(newest) ? at : newest,
+        );
     return HomeViewModel(
       hero: _hero(
         vehicle: vehicle,
@@ -135,7 +137,14 @@ class HomeViewModel {
         now: now,
       ),
       delivery: card,
-      values: _values(vehicle, delivery, options, now),
+      values: _values(
+        vehicle: vehicle,
+        lastValues: lastValues,
+        newest: lastReading,
+        status: delivery,
+        options: options,
+        now: now,
+      ),
     );
   }
 
@@ -324,25 +333,55 @@ class HomeViewModel {
     );
   }
 
-  static ValuesModel? _values(
-    Vehicle vehicle,
-    DeliveryStatus status,
-    List<ValueOption> options,
-    DateTime now,
-  ) {
+  /// The last value of each item the vehicle sends. Values read well
+  /// before the newest, say ones the car stopped reporting as it switched
+  /// off, say when they were read.
+  static ValuesModel? _values({
+    required Vehicle vehicle,
+    required Map<String, LastValue> lastValues,
+    required DateTime? newest,
+    required DeliveryStatus status,
+    required List<ValueOption> options,
+    required DateTime now,
+  }) {
+    final keys = keysToSend(vehicle, options);
+    final shown = {
+      for (final MapEntry(:key, :value) in lastValues.entries)
+        if (keys.contains(key)) key: value,
+    };
+    if (shown.isEmpty || newest == null) return null;
+    final ago = Formatters.ago(newest, now);
+    // The sender knows whether the newest reading went out, when it was
+    // this car's.
     final reading = status.latest;
-    if (reading == null || reading.device != vehicle.deviceId) return null;
-    final ago = Formatters.ago(reading.timestamp, now);
+    final sent = reading?.device == vehicle.deviceId ? reading : null;
     return ValuesModel(
-      title: reading.delivered ? 'Last values sent' : 'Latest readings',
-      meta: switch ((reading.delivered, status.lastError)) {
+      title: switch (sent?.delivered) {
+        true => 'Last values sent',
+        false => 'Latest readings',
+        null => 'Last values',
+      },
+      meta: switch ((sent?.delivered, status.lastError)) {
         (true, _) => 'Updated $ago',
+        (null, _) => 'Read $ago',
         (false, null) => 'Read $ago, sending',
         (false, final error?) when error.isTransient =>
           'Read $ago, not sent yet',
         (false, _) => 'Read $ago, not delivered',
       },
-      tiles: ValueDisplay.tiles(reading.values, options),
+      tiles: ValueDisplay.tiles(
+        {for (final MapEntry(:key, :value) in shown.entries) key: value.value},
+        options,
+        notes: {
+          for (final MapEntry(:key, :value) in shown.entries)
+            if (newest.difference(value.readAt) >= _staleAfter)
+              key: 'Read ${Formatters.ago(value.readAt, now)}',
+        },
+      ),
     );
   }
+
+  /// A value at least this much older than the newest says when it was
+  /// read.
+  static const _staleAfter = Duration(minutes: 1);
 }

@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/bluetooth/classic_bluetooth.dart';
 import '../core/logging/adapter_log.dart';
+import '../core/readings/last_values.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/platform/trip_service_gateway.dart';
@@ -41,6 +42,10 @@ final tripServiceGatewayProvider = Provider<TripServiceGateway>(
 
 final deliveryStorageProvider = Provider<DeliveryStorage>(
   (ref) => FileDeliveryStorage(),
+);
+
+final lastValuesStorageProvider = Provider<LastValuesStorage>(
+  (ref) => FileLastValuesStorage(),
 );
 
 final adapterLogProvider = Provider<AdapterLog>((ref) {
