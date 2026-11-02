@@ -1,15 +1,9 @@
 import 'dart:math';
 
+import '../bluetooth/adapter_type.dart';
 import 'device_id.dart';
 
-/// How the phone talks to the adapter.
-enum AdapterType {
-  /// Bluetooth serial (RFCOMM). Android only.
-  classic,
-
-  /// Bluetooth Low Energy.
-  ble,
-}
+export '../bluetooth/adapter_type.dart';
 
 /// What starts a trip in a vehicle.
 enum TripStart {

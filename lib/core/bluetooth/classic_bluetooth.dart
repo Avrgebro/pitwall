@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import 'adapter_type.dart';
 import 'bluetooth_gateway.dart';
 import 'device_kind.dart';
 
@@ -24,6 +25,7 @@ class ClassicBluetoothGateway implements BluetoothGateway {
           name: device['name'] as String,
           address: device['address'] as String,
           kind: DeviceKind.fromClass(device['deviceClass'] as int),
+          type: AdapterType.classic,
         ),
     ];
   }

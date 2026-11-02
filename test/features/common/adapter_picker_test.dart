@@ -21,6 +21,7 @@ Future<void> _pump(
   String? selected,
   String? Function(String address)? ownerOf,
   Map<AppPermission, bool>? permissions,
+  DeviceRole role = DeviceRole.adapter,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -34,6 +35,7 @@ Future<void> _pump(
           body: SingleChildScrollView(
             child: AdapterPicker(
               selectedAddress: selected,
+              role: role,
               ownerOf: ownerOf,
               onSelected: (_) {},
             ),
@@ -115,5 +117,21 @@ void main() {
     // Settings and setup read this; it no longer says Bluetooth is missing.
     expect(container.read(missingPermissionsProvider), 0);
     expect(find.text('vLinker MC+'), findsOneWidget);
+  });
+
+  testWidgets('an adapter says how it connects', (tester) async {
+    await _pump(tester, [_adapter]);
+    expect(find.text('Classic, A'), findsOneWidget);
+  });
+
+  testWidgets('a head unit shows just its address', (tester) async {
+    await _pump(tester, [
+      const BondedDevice(
+        name: 'TUCSON BT',
+        address: 'B',
+        kind: DeviceKind.audio,
+      ),
+    ], role: DeviceRole.headUnit);
+    expect(find.text('B'), findsOneWidget);
   });
 }

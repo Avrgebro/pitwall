@@ -50,13 +50,12 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     if (vehicle != null) await saveVehicle(_withAdapter(vehicle, adapter));
   }
 
-  /// The one place a device becomes a vehicle's adapter. Paired devices
-  /// are classic adapters.
+  /// The one place a device becomes a vehicle's adapter.
   static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
       vehicle.copyWith(
         adapterAddress: adapter.address,
         adapterName: adapter.name,
-        adapterType: AdapterType.classic,
+        adapterType: adapter.type,
       );
 
   /// Removes the vehicle, its profile file and its last values.

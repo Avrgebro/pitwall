@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../core/bluetooth/adapter_type.dart';
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
 import '../../../state/bluetooth_state.dart';
@@ -134,7 +135,12 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
             null => ChoiceRow<String>(
               value: device.address,
               title: device.name,
-              subtitle: 'Classic, ${device.address}',
+              // How it connects matters for an adapter, not a stereo.
+              subtitle: switch (widget.role) {
+                DeviceRole.adapter =>
+                  '${_typeLabel(device.type)}, ${device.address}',
+                DeviceRole.headUnit => device.address,
+              },
             ),
           },
       ],
@@ -172,6 +178,11 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       ],
     );
   }
+
+  static String _typeLabel(AdapterType type) => switch (type) {
+    AdapterType.classic => 'Classic',
+    AdapterType.ble => 'Bluetooth LE',
+  };
 
   static String _describe(Object error) => switch (error) {
     BluetoothPermissionDenied() =>

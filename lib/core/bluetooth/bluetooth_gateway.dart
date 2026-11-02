@@ -1,4 +1,5 @@
 import '../obd/obd_transport.dart';
+import 'adapter_type.dart';
 import 'device_kind.dart';
 
 /// Access to the phone's Bluetooth, behind an interface so screens and
@@ -20,11 +21,15 @@ class BondedDevice {
     required this.name,
     required this.address,
     this.kind = DeviceKind.uncategorized,
+    this.type = AdapterType.classic,
   });
 
   final String name;
   final String address;
   final DeviceKind kind;
+
+  /// How the phone talks to it, if it's an adapter.
+  final AdapterType type;
 }
 
 /// A transport the app can close when it's done.

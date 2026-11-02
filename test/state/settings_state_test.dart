@@ -87,6 +87,26 @@ void main() {
       expect(saved.adapterType, AdapterType.classic);
     });
 
+    test('the adapter keeps how it connects', () async {
+      final container = await start(const AppSettings());
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .addVehicle(
+            name: 'Tucson',
+            adapter: const BondedDevice(
+              name: 'iCar Pro',
+              address: 'C0:FF:EE:00:00:01',
+              type: AdapterType.ble,
+            ),
+          );
+
+      expect(
+        container.read(appSettingsProvider).value!.vehicles.single.adapterType,
+        AdapterType.ble,
+      );
+    });
+
     test('changing the adapter keeps the rest of the vehicle', () async {
       final container = await start(
         const AppSettings(
