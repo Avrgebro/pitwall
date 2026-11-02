@@ -5,24 +5,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
-import '../../../core/platform/permission_gateway.dart';
-import '../../../state/infrastructure.dart';
+import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
-
-/// Paired Bluetooth devices, after asking for the permission to list them.
-final pairedDevicesProvider = FutureProvider.autoDispose<List<BondedDevice>>((
-  ref,
-) async {
-  final granted = await ref
-      .read(permissionGatewayProvider)
-      .request(AppPermission.bluetooth);
-  if (!granted) throw const BluetoothPermissionDenied();
-  return ref.read(bluetoothGatewayProvider).bondedDevices();
-});
-
-class BluetoothPermissionDenied implements Exception {
-  const BluetoothPermissionDenied();
-}
 
 /// The paired devices as a single-choice list, used to pick an OBD
 /// adapter or the car's head unit. Devices that suit the [role] come first;
@@ -34,7 +18,7 @@ class AdapterPicker extends ConsumerStatefulWidget {
     required this.onSelected,
     this.title = 'Paired adapters',
     this.role = DeviceRole.adapter,
-    this.taken = const {},
+    this.ownerOf,
   });
 
   final String? selectedAddress;
@@ -42,9 +26,9 @@ class AdapterPicker extends ConsumerStatefulWidget {
   final String title;
   final DeviceRole role;
 
-  /// Devices that can't be chosen because another vehicle uses them: upper
-  /// case address to that vehicle's name.
-  final Map<String, String> taken;
+  /// The name of the other vehicle that uses the device at an address, if
+  /// any. Those devices can't be chosen.
+  final String? Function(String address)? ownerOf;
 
   /// More paired devices than this, and the list gets a filter field.
   static const filterAbove = 5;
@@ -143,7 +127,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     Widget group(List<BondedDevice> list) => RowGroup(
       children: [
         for (final device in list)
-          switch (widget.taken[device.address.toUpperCase()]) {
+          switch (widget.ownerOf?.call(device.address)) {
             final owner? => ChoiceRow<String>(
               value: device.address,
               title: device.name,

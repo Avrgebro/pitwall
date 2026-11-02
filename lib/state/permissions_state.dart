@@ -19,9 +19,13 @@ class PermissionsNotifier extends AsyncNotifier<Map<AppPermission, bool>> {
       permission: await _gateway.isGranted(permission),
   };
 
-  Future<void> request(AppPermission permission) async {
+  /// Asks for [permission] and returns whether it's granted.
+  Future<bool> request(AppPermission permission) async {
+    // Otherwise the first check, still running, would overwrite the answer.
+    await future;
     final granted = await _gateway.request(permission);
     state = AsyncData({...?state.value, permission: granted});
+    return granted;
   }
 
   Future<void> refresh() async => state = AsyncData(await build());

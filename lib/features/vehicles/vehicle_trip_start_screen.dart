@@ -108,11 +108,9 @@ class VehicleTripStartScreen extends ConsumerWidget {
             title: 'Paired devices',
             role: DeviceRole.headUnit,
             selectedAddress: vehicle.headUnitAddress,
-            taken: {
-              for (final other in settings.vehicles)
-                if (other.id != vehicle.id)
-                  if (other.headUnitAddress case final address?)
-                    address.toUpperCase(): other.name,
+            ownerOf: (address) => switch (settings.headUnitOwner(address)) {
+              final owner? when owner.id != vehicle.id => owner.name,
+              _ => null,
             },
             onSelected: (device) => Navigator.pop(context, device),
           ),

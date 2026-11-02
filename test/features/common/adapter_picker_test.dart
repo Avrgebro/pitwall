@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/bluetooth/device_kind.dart';
+import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/features/common/widgets/adapter_picker.dart';
+import 'package:pitwall/state/permissions_state.dart';
 import 'package:pitwall/ui/ui.dart';
 
 import '../../helpers/fakes.dart';
@@ -17,12 +19,14 @@ Future<void> _pump(
   WidgetTester tester,
   List<BondedDevice> devices, {
   String? selected,
-  Map<String, String> taken = const {},
+  String? Function(String address)? ownerOf,
+  Map<AppPermission, bool>? permissions,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: testOverrides(
         bluetooth: FakeBluetoothGateway(devices: devices),
+        permissions: permissions,
       ),
       child: MaterialApp(
         theme: AppTheme.light(),
@@ -30,7 +34,7 @@ Future<void> _pump(
           body: SingleChildScrollView(
             child: AdapterPicker(
               selectedAddress: selected,
-              taken: taken,
+              ownerOf: ownerOf,
               onSelected: (_) {},
             ),
           ),
@@ -84,12 +88,32 @@ void main() {
   testWidgets('a device another vehicle uses is shown but not offered', (
     tester,
   ) async {
-    await _pump(tester, [_adapter], taken: {'A': 'Mazda'});
+    await _pump(tester, [
+      _adapter,
+    ], ownerOf: (address) => address == 'A' ? 'Mazda' : null);
 
     expect(find.text('Used by Mazda'), findsOneWidget);
     final row = tester.widget<ChoiceRow<String>>(
       find.byType(ChoiceRow<String>),
     );
     expect(row.enabled, isFalse);
+  });
+
+  testWidgets('granting Bluetooth here counts everywhere', (tester) async {
+    await _pump(
+      tester,
+      [_adapter],
+      permissions: {
+        for (final permission in AppPermission.values)
+          permission: permission != AppPermission.bluetooth,
+      },
+    );
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AdapterPicker)),
+    );
+    // Settings and setup read this; it no longer says Bluetooth is missing.
+    expect(container.read(missingPermissionsProvider), 0);
+    expect(find.text('vLinker MC+'), findsOneWidget);
   });
 }

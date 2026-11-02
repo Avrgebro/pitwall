@@ -9,6 +9,7 @@ import '../core/readings/readings.dart';
 import '../core/session/car_state.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
+import 'permissions_state.dart';
 import 'settings_state.dart';
 
 enum SessionPhase { idle, connecting, connected }
@@ -99,10 +100,13 @@ class SessionController extends Notifier<SessionState> {
     final address = vehicle.adapterAddress;
     if (address == null || state.phase != SessionPhase.idle) return;
     final log = ref.read(adapterLogProvider);
-    final permissions = ref.read(permissionGatewayProvider);
     final granted = askPermission
-        ? await permissions.request(AppPermission.bluetooth)
-        : await permissions.isGranted(AppPermission.bluetooth);
+        ? await ref
+              .read(permissionsProvider.notifier)
+              .request(AppPermission.bluetooth)
+        : await ref
+              .read(permissionGatewayProvider)
+              .isGranted(AppPermission.bluetooth);
     if (!granted) {
       state = const SessionState(problem: SessionProblem.permissionDenied);
       return;
