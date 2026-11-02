@@ -20,9 +20,6 @@ import android.os.PowerManager
 class TripService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
-    // Whether this service runs a trip already.
-    private var tripActive = false
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,13 +65,13 @@ class TripService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val MAX_TRIP_MS = 12 * 60 * 60 * 1000L
 
+        // Whether a trip runs: set when the service starts one, cleared when
+        // Android destroys the service, so it can't outlive the service.
         @Volatile
-        var isRunning = false
-            private set
+        private var tripActive = false
 
         /** Starts a trip; [headUnit] is the car's head unit that connected, or null from the app. */
         fun start(context: Context, headUnit: String? = null) {
-            isRunning = true
             context.startForegroundService(
                 Intent(context, TripService::class.java)
                     .setAction(ACTION_START)
@@ -83,12 +80,11 @@ class TripService : Service() {
         }
 
         fun stop(context: Context) {
-            isRunning = false
             context.stopService(Intent(context, TripService::class.java))
         }
 
         fun updateNotification(context: Context, text: String) {
-            if (!isRunning) return
+            if (!tripActive) return
             context.getSystemService(NotificationManager::class.java)
                 .notify(NOTIFICATION_ID, notification(context, text))
         }
