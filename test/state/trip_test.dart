@@ -9,7 +9,7 @@ import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
-import 'package:pitwall/core/webhook/webhook_auth.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
 import 'package:pitwall/state/settings_state.dart';
@@ -88,7 +88,7 @@ void main() {
         interval: const Duration(milliseconds: 10),
         setupDone: true,
       ),
-    )..webhookUrl = 'https://example.com/api/webhook/x';
+    )..webhook = const WebhookTarget('https://example.com/api/webhook/x');
     final sender = WebhookSender(
       storage: FakeDeliveryStorage(),
       webhookTarget: () async =>

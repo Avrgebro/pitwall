@@ -1,6 +1,6 @@
-import '../../core/settings/settings.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../core/webhook/webhook_auth.dart';
+import '../../core/webhook/webhook_target.dart';
 
 /// Plain-language wording for delivery problems, shared by Home, Settings
 /// and setup. Every state is a sentence; HTTP codes only appear in

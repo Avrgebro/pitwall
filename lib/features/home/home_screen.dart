@@ -27,7 +27,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(appSettingsProvider).value;
-    final webhook = ref.watch(webhookConfigProvider).value;
+    final webhook = ref.watch(webhookProvider).value;
     if (settings == null || webhook == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

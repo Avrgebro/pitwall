@@ -2,15 +2,14 @@ import 'package:pitwall/core/profiles/signal_set.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/settings/settings_store.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
-import 'package:pitwall/core/webhook/webhook_auth.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 
 /// Keeps settings in memory instead of on the device.
 class FakeSettingsStore implements SettingsStore {
   FakeSettingsStore({this.settings = const AppSettings()});
 
   AppSettings settings;
-  String? webhookUrl;
-  WebhookAuth webhookAuth = WebhookAuth.none;
+  WebhookTarget webhook = WebhookTarget.none;
   final Map<String, String> profiles = {};
 
   @override
@@ -20,22 +19,10 @@ class FakeSettingsStore implements SettingsStore {
   Future<void> save(AppSettings settings) async => this.settings = settings;
 
   @override
-  Future<String?> loadWebhookUrl() async => webhookUrl;
+  Future<WebhookTarget> loadWebhook() async => webhook;
 
   @override
-  Future<void> saveWebhookUrl(String? url) async => webhookUrl = url;
-
-  @override
-  Future<WebhookAuth> loadWebhookAuth() async => webhookAuth;
-
-  @override
-  Future<void> saveWebhookAuth(WebhookAuth auth) async => webhookAuth = auth;
-
-  @override
-  Future<WebhookTarget?> loadWebhookTarget() async => switch (webhookUrl) {
-    final url? when url.isNotEmpty => WebhookTarget(url, webhookAuth),
-    _ => null,
-  };
+  Future<void> saveWebhook(WebhookTarget target) async => webhook = target;
 
   @override
   Future<SignalSet?> loadProfile(Vehicle vehicle) async =>

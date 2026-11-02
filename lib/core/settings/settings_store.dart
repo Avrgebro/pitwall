@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../profiles/signal_set.dart';
 import '../vehicles/vehicle.dart';
 import '../webhook/webhook_auth.dart';
+import '../webhook/webhook_target.dart';
 import 'settings.dart';
 
 /// Saves settings on the device: plain settings in shared preferences, the
@@ -22,8 +23,11 @@ class SettingsStore {
        _secrets = secrets ?? const FlutterSecureStorage();
 
   static const _settingsKey = 'settings';
-  static const _webhookUrlKey = 'webhook_url';
-  static const _webhookAuthKey = 'webhook_auth';
+  static const _webhookKey = 'webhook';
+
+  // Earlier versions kept the URL and credentials under two keys.
+  static const _oldWebhookUrlKey = 'webhook_url';
+  static const _oldWebhookAuthKey = 'webhook_auth';
 
   // Single-car format, before vehicles: one profile file and its name.
   static const _legacyProfileFile = 'vehicle_profile.json';
@@ -50,32 +54,43 @@ class SettingsStore {
   Future<void> save(AppSettings settings) =>
       _preferences.setString(_settingsKey, jsonEncode(settings.toJson()));
 
-  Future<String?> loadWebhookUrl() => _secrets.read(key: _webhookUrlKey);
-
-  Future<void> saveWebhookUrl(String? url) => url == null || url.isEmpty
-      ? _secrets.delete(key: _webhookUrlKey)
-      : _secrets.write(key: _webhookUrlKey, value: url);
-
-  Future<WebhookAuth> loadWebhookAuth() async {
-    final saved = await _secrets.read(key: _webhookAuthKey);
-    if (saved == null) return WebhookAuth.none;
-    try {
-      return WebhookAuth.fromJson(jsonDecode(saved) as Map<String, Object?>);
-    } on Object {
-      return WebhookAuth.none;
-    }
+  /// The webhook URL and credentials; [WebhookTarget.none] if not set.
+  Future<WebhookTarget> loadWebhook() async {
+    final saved = await _secrets.read(key: _webhookKey);
+    if (saved == null) return _migrateWebhook();
+    return switch (_decode(saved)) {
+      final Map<String, Object?> json => WebhookTarget.fromJson(json),
+      _ => WebhookTarget.none,
+    };
   }
 
-  Future<void> saveWebhookAuth(WebhookAuth auth) =>
-      auth.type == WebhookAuthType.none
-      ? _secrets.delete(key: _webhookAuthKey)
-      : _secrets.write(key: _webhookAuthKey, value: jsonEncode(auth.toJson()));
+  Future<void> saveWebhook(WebhookTarget target) => target == WebhookTarget.none
+      ? _secrets.delete(key: _webhookKey)
+      : _secrets.write(key: _webhookKey, value: jsonEncode(target.toJson()));
 
-  /// The URL and credentials to send to, or null without a URL.
-  Future<WebhookTarget?> loadWebhookTarget() async {
-    final url = await loadWebhookUrl();
-    if (url == null || url.isEmpty) return null;
-    return WebhookTarget(url, await loadWebhookAuth());
+  /// Moves a URL and credentials saved under the earlier two keys into one.
+  Future<WebhookTarget> _migrateWebhook() async {
+    final url = await _secrets.read(key: _oldWebhookUrlKey);
+    final auth = await _secrets.read(key: _oldWebhookAuthKey);
+    if (url == null && auth == null) return WebhookTarget.none;
+    final target = WebhookTarget(url ?? '', switch (_decode(auth)) {
+      final Map<String, Object?> json => WebhookAuth.fromJson(json),
+      _ => WebhookAuth.none,
+    });
+    await saveWebhook(target);
+    await _secrets.delete(key: _oldWebhookUrlKey);
+    await _secrets.delete(key: _oldWebhookAuthKey);
+    return target;
+  }
+
+  /// [source] as JSON, or null if there's none or it doesn't parse.
+  static Object? _decode(String? source) {
+    if (source == null) return null;
+    try {
+      return jsonDecode(source);
+    } on FormatException {
+      return null;
+    }
   }
 
   /// The vehicle's imported profile, or null if it has none.

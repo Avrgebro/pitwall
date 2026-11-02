@@ -2,7 +2,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../../core/webhook/delivery_status.dart';
 import '../../../core/webhook/webhook_auth.dart';
 import '../../../state/webhook_state.dart';
 import '../../../ui/ui.dart';
@@ -10,24 +9,38 @@ import '../delivery_text.dart';
 import 'auth_editor.dart';
 
 /// The webhook URL, its optional authentication and a test send. Also used
-/// in first-run setup.
-class WebhookSection extends ConsumerStatefulWidget {
-  const WebhookSection({super.key, this.onTested});
-
-  /// Called after each test send, with whether it worked.
-  final ValueChanged<bool>? onTested;
+/// in first-run setup. What's typed, saved and tested lives in
+/// [webhookProvider], so it survives leaving the screen.
+class WebhookSection extends ConsumerWidget {
+  const WebhookSection({super.key});
 
   @override
-  ConsumerState<WebhookSection> createState() => _WebhookSectionState();
+  Widget build(BuildContext context, WidgetRef ref) =>
+      switch (ref.watch(webhookProvider)) {
+        AsyncData(:final value) => _WebhookForm(initialUrl: value.draft.url),
+        AsyncError() => const InfoNote(
+          icon: Icons.error_outline,
+          text: TextSpan(text: 'Couldn\'t read the saved webhook.'),
+        ),
+        _ => const Center(child: CircularProgressIndicator()),
+      };
 }
 
-class _WebhookSectionState extends ConsumerState<WebhookSection> {
-  final _url = TextEditingController();
-  WebhookAuth _auth = WebhookAuth.none;
-  String? _urlProblem;
+class _WebhookForm extends ConsumerStatefulWidget {
+  const _WebhookForm({required this.initialUrl});
+
+  /// What the URL field starts with; the field reports every edit.
+  final String initialUrl;
+
+  @override
+  ConsumerState<_WebhookForm> createState() => _WebhookFormState();
+}
+
+class _WebhookFormState extends ConsumerState<_WebhookForm> {
+  late final _url = TextEditingController(text: widget.initialUrl);
   bool _testing = false;
-  ({TestResult result, DateTime at})? _test;
-  bool _loaded = false;
+
+  WebhookNotifier get _webhook => ref.read(webhookProvider.notifier);
 
   @override
   void dispose() {
@@ -35,55 +48,16 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
     super.dispose();
   }
 
-  void _load(WebhookConfig config) {
-    if (_loaded) return;
-    _loaded = true;
-    _url.text = config.url;
-    _auth = config.auth;
-  }
-
-  Future<void> _urlChanged(String text) async {
-    final problem = await ref.read(webhookConfigProvider.notifier).setUrl(text);
-    if (!mounted) return;
-    setState(() {
-      _urlProblem = problem == null ? null : DeliveryText.urlProblem(problem);
-      _test = null;
-    });
-  }
-
-  Future<void> _authChanged(WebhookAuth auth) async {
-    setState(() {
-      _auth = auth;
-      _test = null;
-    });
-    // Saved once valid; the editor shows the problem on its field meanwhile.
-    await ref.read(webhookConfigProvider.notifier).setAuth(auth);
-  }
-
   Future<void> _sendTest() async {
     setState(() => _testing = true);
-    final result = await ref
-        .read(webhookConfigProvider.notifier)
-        .sendTest(_url.text, _auth);
-    if (!mounted) return;
-    setState(() {
-      _testing = false;
-      _test = (result: result, at: DateTime.now());
-    });
-    widget.onTested?.call(result.succeeded);
+    await _webhook.sendTest();
+    if (mounted) setState(() => _testing = false);
   }
-
-  bool get _canTest =>
-      !_testing &&
-      _url.text.trim().isNotEmpty &&
-      _urlProblem == null &&
-      _auth.problem == null;
 
   @override
   Widget build(BuildContext context) {
-    final config = ref.watch(webhookConfigProvider);
-    if (config.value case final value?) _load(value);
-    final insecure = _url.text.trim().startsWith('http://');
+    final settings = ref.watch(webhookProvider).requireValue;
+    final draft = settings.draft;
     final mono = Theme.of(context).textTheme.mono;
 
     return Column(
@@ -95,14 +69,17 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
             label: 'Webhook URL',
             keyboardType: TextInputType.url,
             helperText: 'Stored securely on this phone',
-            errorText: _urlProblem,
+            errorText: switch (draft.urlProblem) {
+              final problem? => DeliveryText.urlProblem(problem),
+              null => null,
+            },
             multilineWhenShown: true,
-            onChanged: _urlChanged,
-            warning: insecure
+            onChanged: _webhook.editUrl,
+            warning: draft.isInsecure
                 ? TextSpan(
                     children: [
                       TextSpan(
-                        text: _auth.type == WebhookAuthType.none
+                        text: draft.auth.type == WebhookAuthType.none
                             ? 'Not encrypted. Anyone on the same network can '
                                   'read your car\'s data. Use '
                             : 'Not encrypted. Anyone on the same network can '
@@ -119,10 +96,10 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
           ),
         ),
         const SectionHeader('Authentication', icon: Symbols.key_rounded),
-        AuthEditor(auth: _auth, onChanged: _authChanged),
+        AuthEditor(auth: draft.auth, onChanged: _webhook.editAuth),
         const SizedBox(height: Insets.xl),
         GlassButton(
-          onPressed: _canTest ? _sendTest : null,
+          onPressed: settings.canTest && !_testing ? _sendTest : null,
           icon: _testing
               ? const SizedBox.square(
                   dimension: Sizes.iconSmall,
@@ -131,7 +108,7 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
               : const Icon(Symbols.send_rounded),
           child: const Text('Send test'),
         ),
-        if (_test case (:final result, :final at)) ...[
+        if (settings.lastTest case (:final result, :final at)) ...[
           const SizedBox(height: Insets.m),
           if (result.error case final error?)
             ResultBanner(

@@ -28,7 +28,6 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   _Step _step = _Step.welcome;
   VehicleDraft _draft = const VehicleDraft();
   String? _vehicleId;
-  bool _testPassed = false;
 
   void _go(_Step step) => setState(() => _step = step);
 
@@ -115,19 +114,14 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             'In Home Assistant, create an automation with a Webhook trigger '
             'and paste its URL here.',
         primaryLabel: 'Continue',
-        onPrimary: ref.watch(webhookConfigProvider).value?.hasUrl ?? false
+        onPrimary: ref.watch(webhookProvider).value?.hasUrl ?? false
             ? () => _go(_Step.done)
             : null,
         onBack: () => _go(_Step.permissions),
         // The webhook can be set later in Settings; readings wait on the
         // phone until then.
         onSkip: () => _go(_Step.done),
-        children: [
-          WebhookStep(
-            vehicleName: _draft.name.trim(),
-            onTested: (passed) => setState(() => _testPassed = passed),
-          ),
-        ],
+        children: [WebhookStep(vehicleName: _draft.name.trim())],
       ),
       _Step.done => StepScaffold(
         step: step,
@@ -139,8 +133,6 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             vehicle: _vehicleId == null
                 ? null
                 : ref.watch(vehicleProvider(_vehicleId!)),
-            testPassed: _testPassed,
-            hasWebhook: ref.watch(webhookConfigProvider).value?.hasUrl ?? false,
           ),
         ],
       ),

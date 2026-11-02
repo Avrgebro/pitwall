@@ -1,28 +1,25 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/vehicles/vehicle.dart';
+import '../../../state/webhook_state.dart';
 import '../../../ui/ui.dart';
 import '../../common/trip_start_text.dart';
 
 /// A summary of what was set up.
-class DoneStep extends StatelessWidget {
-  const DoneStep({
-    super.key,
-    required this.vehicle,
-    required this.testPassed,
-    required this.hasWebhook,
-  });
+class DoneStep extends ConsumerWidget {
+  const DoneStep({super.key, required this.vehicle});
 
   final Vehicle? vehicle;
-  final bool testPassed;
-  final bool hasWebhook;
-
-  /// Both are needed before Pitwall can start on its own.
-  bool get _complete => vehicle != null && hasWebhook;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final webhook = ref.watch(webhookProvider).value;
+    final hasWebhook = webhook?.hasUrl ?? false;
+    final testPassed = webhook?.testPassed ?? false;
+    // Both are needed before Pitwall can start on its own.
+    final complete = vehicle != null && hasWebhook;
     final theme = Theme.of(context);
     final healthy = context.tone(StatusTone.healthy).accent;
     return Column(
@@ -35,12 +32,12 @@ class DoneStep extends StatelessWidget {
         ),
         const SizedBox(height: Insets.xl),
         Text(
-          _complete ? 'You\'re all set' : 'Almost there',
+          complete ? 'You\'re all set' : 'Almost there',
           style: theme.textTheme.headlineLarge,
         ),
         const SizedBox(height: Insets.m),
         Text(
-          _complete
+          complete
               ? 'Pitwall will start on its own when you drive. You can close '
                     'the app.'
               : 'Pitwall starts on its own once it has a vehicle and a '

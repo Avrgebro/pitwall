@@ -1,67 +1,104 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/settings/settings.dart';
 import '../core/webhook/delivery_status.dart';
 import '../core/webhook/webhook_auth.dart';
+import '../core/webhook/webhook_target.dart';
 import 'infrastructure.dart';
 
-/// The saved webhook URL and credentials.
+/// The webhook as saved, as being edited, and its last test.
 @immutable
-class WebhookConfig {
-  const WebhookConfig({this.url = '', this.auth = WebhookAuth.none});
+class WebhookSettings {
+  const WebhookSettings({
+    this.saved = WebhookTarget.none,
+    WebhookTarget? draft,
+    this.lastTest,
+  }) : draft = draft ?? saved;
 
-  final String url;
-  final WebhookAuth auth;
+  /// What readings are sent to.
+  final WebhookTarget saved;
 
-  bool get hasUrl => url.isNotEmpty;
+  /// What the form shows. A part that can't be used yet, such as a
+  /// half-typed URL or token, stays here unsaved, so it never replaces a
+  /// working one.
+  final WebhookTarget draft;
+
+  /// The last test send, of [saved]. Any edit clears it.
+  final ({TestResult result, DateTime at})? lastTest;
+
+  bool get hasUrl => saved.hasUrl;
+
+  /// Only what's saved is tested, so the result says what readings get.
+  bool get canTest => draft == saved && saved.isUsable;
+
+  bool get testPassed => lastTest?.result.succeeded ?? false;
 }
 
-final webhookConfigProvider =
-    AsyncNotifierProvider<WebhookConfigNotifier, WebhookConfig>(
-      WebhookConfigNotifier.new,
-    );
+final webhookProvider = AsyncNotifierProvider<WebhookNotifier, WebhookSettings>(
+  WebhookNotifier.new,
+);
 
-class WebhookConfigNotifier extends AsyncNotifier<WebhookConfig> {
+class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
   @override
-  Future<WebhookConfig> build() async {
-    final store = ref.read(settingsStoreProvider);
-    return WebhookConfig(
-      url: await store.loadWebhookUrl() ?? '',
-      auth: await store.loadWebhookAuth(),
+  Future<WebhookSettings> build() async => WebhookSettings(
+    saved: await ref.read(settingsStoreProvider).loadWebhook(),
+  );
+
+  WebhookSettings get _current => state.value ?? const WebhookSettings();
+
+  /// Edits the URL; it's saved once valid, or empty to remove it.
+  Future<void> editUrl(String text) async {
+    final current = _current;
+    final draft = current.draft.copyWith(url: text.trim());
+    await _edit(
+      draft: draft,
+      saved: draft.urlProblem == null
+          ? current.saved.copyWith(url: draft.url)
+          : current.saved,
     );
   }
 
-  WebhookConfig get _current => state.value ?? const WebhookConfig();
-
-  /// Saves [url] if it's valid or empty; returns why not otherwise.
-  Future<WebhookUrlProblem?> setUrl(String url) async {
-    final trimmed = url.trim();
-    final problem = trimmed.isEmpty ? null : validateWebhookUrl(trimmed);
-    if (problem != null) return problem;
-    await ref.read(settingsStoreProvider).saveWebhookUrl(trimmed);
-    state = AsyncData(WebhookConfig(url: trimmed, auth: _current.auth));
-    _resumeDelivery();
-    return null;
+  /// Edits the credentials; they're saved once usable.
+  Future<void> editAuth(WebhookAuth auth) async {
+    final current = _current;
+    await _edit(
+      draft: current.draft.copyWith(auth: auth),
+      saved: auth.problem == null
+          ? current.saved.copyWith(auth: auth)
+          : current.saved,
+    );
   }
 
-  /// Saves [auth] if it's usable; returns why not otherwise. A half-typed
-  /// token never replaces a working one.
-  Future<AuthProblem?> setAuth(WebhookAuth auth) async {
-    if (auth.problem case final problem?) return problem;
-    await ref.read(settingsStoreProvider).saveWebhookAuth(auth);
-    state = AsyncData(WebhookConfig(url: _current.url, auth: auth));
-    _resumeDelivery();
-    return null;
+  /// Sends a test reading to the saved webhook.
+  Future<void> sendTest() async {
+    final tested = _current;
+    if (!tested.canTest) return;
+    final result = await ref.read(webhookSenderProvider).sendTest(tested.saved);
+    // An edit while it was on its way makes the result stale.
+    if (_current.saved != tested.saved) return;
+    state = AsyncData(
+      WebhookSettings(
+        saved: tested.saved,
+        draft: _current.draft,
+        lastTest: (result: result, at: DateTime.now()),
+      ),
+    );
   }
 
-  /// Sends a test reading to [url] with [auth], without saving either.
-  Future<TestResult> sendTest(String url, WebhookAuth auth) =>
-      ref.read(webhookSenderProvider).sendTest(WebhookTarget(url.trim(), auth));
-
-  // A fixed URL or token should deliver what's queued without waiting for
-  // the next retry.
-  void _resumeDelivery() => ref.read(webhookSenderProvider).flush();
+  Future<void> _edit({
+    required WebhookTarget draft,
+    required WebhookTarget saved,
+  }) async {
+    final changed = saved != _current.saved;
+    state = AsyncData(WebhookSettings(saved: saved, draft: draft));
+    if (!changed) return;
+    await ref.read(settingsStoreProvider).saveWebhook(saved);
+    // A fixed URL or token should deliver what's queued without waiting
+    // for the next retry; the edit doesn't wait for it.
+    unawaited(ref.read(webhookSenderProvider).flush());
+  }
 }
 
 /// How delivery is going, updated as the sender works.

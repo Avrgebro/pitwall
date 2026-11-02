@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 enum WebhookAuthType {
   /// No credentials. Right for Home Assistant, where the webhook id in the
   /// URL is the secret.
@@ -32,6 +34,7 @@ enum AuthProblem {
 
 /// Credentials added to every webhook request. Kept in secure storage with
 /// the URL, and never shown in errors or logs.
+@immutable
 class WebhookAuth {
   const WebhookAuth({
     this.type = WebhookAuthType.none,
@@ -120,6 +123,20 @@ class WebhookAuth {
     'headerValue': headerValue,
   };
 
+  @override
+  bool operator ==(Object other) =>
+      other is WebhookAuth &&
+      other.type == type &&
+      other.token == token &&
+      other.username == username &&
+      other.password == password &&
+      other.headerName == headerName &&
+      other.headerValue == headerValue;
+
+  @override
+  int get hashCode =>
+      Object.hash(type, token, username, password, headerName, headerValue);
+
   factory WebhookAuth.fromJson(Map<String, Object?> json) {
     String text(String key) => switch (json[key]) {
       final String value => value,
@@ -136,12 +153,4 @@ class WebhookAuth {
       headerValue: text('headerValue'),
     );
   }
-}
-
-/// Where readings go: the webhook URL and its credentials.
-class WebhookTarget {
-  const WebhookTarget(this.url, [this.auth = WebhookAuth.none]);
-
-  final String url;
-  final WebhookAuth auth;
 }

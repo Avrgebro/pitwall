@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'delivery_status.dart';
 import 'delivery_storage.dart';
 import 'payload.dart';
-import 'webhook_auth.dart';
+import 'webhook_target.dart';
 
 /// Sends readings to the webhook, one POST each, in order. Readings are
 /// queued on the device first, so nothing is lost without signal; failed
@@ -38,8 +38,8 @@ class WebhookSender {
 
   final DeliveryStorage _storage;
 
-  /// The URL and credentials to send to, or null if none is set.
-  final Future<WebhookTarget?> Function() _webhookTarget;
+  /// The URL and credentials to send to, as saved now.
+  final Future<WebhookTarget> Function() _webhookTarget;
   final http.Client _client;
   final DateTime Function() _clock;
   final Duration Function(int attempt) _backoff;
@@ -104,17 +104,8 @@ class WebhookSender {
     try {
       while (_queue.isNotEmpty) {
         final target = await _webhookTarget();
-        if (target == null || target.url.isEmpty) {
-          _fail(const DeliveryError(DeliveryErrorKind.noUrl));
-          return;
-        }
-        if (target.auth.problem case final problem?) {
-          _fail(
-            DeliveryError(
-              DeliveryErrorKind.authIncomplete,
-              authProblem: problem,
-            ),
-          );
+        if (_unusable(target) case final error?) {
+          _fail(error);
           return;
         }
         final (:error, :elapsed) = await _post(target, _queue.first);
@@ -134,6 +125,9 @@ class WebhookSender {
 
   /// Sends a test payload straight to [target], without queueing it.
   Future<TestResult> sendTest(WebhookTarget target) async {
+    if (_unusable(target) case final error?) {
+      return TestResult(elapsed: Duration.zero, error: error);
+    }
     final (:error, :elapsed) = await _post(
       target,
       jsonEncode({
@@ -180,8 +174,6 @@ class WebhookSender {
       error = _errorFor(response.statusCode);
     } on TimeoutException {
       error = const DeliveryError(DeliveryErrorKind.timeout);
-    } on FormatException {
-      error = const DeliveryError(DeliveryErrorKind.invalidUrl);
     } on Exception {
       // Network errors can mention the URL, so only the kind is kept.
       error = const DeliveryError(DeliveryErrorKind.unreachable);
@@ -196,6 +188,21 @@ class WebhookSender {
       ),
     );
     return (error: error, elapsed: stopwatch.elapsed);
+  }
+
+  /// Why [target] can't be sent to, as [WebhookTarget] decides, or null.
+  static DeliveryError? _unusable(WebhookTarget target) {
+    if (!target.hasUrl) return const DeliveryError(DeliveryErrorKind.noUrl);
+    if (target.urlProblem != null) {
+      return const DeliveryError(DeliveryErrorKind.invalidUrl);
+    }
+    if (target.auth.problem case final problem?) {
+      return DeliveryError(
+        DeliveryErrorKind.authIncomplete,
+        authProblem: problem,
+      );
+    }
+    return null;
   }
 
   static DeliveryError? _errorFor(int statusCode) => switch (statusCode) {

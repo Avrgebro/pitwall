@@ -168,23 +168,3 @@ String? _string(Object? value) => value is String ? value : null;
 /// case, but stored ones may differ.
 bool _sameAddress(String? a, String b) =>
     a != null && a.toUpperCase() == b.toUpperCase();
-
-enum WebhookUrlProblem {
-  /// Not a full URL with a scheme and host.
-  incomplete,
-
-  /// A scheme other than https or http.
-  unsupportedScheme,
-}
-
-/// Returns why [url] can't be used as a webhook, or null if it can.
-WebhookUrlProblem? validateWebhookUrl(String url) {
-  final uri = Uri.tryParse(url.trim());
-  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-    return WebhookUrlProblem.incomplete;
-  }
-  if (uri.scheme != 'https' && uri.scheme != 'http') {
-    return WebhookUrlProblem.unsupportedScheme;
-  }
-  return null;
-}

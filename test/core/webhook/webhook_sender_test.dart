@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:pitwall/core/webhook/delivery_status.dart';
 import 'package:pitwall/core/webhook/webhook_auth.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 
 import 'fake_delivery_storage.dart';
 
@@ -33,7 +34,7 @@ void main() {
     WebhookAuth auth = WebhookAuth.none,
   }) => WebhookSender(
     storage: storage,
-    webhookTarget: () async => url == null ? null : WebhookTarget(url, auth),
+    webhookTarget: () async => WebhookTarget(url ?? '', auth),
     client: client ?? server(),
     clock: () => DateTime.utc(2026, 10, 31, 19, 40),
     backoff: (_) => const Duration(milliseconds: 10),

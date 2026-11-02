@@ -14,6 +14,7 @@ import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/state/infrastructure.dart';
 import 'package:pitwall/state/session_state.dart';
 
@@ -150,7 +151,7 @@ List<Override> testOverrides({
 }) {
   final sender = WebhookSender(
     storage: FakeDeliveryStorage(),
-    webhookTarget: () async => null,
+    webhookTarget: () async => WebhookTarget.none,
     client: MockClient((_) async => http.Response('', 200)),
   );
   return [

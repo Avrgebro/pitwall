@@ -1,5 +1,5 @@
 import '../../core/webhook/delivery_status.dart';
-import '../../state/webhook_state.dart';
+import '../../core/webhook/webhook_target.dart';
 import '../../core/format/formatters.dart';
 import '../common/delivery_text.dart';
 
@@ -8,11 +8,11 @@ abstract final class SettingsSummary {
   /// "Not set yet", "Nothing sent yet", "Last sent 2 min ago", or the
   /// problem.
   static ({String text, bool problem}) webhook(
-    WebhookConfig config,
+    WebhookTarget webhook,
     DeliveryStatus status,
     DateTime now,
   ) {
-    if (!config.hasUrl) return (text: 'Not set yet', problem: true);
+    if (!webhook.hasUrl) return (text: 'Not set yet', problem: true);
     final error = status.lastError;
     if (error != null && !error.isTransient) {
       return (text: DeliveryText.error(error).title, problem: true);

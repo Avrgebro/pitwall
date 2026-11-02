@@ -60,7 +60,7 @@ final webhookSenderProvider = Provider<WebhookSender>((ref) {
   final log = ref.watch(adapterLogProvider);
   final sender = WebhookSender(
     storage: ref.watch(deliveryStorageProvider),
-    webhookTarget: ref.watch(settingsStoreProvider).loadWebhookTarget,
+    webhookTarget: ref.watch(settingsStoreProvider).loadWebhook,
     onAttempt: (attempt) => _logAttempt(log, attempt),
   );
   ref.onDispose(sender.dispose);

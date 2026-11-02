@@ -9,14 +9,9 @@ import '../../common/widgets/webhook_section.dart';
 
 /// The webhook URL with a test send, and what a reading will look like.
 class WebhookStep extends StatelessWidget {
-  const WebhookStep({
-    super.key,
-    required this.vehicleName,
-    required this.onTested,
-  });
+  const WebhookStep({super.key, required this.vehicleName});
 
   final String vehicleName;
-  final ValueChanged<bool> onTested;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +32,7 @@ class WebhookStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        WebhookSection(onTested: onTested),
+        const WebhookSection(),
         const SectionHeader('What a reading looks like'),
         CodeBlock(child: Text(sample)),
       ],

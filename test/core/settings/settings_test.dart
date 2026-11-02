@@ -205,17 +205,4 @@ void main() {
     expect(cleared.selectedKeys, isNull);
     expect(cleared.adapterName, 'OBDII');
   });
-
-  group('webhook URL', () {
-    test('accepts https and http URLs', () {
-      expect(validateWebhookUrl('https://example.com/api/webhook/abc'), isNull);
-      expect(validateWebhookUrl('http://192.168.1.10:8123/x'), isNull);
-    });
-
-    test('rejects anything else', () {
-      expect(validateWebhookUrl('example.com/hook'), isNotNull);
-      expect(validateWebhookUrl('ftp://example.com/hook'), isNotNull);
-      expect(validateWebhookUrl(''), isNotNull);
-    });
-  });
 }
