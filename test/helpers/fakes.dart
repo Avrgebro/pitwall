@@ -52,12 +52,16 @@ class FakeBluetoothGateway implements BluetoothGateway {
   final ClosableTransport? Function(String address)? adapter;
   int attempts = 0;
 
+  /// The adapter addresses connected to, in order.
+  final connected = <String>[];
+
   @override
   Future<List<BondedDevice>> bondedDevices() async => devices;
 
   @override
   Future<ClosableTransport> connect(String address) async {
     attempts++;
+    connected.add(address);
     final transport = adapter?.call(address);
     if (transport == null) {
       throw PlatformException(code: 'connect_failed');
@@ -68,34 +72,34 @@ class FakeBluetoothGateway implements BluetoothGateway {
 
 /// Records what Dart asks of the Android trip service.
 class FakeTripServiceGateway implements TripServiceGateway {
-  FakeTripServiceGateway({this.pendingRequest = false});
+  FakeTripServiceGateway({this.pendingRequest});
 
-  bool pendingRequest;
+  StartTrip? pendingRequest;
   final calls = <String>[];
   final notifications = <String>[];
-  String? headUnitAddress;
-  final _commands = StreamController<TripCommand>.broadcast();
+  Set<String>? headUnitAddresses;
+  final _starts = StreamController<StartTrip>.broadcast();
 
-  void send(TripCommand command) => _commands.add(command);
-
-  @override
-  Stream<TripCommand> get commands => _commands.stream;
+  void send(StartTrip start) => _starts.add(start);
 
   @override
-  Future<bool> takeTripRequest() async {
+  Stream<StartTrip> get starts => _starts.stream;
+
+  @override
+  Future<StartTrip?> takeTripRequest() async {
     final pending = pendingRequest;
-    pendingRequest = false;
+    pendingRequest = null;
     return pending;
   }
 
   @override
-  Future<void> configure({String? headUnitAddress}) async =>
-      this.headUnitAddress = headUnitAddress;
+  Future<void> configure({required Set<String> headUnitAddresses}) async =>
+      this.headUnitAddresses = headUnitAddresses;
 
   @override
   Future<void> startService() async {
     calls.add('startService');
-    send(TripCommand.start);
+    send(const StartTrip());
   }
 
   @override

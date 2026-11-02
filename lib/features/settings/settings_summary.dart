@@ -1,4 +1,3 @@
-import '../../core/settings/settings.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../state/webhook_state.dart';
 import '../../ui/format/formatters.dart';
@@ -25,19 +24,6 @@ abstract final class SettingsSummary {
       problem: false,
     );
   }
-
-  /// "When TUCSON BT connects", or what's missing.
-  static ({String text, bool problem}) wake(AppSettings settings) =>
-      switch (settings.wakeTrigger) {
-        WakeTrigger.carBluetooth => switch (settings.headUnitName) {
-          final name? => (text: 'When $name connects', problem: false),
-          null => (text: 'Choose your car\'s Bluetooth', problem: true),
-        },
-        WakeTrigger.drivingDetection => (
-          text: 'When driving is detected (not available yet)',
-          problem: true,
-        ),
-      };
 
   /// "All set" or "1 needs fixing".
   static ({String text, bool problem}) checks(int missing) => missing == 0

@@ -1,14 +1,5 @@
 import '../vehicles/vehicle.dart';
 
-/// What starts Pitwall when a drive begins.
-enum WakeTrigger {
-  /// The phone connecting to the car's own Bluetooth (head unit).
-  carBluetooth,
-
-  /// Android detecting that the phone is in a moving vehicle.
-  drivingDetection,
-}
-
 /// The user's settings, except the webhook URL and credentials. Those work
 /// like passwords, so they're kept apart in secure storage (see
 /// `SettingsStore`).
@@ -16,9 +7,6 @@ class AppSettings {
   const AppSettings({
     this.vehicles = const [],
     this.interval = defaultInterval,
-    this.wakeTrigger = WakeTrigger.carBluetooth,
-    this.headUnitAddress,
-    this.headUnitName,
     this.setupDone = false,
   });
 
@@ -39,18 +27,30 @@ class AppSettings {
   /// How often a reading is sent while driving.
   final Duration interval;
 
-  final WakeTrigger wakeTrigger;
-
-  /// The car's Bluetooth head unit, for [WakeTrigger.carBluetooth].
-  final String? headUnitAddress;
-  final String? headUnitName;
-
   /// Whether first-run setup has been completed.
   final bool setupDone;
 
   /// The vehicle whose adapter has [address], if any.
   Vehicle? vehicleForAdapter(String address) =>
       vehicles.where((v) => v.adapterAddress == address).firstOrNull;
+
+  /// The vehicle whose trips start when the head unit at [address]
+  /// connects, if any.
+  Vehicle? vehicleForHeadUnit(String address) => vehicles
+      .where((v) => _sameAddress(v.startingHeadUnit, address))
+      .firstOrNull;
+
+  /// The vehicle the head unit at [address] belongs to, whatever starts its
+  /// trips. A head unit belongs to one vehicle at most.
+  Vehicle? headUnitOwner(String address) => vehicles
+      .where((v) => _sameAddress(v.headUnitAddress, address))
+      .firstOrNull;
+
+  /// Every head unit that starts a trip, for Android to watch for.
+  Set<String> get startingHeadUnits => {
+    for (final vehicle in vehicles)
+      if (vehicle.startingHeadUnit case final address?) address.toUpperCase(),
+  };
 
   Vehicle? vehicleById(String id) =>
       vehicles.where((v) => v.id == id).firstOrNull;
@@ -82,40 +82,28 @@ class AppSettings {
   AppSettings copyWith({
     List<Vehicle>? vehicles,
     Duration? interval,
-    WakeTrigger? wakeTrigger,
-    Object? headUnitAddress = _keep,
-    Object? headUnitName = _keep,
     bool? setupDone,
   }) => AppSettings(
     vehicles: vehicles ?? this.vehicles,
     interval: interval ?? this.interval,
-    wakeTrigger: wakeTrigger ?? this.wakeTrigger,
-    headUnitAddress: headUnitAddress == _keep
-        ? this.headUnitAddress
-        : headUnitAddress as String?,
-    headUnitName: headUnitName == _keep
-        ? this.headUnitName
-        : headUnitName as String?,
     setupDone: setupDone ?? this.setupDone,
   );
 
   Map<String, Object?> toJson() => {
     'vehicles': [for (final vehicle in vehicles) vehicle.toJson()],
     'intervalSeconds': interval.inSeconds,
-    'wakeTrigger': wakeTrigger.name,
-    'headUnitAddress': headUnitAddress,
-    'headUnitName': headUnitName,
     'setupDone': setupDone,
   };
 
-  /// Tolerates missing or wrongly typed fields. Also reads the earlier
-  /// single-car format, where the car's settings sat at the top level.
+  /// Tolerates missing or wrongly typed fields. Also reads earlier
+  /// formats: the single-car one, where the car's settings sat at the top
+  /// level, and the one with a single head unit for the whole app.
   factory AppSettings.fromJson(Map<String, Object?> json) {
     if (isLegacy(json)) {
       return AppSettings(vehicles: [Vehicle.fromJson(json)], setupDone: true);
     }
     final seconds = json['intervalSeconds'];
-    return AppSettings(
+    final settings = AppSettings(
       vehicles: switch (json['vehicles']) {
         final List<Object?> list => [
           for (final item in list)
@@ -126,12 +114,29 @@ class AppSettings {
       interval: seconds is num && seconds >= minInterval.inSeconds
           ? Duration(seconds: seconds.toInt())
           : defaultInterval,
-      wakeTrigger:
-          WakeTrigger.values.asNameMap()[json['wakeTrigger']] ??
-          WakeTrigger.carBluetooth,
-      headUnitAddress: _string(json['headUnitAddress']),
-      headUnitName: _string(json['headUnitName']),
       setupDone: json['setupDone'] == true,
+    );
+    return settings._withAppHeadUnit(
+      address: _string(json['headUnitAddress']),
+      name: _string(json['headUnitName']),
+    );
+  }
+
+  /// Moves the app-wide head unit of the earlier format onto the vehicle
+  /// seen most recently, unless a vehicle already has a head unit.
+  AppSettings _withAppHeadUnit({String? address, String? name}) {
+    final vehicle = mostRecentVehicle;
+    if (address == null ||
+        vehicle == null ||
+        vehicles.any((v) => v.headUnitAddress != null)) {
+      return this;
+    }
+    return withVehicle(
+      vehicle.copyWith(
+        tripStart: TripStart.carBluetooth,
+        headUnitAddress: address,
+        headUnitName: name,
+      ),
     );
   }
 
@@ -141,9 +146,12 @@ class AppSettings {
       (json.containsKey('adapterAddress') || json.containsKey('deviceName'));
 }
 
-const _keep = Object();
-
 String? _string(Object? value) => value is String ? value : null;
+
+/// Bluetooth addresses compare without case: Android reports them upper
+/// case, but stored ones may differ.
+bool _sameAddress(String? a, String b) =>
+    a != null && a.toUpperCase() == b.toUpperCase();
 
 enum WebhookUrlProblem {
   /// Not a full URL with a scheme and host.

@@ -34,12 +34,17 @@ class AdapterPicker extends ConsumerStatefulWidget {
     required this.onSelected,
     this.title = 'Paired adapters',
     this.role = DeviceRole.adapter,
+    this.taken = const {},
   });
 
   final String? selectedAddress;
   final ValueChanged<BondedDevice> onSelected;
   final String title;
   final DeviceRole role;
+
+  /// Devices that can't be chosen because another vehicle uses them: upper
+  /// case address to that vehicle's name.
+  final Map<String, String> taken;
 
   /// More paired devices than this, and the list gets a filter field.
   static const filterAbove = 5;
@@ -138,11 +143,19 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     Widget group(List<BondedDevice> list) => RowGroup(
       children: [
         for (final device in list)
-          ChoiceRow<String>(
-            value: device.address,
-            title: device.name,
-            subtitle: 'Classic · ${device.address}',
-          ),
+          switch (widget.taken[device.address.toUpperCase()]) {
+            final owner? => ChoiceRow<String>(
+              value: device.address,
+              title: device.name,
+              subtitle: 'Used by $owner',
+              enabled: false,
+            ),
+            null => ChoiceRow<String>(
+              value: device.address,
+              title: device.name,
+              subtitle: 'Classic · ${device.address}',
+            ),
+          },
       ],
     );
 

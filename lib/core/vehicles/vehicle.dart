@@ -11,9 +11,18 @@ enum AdapterType {
   ble,
 }
 
-/// One car: its adapter, the name sent in payloads, its optional OBDb
-/// profile and the values to send. The vehicle in use is picked by which
-/// adapter connects.
+/// What starts a trip in a vehicle.
+enum TripStart {
+  /// The phone connecting to the car's own Bluetooth (head unit).
+  carBluetooth,
+
+  /// Android detecting that the phone is in a moving vehicle. Not built
+  /// yet.
+  drivingDetection,
+}
+
+/// One car: its adapter, the name sent in payloads, what starts its trips,
+/// its optional OBDb profile and the values to send.
 class Vehicle {
   const Vehicle({
     required this.id,
@@ -21,6 +30,9 @@ class Vehicle {
     this.adapterAddress,
     this.adapterName,
     this.adapterType = AdapterType.classic,
+    this.tripStart = TripStart.carBluetooth,
+    this.headUnitAddress,
+    this.headUnitName,
     this.modelYear,
     this.selectedKeys,
     this.profileName,
@@ -49,6 +61,20 @@ class Vehicle {
   final String? adapterName;
   final AdapterType adapterType;
 
+  final TripStart tripStart;
+
+  /// The car's Bluetooth head unit, for [TripStart.carBluetooth].
+  final String? headUnitAddress;
+  final String? headUnitName;
+
+  /// The head unit whose connection starts this vehicle's trips, if its
+  /// trips start that way and one is chosen.
+  String? get startingHeadUnit =>
+      tripStart == TripStart.carBluetooth ? headUnitAddress : null;
+
+  /// Whether something will start this vehicle's trips on its own.
+  bool get hasTripStart => startingHeadUnit != null;
+
   /// Picks which of the profile's signals apply.
   final int? modelYear;
 
@@ -67,6 +93,9 @@ class Vehicle {
     Object? adapterAddress = _keep,
     Object? adapterName = _keep,
     AdapterType? adapterType,
+    TripStart? tripStart,
+    Object? headUnitAddress = _keep,
+    Object? headUnitName = _keep,
     Object? modelYear = _keep,
     Object? selectedKeys = _keep,
     Object? profileName = _keep,
@@ -82,6 +111,13 @@ class Vehicle {
         ? this.adapterName
         : adapterName as String?,
     adapterType: adapterType ?? this.adapterType,
+    tripStart: tripStart ?? this.tripStart,
+    headUnitAddress: headUnitAddress == _keep
+        ? this.headUnitAddress
+        : headUnitAddress as String?,
+    headUnitName: headUnitName == _keep
+        ? this.headUnitName
+        : headUnitName as String?,
     modelYear: modelYear == _keep ? this.modelYear : modelYear as int?,
     selectedKeys: selectedKeys == _keep
         ? this.selectedKeys
@@ -101,6 +137,9 @@ class Vehicle {
     'adapterAddress': adapterAddress,
     'adapterName': adapterName,
     'adapterType': adapterType.name,
+    'tripStart': tripStart.name,
+    'headUnitAddress': headUnitAddress,
+    'headUnitName': headUnitName,
     'modelYear': modelYear,
     'selectedKeys': selectedKeys?.toList()?..sort(),
     'profileName': profileName,
@@ -121,6 +160,11 @@ class Vehicle {
     adapterType:
         AdapterType.values.asNameMap()[json['adapterType']] ??
         AdapterType.classic,
+    tripStart:
+        TripStart.values.asNameMap()[json['tripStart']] ??
+        TripStart.carBluetooth,
+    headUnitAddress: _string(json['headUnitAddress']),
+    headUnitName: _string(json['headUnitName']),
     modelYear: switch (json['modelYear']) {
       final num year => year.toInt(),
       _ => null,

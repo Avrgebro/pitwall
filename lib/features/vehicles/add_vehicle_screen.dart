@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
 import '../../core/bluetooth/classic_bluetooth.dart';
@@ -32,7 +33,37 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       adapterType: AdapterType.classic,
     );
     await ref.read(appSettingsProvider.notifier).saveVehicle(vehicle);
-    if (mounted) context.pushReplacement(Routes.vehicle(vehicle.id));
+    if (!mounted) return;
+    // The phone is usually in the car right now, the best moment to pick
+    // its stereo.
+    final chooseNow = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Symbols.bluetooth_drive_rounded),
+        title: Text('Choose ${vehicle.name}\'s Bluetooth?'),
+        content: const Text(
+          'Trips start on their own when the phone connects to the car\'s '
+          'stereo or hands-free system. You can also do this later on the '
+          'vehicle\'s page.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Choose now'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    context.go(
+      chooseNow == true
+          ? Routes.vehicleTripStart(vehicle.id)
+          : Routes.vehicle(vehicle.id),
+    );
   }
 
   @override

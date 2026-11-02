@@ -30,7 +30,6 @@ class SettingsScreen extends ConsumerWidget {
       ref.watch(deliveryStatusProvider),
       now,
     );
-    final wake = SettingsSummary.wake(settings);
     final checks = SettingsSummary.checks(
       ref.watch(missingPermissionsProvider),
     );
@@ -64,13 +63,6 @@ class SettingsScreen extends ConsumerWidget {
         const SectionHeader('Trips', icon: Symbols.route_rounded),
         RowGroup(
           children: [
-            GroupTile(
-              icon: Symbols.bluetooth_drive_rounded,
-              title: 'What wakes Pitwall',
-              subtitle: wake.text,
-              subtitleTone: tone(wake.problem),
-              onTap: () => context.push(Routes.wakeSettings),
-            ),
             GroupTile(
               icon: Symbols.verified_user_rounded,
               title: 'Background checks',

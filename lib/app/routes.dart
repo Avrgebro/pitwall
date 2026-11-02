@@ -11,11 +11,11 @@ abstract final class Routes {
   static String vehicleAdapter(String id) => '/vehicles/$id/adapter';
   static String vehicleProfile(String id) => '/vehicles/$id/profile';
   static String vehicleValues(String id) => '/vehicles/$id/values';
+  static String vehicleTripStart(String id) => '/vehicles/$id/trip-start';
 
   static const settings = '/settings';
   static const webhookSettings = '/settings/webhook';
   static const intervalSettings = '/settings/interval';
-  static const wakeSettings = '/settings/wake';
   static const backgroundChecks = '/settings/checks';
   static const about = '/settings/about';
   static const developer = '/settings/developer';

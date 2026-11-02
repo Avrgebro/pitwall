@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/app/app.dart';
+import 'package:pitwall/core/bluetooth/classic_bluetooth.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
@@ -85,7 +86,9 @@ void main() {
 
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
-    expect(find.text('What wakes Pitwall'), findsOneWidget);
+    expect(find.text('Background checks'), findsOneWidget);
+    // Trip start lives on each vehicle now.
+    expect(find.text('What wakes Pitwall'), findsNothing);
   });
 
   testWidgets('a vehicle opens its detail screen above the tabs', (
@@ -331,4 +334,56 @@ void main() {
       );
     },
   );
+
+  testWidgets('a vehicle\'s trip start has its own page', (tester) async {
+    await _pumpApp(
+      tester,
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    );
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tucson'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose the car\'s Bluetooth'), findsOneWidget);
+
+    await tester.tap(find.text('Trip start'));
+    await tester.pumpAndSettle();
+    expect(find.text('Car head unit'), findsOneWidget);
+    expect(find.text('Not chosen yet'), findsOneWidget);
+  });
+
+  testWidgets('a new vehicle is offered its trip start right away', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          settings: const AppSettings(setupDone: true),
+          bluetooth: FakeBluetoothGateway(
+            devices: const [BondedDevice(name: 'OBDII', address: 'A')],
+          ),
+        ),
+        child: const PitwallApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add vehicle'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Mazda');
+    await tester.tap(find.text('OBDII'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(GlassButton, 'Add vehicle'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose Mazda\'s Bluetooth?'), findsOneWidget);
+
+    await tester.tap(find.text('Choose now'));
+    await tester.pumpAndSettle();
+    expect(find.text('Car head unit'), findsOneWidget);
+  });
+
 }

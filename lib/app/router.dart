@@ -8,7 +8,6 @@ import '../features/settings/about_screen.dart';
 import '../features/settings/background_checks_screen.dart';
 import '../features/settings/interval_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../features/settings/wake_screen.dart';
 import '../features/settings/webhook_screen.dart';
 import '../features/setup/setup_screen.dart';
 import '../features/vehicles/add_vehicle_screen.dart';
@@ -17,6 +16,7 @@ import '../features/vehicles/vehicle_adapter_screen.dart';
 import '../features/vehicles/vehicle_detail_screen.dart';
 import '../features/vehicles/vehicle_name_screen.dart';
 import '../features/vehicles/vehicle_profile_screen.dart';
+import '../features/vehicles/vehicle_trip_start_screen.dart';
 import '../features/vehicles/vehicles_screen.dart';
 import '../state/settings_state.dart';
 import 'app_shell.dart';
@@ -78,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                         ('adapter', VehicleAdapterScreen.new),
                         ('profile', VehicleProfileScreen.new),
                         ('values', ValuesToSendScreen.new),
+                        ('trip-start', VehicleTripStartScreen.new),
                       ])
                         subScreen(
                           path,
@@ -103,7 +104,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   subScreen('webhook', (_) => const WebhookScreen()),
                   subScreen('interval', (_) => const IntervalScreen()),
-                  subScreen('wake', (_) => const WakeScreen()),
                   subScreen('checks', (_) => const BackgroundChecksScreen()),
                   subScreen('about', (_) => const AboutScreen()),
                   subScreen('developer', (_) => const DeveloperScreen()),

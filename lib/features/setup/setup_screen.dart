@@ -149,7 +149,6 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             vehicle: _vehicleId == null
                 ? null
                 : ref.watch(vehicleProvider(_vehicleId!)),
-            settings: ref.watch(appSettingsProvider).requireValue,
             testPassed: _testPassed,
             hasWebhook: ref.watch(webhookConfigProvider).value?.hasUrl ?? false,
           ),

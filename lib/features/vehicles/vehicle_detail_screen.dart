@@ -10,6 +10,7 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
+import '../common/trip_start_text.dart';
 
 /// One vehicle's overview: a row per setting, each opening its own page.
 class VehicleDetailScreen extends ConsumerWidget {
@@ -29,6 +30,7 @@ class VehicleDetailScreen extends ConsumerWidget {
     final profile = ref.watch(vehicleProfileProvider(vehicleId)).value;
     final options = valueOptions(profile, vehicle.modelYear);
     final selected = vehicle.selectedKeys ?? defaultKeys(options);
+    final tripStart = TripStartText.summary(vehicle);
 
     return AppPage(
       title: vehicle.name,
@@ -54,6 +56,13 @@ class VehicleDetailScreen extends ConsumerWidget {
                   ? StatusTone.error
                   : null,
               onTap: () => context.push(Routes.vehicleAdapter(vehicle.id)),
+            ),
+            GroupTile(
+              icon: Symbols.bluetooth_drive_rounded,
+              title: 'Trip start',
+              subtitle: tripStart.text,
+              subtitleTone: tripStart.problem ? StatusTone.error : null,
+              onTap: () => context.push(Routes.vehicleTripStart(vehicle.id)),
             ),
           ],
         ),

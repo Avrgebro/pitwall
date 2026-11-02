@@ -1,22 +1,20 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../../core/settings/settings.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
+import '../../common/trip_start_text.dart';
 
 /// A summary of what was set up.
 class DoneStep extends StatelessWidget {
   const DoneStep({
     super.key,
     required this.vehicle,
-    required this.settings,
     required this.testPassed,
     required this.hasWebhook,
   });
 
   final Vehicle? vehicle;
-  final AppSettings settings;
   final bool testPassed;
   final bool hasWebhook;
 
@@ -81,14 +79,13 @@ class DoneStep extends StatelessWidget {
                 valueColor: testPassed ? healthy : null,
               ),
               SummaryRow(
-                icon: Symbols.motion_sensor_active_rounded,
-                label: 'Wakes up',
-                value: switch (settings.wakeTrigger) {
-                  WakeTrigger.carBluetooth =>
-                    'When the car\'s Bluetooth connects',
-                  WakeTrigger.drivingDetection => 'When driving is detected',
+                icon: Symbols.bluetooth_drive_rounded,
+                label: 'Trip start',
+                value: switch (vehicle) {
+                  final vehicle? => TripStartText.summary(vehicle).text,
+                  null => 'Add a vehicle first',
                 },
-                caption: 'Change in Settings',
+                caption: 'On the vehicle\'s page',
                 stacked: true,
               ),
             ],

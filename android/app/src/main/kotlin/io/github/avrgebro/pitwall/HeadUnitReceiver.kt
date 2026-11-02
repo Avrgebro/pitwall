@@ -6,8 +6,12 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * Starts a trip when the phone connects to the car's head unit, and ends
- * it when it disconnects.
+ * Starts a trip when the phone connects to one of the cars' head units.
+ * Which head unit it was goes along, so the trip knows the car.
+ *
+ * The head unit only starts trips. Disconnecting from it doesn't end one:
+ * the stereo may be handed to someone else's phone mid-drive. The trip ends
+ * when the car or the adapter goes quiet.
  *
  * Android 12+ lets an app start a foreground service from a Bluetooth
  * broadcast that needs BLUETOOTH_CONNECT, which these do, so this works
@@ -17,11 +21,9 @@ class HeadUnitReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
             ?: return
-        val headUnit = ServiceBridge.headUnitAddress(context) ?: return
-        if (!device.address.equals(headUnit, ignoreCase = true)) return
-        when (intent.action) {
-            BluetoothDevice.ACTION_ACL_CONNECTED -> TripService.start(context)
-            BluetoothDevice.ACTION_ACL_DISCONNECTED -> TripService.requestStop(context)
+        if (!ServiceBridge.startsTrip(context, device.address)) return
+        if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+            TripService.start(context, device.address)
         }
     }
 }

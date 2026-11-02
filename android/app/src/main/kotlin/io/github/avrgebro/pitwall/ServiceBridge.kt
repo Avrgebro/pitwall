@@ -11,27 +11,37 @@ import io.flutter.plugin.common.MethodChannel
  *
  * Dart → Android: `configure`, `startService`, `stopService`,
  * `updateNotification`, `takeTripRequest`.
- * Android → Dart: `tripStart`, `tripStop`.
+ * Android → Dart: `tripStart`, with the `headUnit` that connected (null
+ * when the app asked).
  *
  * A trip can be requested before Dart has finished starting, so requests
  * wait until Dart asks for them with `takeTripRequest`.
  */
 object ServiceBridge {
     private const val PREFS = "pitwall_service"
-    private const val KEY_HEAD_UNIT = "head_unit_address"
+    private const val KEY_HEAD_UNITS = "head_unit_addresses"
+
+    // The single head unit of earlier versions; removed on the next
+    // configure, which Dart sends at every start.
+    private const val KEY_OLD_HEAD_UNIT = "head_unit_address"
+
+    /** A trip asked for before Dart was listening. */
+    private class PendingStart(val headUnit: String?)
 
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
     private var dartReady = false
-    private var pendingStart = false
+    private var pendingStart: PendingStart? = null
 
     fun attach(context: Context, messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, "pitwall/service").apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
                     "configure" -> {
+                        val addresses = call.argument<List<String>>("headUnitAddresses").orEmpty()
                         prefs(context).edit()
-                            .putString(KEY_HEAD_UNIT, call.argument<String>("headUnitAddress"))
+                            .putStringSet(KEY_HEAD_UNITS, addresses.map { it.uppercase() }.toSet())
+                            .remove(KEY_OLD_HEAD_UNIT)
                             .apply()
                         result.success(null)
                     }
@@ -49,8 +59,8 @@ object ServiceBridge {
                     }
                     "takeTripRequest" -> {
                         dartReady = true
-                        result.success(pendingStart)
-                        pendingStart = false
+                        result.success(pendingStart?.let { mapOf("headUnit" to it.headUnit) })
+                        pendingStart = null
                     }
                     else -> result.notImplemented()
                 }
@@ -58,17 +68,20 @@ object ServiceBridge {
         }
     }
 
-    /** The head unit whose connection starts a trip, as set in the app. */
-    fun headUnitAddress(context: Context): String? =
-        prefs(context).getString(KEY_HEAD_UNIT, null)
-
-    fun requestTripStart() = main.post {
-        if (dartReady) channel?.invokeMethod("tripStart", null) else pendingStart = true
+    /** Whether [address] is a head unit that starts a trip, as set in the app. */
+    fun startsTrip(context: Context, address: String): Boolean {
+        val prefs = prefs(context)
+        val addresses = prefs.getStringSet(KEY_HEAD_UNITS, null)
+            ?: setOfNotNull(prefs.getString(KEY_OLD_HEAD_UNIT, null)?.uppercase())
+        return address.uppercase() in addresses
     }
 
-    fun requestTripStop() = main.post {
-        pendingStart = false
-        if (dartReady) channel?.invokeMethod("tripStop", null)
+    fun requestTripStart(headUnit: String?) = main.post {
+        if (dartReady) {
+            channel?.invokeMethod("tripStart", mapOf("headUnit" to headUnit))
+        } else {
+            pendingStart = PendingStart(headUnit)
+        }
     }
 
     private fun prefs(context: Context) =

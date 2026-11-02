@@ -16,7 +16,7 @@ void main() {
     adapterName: 'vLinker MC+',
     lastSeen: DateTime(2026, 10, 31, 8, 24),
   );
-  const settings = AppSettings(headUnitAddress: 'AA:BB:CC:DD:EE:FF');
+  const settings = AppSettings();
   final options = valueOptions(null, null);
   final driving = SessionState(
     phase: SessionPhase.connected,

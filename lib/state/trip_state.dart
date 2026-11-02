@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/platform/trip_service_gateway.dart';
 import '../core/session/car_state.dart';
-import '../core/settings/settings.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'session_state.dart';
@@ -15,10 +14,11 @@ enum TripPhase { idle, connecting, running, ending }
 
 /// Why the last trip ended.
 enum TripEnd {
-  /// Asked to stop: the head unit disconnected, or the user stopped it.
+  /// The user stopped it.
   stopped,
 
-  /// No vehicle has an adapter set.
+  /// No vehicle has an adapter set, or none goes with the head unit that
+  /// connected.
   noVehicle,
 
   /// Bluetooth permission is missing, and there's no screen to ask on.
@@ -81,12 +81,21 @@ final tripProvider = NotifierProvider<TripController, TripState>(
   TripController.new,
 );
 
-/// Runs a trip in the background: started by Android when the car's head
-/// unit connects, ended when it disconnects or the car goes quiet. Uses the
-/// same session and sender as the screens, so Home shows the trip live.
+/// Runs a trip in the background: started by Android when a car's head
+/// unit connects, ended when the car stops answering or the adapter can't
+/// be reached. Uses the same session and sender as the screens, so Home
+/// shows the trip live.
+///
+/// The head unit names the car, so the trip goes straight to its adapter.
+/// It only starts trips: disconnecting from it, say to hand the stereo to
+/// someone else, doesn't end one. One trip runs at a time.
 class TripController extends Notifier<TripState> {
   bool _stopRequested = false;
   Completer<void>? _wake;
+
+  /// Whether this trip sent readings; only then is there something to
+  /// close.
+  bool _open = false;
 
   TripServiceGateway get _gateway => ref.read(tripServiceGatewayProvider);
   SessionController get _session => ref.read(sessionProvider.notifier);
@@ -96,39 +105,30 @@ class TripController extends Notifier<TripState> {
   @override
   TripState build() {
     final gateway = ref.watch(tripServiceGatewayProvider);
-    final commands = gateway.commands.listen((command) {
-      switch (command) {
-        case TripCommand.start:
-          unawaited(_run());
-        case TripCommand.stop:
-          stop();
-      }
-    });
-    ref.onDispose(commands.cancel);
-    // Android needs to know which head unit starts a trip, even while the
-    // app isn't running.
-    ref.listen(
-      appSettingsProvider.select(
-        (settings) => switch (settings.value) {
-          final value? =>
-            value.wakeTrigger == WakeTrigger.carBluetooth
-                ? value.headUnitAddress
-                : null,
-          null => null,
-        },
-      ),
-      (_, address) => gateway.configure(headUnitAddress: address),
-      fireImmediately: true,
+    final starts = gateway.starts.listen(
+      (start) => unawaited(_run(headUnit: start.headUnit)),
     );
+    ref.onDispose(starts.cancel);
+    // Android needs to know which head units start a trip, even while the
+    // app isn't running.
+    Set<String>? configured;
+    ref.listen(appSettingsProvider, (_, settings) {
+      final headUnits = settings.value?.startingHeadUnits;
+      if (headUnits == null || setEquals(headUnits, configured)) return;
+      configured = headUnits;
+      gateway.configure(headUnitAddresses: headUnits);
+    }, fireImmediately: true);
     // Android may have started the service before Dart was listening.
     Future.microtask(() async {
-      if (await gateway.takeTripRequest()) unawaited(_run());
+      if (await gateway.takeTripRequest() case StartTrip(:final headUnit)) {
+        unawaited(_run(headUnit: headUnit));
+      }
     });
     return const TripState();
   }
 
-  /// Starts a trip from the app, through the service, as if the head unit
-  /// had connected.
+  /// Starts a trip from the app, through the service. Without a head unit
+  /// to go by, it tries every vehicle's adapter.
   Future<void> startManually() => _gateway.startService();
 
   /// Ends the trip after the current step; the last reading is still sent.
@@ -138,19 +138,29 @@ class TripController extends Notifier<TripState> {
     if (wake != null && !wake.isCompleted) wake.complete();
   }
 
-  Future<void> _run() async {
+  /// Runs a trip for the vehicle whose head unit is [headUnit], or, when
+  /// the app started it, for whichever vehicle's adapter answers.
+  Future<void> _run({String? headUnit}) async {
     if (state.isActive) return;
     _stopRequested = false;
+    _open = false;
     state = TripState(phase: TripPhase.connecting, startedAt: DateTime.now());
     final settings = await ref.read(appSettingsProvider.future);
-    final candidates =
-        settings.vehicles.where((v) => v.adapterAddress != null).toList()
-          // The car seen most recently is the likeliest to be this one.
-          ..sort((a, b) {
-            final seenA = a.lastSeen, seenB = b.lastSeen;
-            if (seenA == null) return seenB == null ? 0 : 1;
-            return seenB == null ? -1 : seenB.compareTo(seenA);
-          });
+    // A head unit names the vehicle; otherwise any may answer.
+    final List<Vehicle> candidates;
+    if (headUnit != null) {
+      final named = settings.vehicleForHeadUnit(headUnit);
+      candidates = [if (named != null && named.adapterAddress != null) named];
+    } else {
+      candidates =
+          settings.vehicles.where((v) => v.adapterAddress != null).toList()
+            // The car seen most recently is the likeliest to be this one.
+            ..sort((a, b) {
+              final seenA = a.lastSeen, seenB = b.lastSeen;
+              if (seenA == null) return seenB == null ? 0 : 1;
+              return seenB == null ? -1 : seenB.compareTo(seenA);
+            });
+    }
     if (candidates.isEmpty) return _finish(TripEnd.noVehicle);
 
     final (vehicle, problem) = await _connect(candidates);
@@ -209,6 +219,7 @@ class TripController extends Notifier<TripState> {
         final values = await _session.readAndSend();
         if (values != null && values.isNotEmpty) {
           quietSince = null;
+          _open = true;
           await _notify(_Stage.reading, vehicle, interval: interval);
         }
       }
@@ -217,25 +228,30 @@ class TripController extends Notifier<TripState> {
     return TripEnd.stopped;
   }
 
+  /// Tells the receiver the car disconnected, if readings went out.
+  Future<void> _close(Vehicle vehicle) async {
+    if (!_open) return;
+    _open = false;
+    await _notify(_Stage.ending, vehicle);
+    try {
+      await ref
+          .read(webhookSenderProvider)
+          .send(device: vehicle.deviceId, values: const {}, connected: false)
+          .timeout(_timing.finalDeliveryWait);
+    } on TimeoutException {
+      // It stays queued and goes out with the next delivery.
+    }
+  }
+
   Future<void> _finish(TripEnd end, {Vehicle? vehicle}) async {
     state = TripState(
       phase: TripPhase.ending,
       vehicleId: state.vehicleId,
       startedAt: state.startedAt,
     );
-    final sender = ref.read(webhookSenderProvider);
-    // Mark the end of the trip, but only if the trip got going: a trip
-    // that never reached the car has nothing to close.
-    if (vehicle != null) {
-      await _notify(_Stage.ending, vehicle);
-      try {
-        await sender
-            .send(device: vehicle.deviceId, values: const {}, connected: false)
-            .timeout(_timing.finalDeliveryWait);
-      } on TimeoutException {
-        // It stays queued and goes out with the next delivery.
-      }
-    }
+    // Mark the end, but only after readings: a trip that never sent one,
+    // like a stereo waking with the car parked, has nothing to close.
+    if (vehicle != null) await _close(vehicle);
     if (_sessionState.phase != SessionPhase.idle) await _session.disconnect();
     ref.read(adapterLogProvider).note('Trip ended: ${end.name}');
     await _gateway.stopService();

@@ -42,11 +42,36 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setInterval(Duration interval) =>
       _save(_current.copyWith(interval: interval));
 
-  Future<void> setWakeTrigger(WakeTrigger trigger) =>
-      _save(_current.copyWith(wakeTrigger: trigger));
+  Future<void> setTripStart(String vehicleId, TripStart tripStart) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle != null) {
+      await saveVehicle(vehicle.copyWith(tripStart: tripStart));
+    }
+  }
 
-  Future<void> setHeadUnit({required String address, required String name}) =>
-      _save(_current.copyWith(headUnitAddress: address, headUnitName: name));
+  /// Makes the head unit at [address] start the vehicle's trips.
+  ///
+  /// Throws [StateError] if another vehicle already uses it: a head unit
+  /// belongs to one vehicle, so a connection always names one car.
+  Future<void> setHeadUnit(
+    String vehicleId, {
+    required String address,
+    required String name,
+  }) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null) return;
+    final owner = _current.headUnitOwner(address);
+    if (owner != null && owner.id != vehicleId) {
+      throw StateError('${owner.name} already uses $name');
+    }
+    await saveVehicle(
+      vehicle.copyWith(
+        tripStart: TripStart.carBluetooth,
+        headUnitAddress: address,
+        headUnitName: name,
+      ),
+    );
+  }
 
   Future<void> completeSetup() => _save(_current.copyWith(setupDone: true));
 

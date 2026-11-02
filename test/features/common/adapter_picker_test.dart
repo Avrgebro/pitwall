@@ -17,6 +17,7 @@ Future<void> _pump(
   WidgetTester tester,
   List<BondedDevice> devices, {
   String? selected,
+  Map<String, String> taken = const {},
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -27,7 +28,11 @@ Future<void> _pump(
         theme: AppTheme.light(),
         home: Scaffold(
           body: SingleChildScrollView(
-            child: AdapterPicker(selectedAddress: selected, onSelected: (_) {}),
+            child: AdapterPicker(
+              selectedAddress: selected,
+              taken: taken,
+              onSelected: (_) {},
+            ),
           ),
         ),
       ),
@@ -74,5 +79,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Earbuds 3'), findsOneWidget);
     expect(find.text('vLinker MC+'), findsNothing);
+  });
+
+  testWidgets('a device another vehicle uses is shown but not offered', (
+    tester,
+  ) async {
+    await _pump(tester, [_adapter], taken: {'A': 'Mazda'});
+
+    expect(find.text('Used by Mazda'), findsOneWidget);
+    final row = tester.widget<ChoiceRow<String>>(
+      find.byType(ChoiceRow<String>),
+    );
+    expect(row.enabled, isFalse);
   });
 }

@@ -2,41 +2,48 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/bluetooth/device_kind.dart';
 import '../../core/bluetooth/classic_bluetooth.dart';
+import '../../core/bluetooth/device_kind.dart';
 import '../../core/settings/settings.dart';
+import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
 
-/// What starts Pitwall when a drive begins.
-class WakeScreen extends ConsumerWidget {
-  const WakeScreen({super.key});
+/// What starts the vehicle's trips: its head unit connecting, for now.
+class VehicleTripStartScreen extends ConsumerWidget {
+  const VehicleTripStartScreen({super.key, required this.vehicleId});
+
+  final String vehicleId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(appSettingsProvider).value;
-    if (settings == null) return const AppPage(title: '', children: []);
+    final vehicle = settings?.vehicleById(vehicleId);
+    if (settings == null || vehicle == null) {
+      return const AppPage(title: 'Trip start', children: []);
+    }
     final notifier = ref.read(appSettingsProvider.notifier);
-    final headUnit = settings.headUnitName;
+    final headUnit = vehicle.headUnitName;
 
     return AppPage(
-      title: 'What wakes Pitwall',
+      title: 'Trip start',
+      subtitle: vehicle.name,
       children: [
-        RadioGroup<WakeTrigger>(
-          groupValue: settings.wakeTrigger,
-          onChanged: (trigger) {
-            if (trigger != null) notifier.setWakeTrigger(trigger);
+        RadioGroup<TripStart>(
+          groupValue: vehicle.tripStart,
+          onChanged: (tripStart) {
+            if (tripStart != null) notifier.setTripStart(vehicle.id, tripStart);
           },
           child: const RowGroup(
             children: [
               ChoiceRow(
-                value: WakeTrigger.carBluetooth,
+                value: TripStart.carBluetooth,
                 title: 'When the phone connects to the car\'s Bluetooth',
                 subtitle: 'Starts within seconds of switching the car on.',
               ),
               ChoiceRow(
-                value: WakeTrigger.drivingDetection,
+                value: TripStart.drivingDetection,
                 enabled: false,
                 title: 'When driving is detected',
                 subtitle:
@@ -45,7 +52,7 @@ class WakeScreen extends ConsumerWidget {
             ],
           ),
         ),
-        if (settings.wakeTrigger == WakeTrigger.carBluetooth) ...[
+        if (vehicle.tripStart == TripStart.carBluetooth) ...[
           const SectionHeader('Car head unit'),
           RowGroup(
             children: [
@@ -53,21 +60,24 @@ class WakeScreen extends ConsumerWidget {
                 icon: Symbols.bluetooth_rounded,
                 title: headUnit ?? 'Not chosen yet',
                 subtitle: headUnit == null
-                    ? 'Choose your car\'s stereo or hands-free system'
-                    : settings.headUnitAddress,
+                    ? 'Choose the car\'s stereo or hands-free system'
+                    : vehicle.headUnitAddress,
                 trailing: TextButton(
-                  onPressed: () => _chooseHeadUnit(context, ref, settings),
+                  onPressed: () =>
+                      chooseHeadUnit(context, ref, settings, vehicle),
                   child: Text(headUnit == null ? 'Choose' : 'Change'),
                 ),
               ),
             ],
           ),
-          const InfoNote(
+          InfoNote(
             text: TextSpan(
               text:
-                  'When the phone connects to it, Pitwall connects to the '
-                  'adapter and starts sending. When it disconnects, the trip '
-                  'ends.',
+                  'When the phone connects to it, Pitwall connects to '
+                  '${vehicle.name}\'s adapter and starts sending. It stops a '
+                  'few minutes after the car is switched off or the phone '
+                  'leaves the car. Disconnecting from the stereo, say to '
+                  'hand it to someone else, doesn\'t stop it.',
             ),
           ),
         ],
@@ -75,10 +85,13 @@ class WakeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _chooseHeadUnit(
+  /// Opens the paired devices, car audio first, and saves the one chosen.
+  /// Head units other vehicles use can't be chosen.
+  static Future<void> chooseHeadUnit(
     BuildContext context,
     WidgetRef ref,
     AppSettings settings,
+    Vehicle vehicle,
   ) async {
     final device = await showModalBottomSheet<BondedDevice>(
       context: context,
@@ -94,7 +107,13 @@ class WakeScreen extends ConsumerWidget {
           child: AdapterPicker(
             title: 'Paired devices',
             role: DeviceRole.headUnit,
-            selectedAddress: settings.headUnitAddress,
+            selectedAddress: vehicle.headUnitAddress,
+            taken: {
+              for (final other in settings.vehicles)
+                if (other.id != vehicle.id)
+                  if (other.headUnitAddress case final address?)
+                    address.toUpperCase(): other.name,
+            },
             onSelected: (device) => Navigator.pop(context, device),
           ),
         ),
@@ -103,6 +122,6 @@ class WakeScreen extends ConsumerWidget {
     if (device == null) return;
     await ref
         .read(appSettingsProvider.notifier)
-        .setHeadUnit(address: device.address, name: device.name);
+        .setHeadUnit(vehicle.id, address: device.address, name: device.name);
   }
 }

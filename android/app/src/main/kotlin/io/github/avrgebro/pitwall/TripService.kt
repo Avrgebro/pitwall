@@ -8,50 +8,44 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
 
 /**
  * Keeps Pitwall running during a trip, with the notification Android
- * requires. The trip itself runs in Dart, in the shared engine; this
- * service starts it, keeps the CPU awake for it, and asks it to end.
+ * requires. The trip itself runs in Dart, in the shared engine, and
+ * decides when it's over; this service starts it and keeps the CPU awake
+ * for it.
  */
 class TripService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
-    private val main = Handler(Looper.getMainLooper())
 
-    // If Dart doesn't finish within this after being asked to stop (it
-    // sends a last reading first), the service stops anyway.
-    private val forceStop = Runnable { stopSelf() }
+    // Whether this service runs a trip already.
+    private var tripActive = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                ServiceBridge.requestTripStop()
-                main.postDelayed(forceStop, STOP_GRACE_MS)
-            }
-            else -> {
-                main.removeCallbacks(forceStop)
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification(this, getString(R.string.trip_starting)),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-                )
-                acquireWakeLock()
-                EngineHolder.get(this)
-                ServiceBridge.requestTripStart()
-            }
+        // Every start must reach the foreground, even one that's ignored.
+        startForeground(
+            NOTIFICATION_ID,
+            notification(this, getString(R.string.trip_starting)),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+        )
+        // One trip at a time: a head unit connecting mid-trip, say after
+        // the stereo was handed to someone else and back, changes nothing.
+        if (!tripActive) {
+            tripActive = true
+            acquireWakeLock()
+            EngineHolder.get(this)
+            ServiceBridge.requestTripStart(intent?.getStringExtra(EXTRA_HEAD_UNIT))
         }
         // Without a trip request there's nothing to resume after a restart.
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        main.removeCallbacks(forceStop)
+        tripActive = false
         wakeLock?.takeIf { it.isHeld }?.release()
         wakeLock = null
         super.onDestroy()
@@ -69,27 +63,23 @@ class TripService : Service() {
 
     companion object {
         const val ACTION_START = "io.github.avrgebro.pitwall.TRIP_START"
-        const val ACTION_STOP = "io.github.avrgebro.pitwall.TRIP_STOP"
+        private const val EXTRA_HEAD_UNIT = "head_unit"
         private const val CHANNEL_ID = "trip"
         private const val NOTIFICATION_ID = 1
-        private const val STOP_GRACE_MS = 30_000L
         private const val MAX_TRIP_MS = 12 * 60 * 60 * 1000L
 
         @Volatile
         var isRunning = false
             private set
 
-        fun start(context: Context) {
+        /** Starts a trip; [headUnit] is the car's head unit that connected, or null from the app. */
+        fun start(context: Context, headUnit: String? = null) {
             isRunning = true
             context.startForegroundService(
-                Intent(context, TripService::class.java).setAction(ACTION_START),
+                Intent(context, TripService::class.java)
+                    .setAction(ACTION_START)
+                    .putExtra(EXTRA_HEAD_UNIT, headUnit),
             )
-        }
-
-        /** Asks the running trip to end; it stops the service when done. */
-        fun requestStop(context: Context) {
-            if (!isRunning) return
-            context.startService(Intent(context, TripService::class.java).setAction(ACTION_STOP))
         }
 
         fun stop(context: Context) {

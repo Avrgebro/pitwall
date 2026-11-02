@@ -12,6 +12,7 @@ import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_auth.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
+import 'package:pitwall/state/settings_state.dart';
 import 'package:pitwall/state/trip_state.dart';
 
 import '../core/obd/fake_transport.dart';
@@ -38,11 +39,25 @@ class _Adapter extends FakeTransport implements ClosableTransport {
   Future<void> close() async {}
 }
 
+const _tucsonStereo = 'AA:BB:CC:DD:EE:FF';
+const _mazdaStereo = '11:22:33:44:55:66';
+
 const _tucson = Vehicle(
   id: 'tucson',
   name: 'Hyundai Tucson',
   adapterAddress: '00:1D:A5:68:98:8B',
   adapterName: 'vLinker MC+',
+  headUnitAddress: _tucsonStereo,
+  headUnitName: 'TUCSON BT',
+);
+
+const _mazda = Vehicle(
+  id: 'mazda',
+  name: 'Mazda',
+  adapterAddress: '00:00:00:00:00:02',
+  adapterName: 'OBDII',
+  headUnitAddress: _mazdaStereo,
+  headUnitName: 'MAZDA',
 );
 
 const _fast = TripTiming(
@@ -59,8 +74,9 @@ void main() {
   ProviderContainer container({
     ClosableTransport? Function(String)? adapter,
     List<Vehicle> vehicles = const [_tucson],
-    bool pendingRequest = false,
+    StartTrip? pendingRequest,
     FakePermissionGateway? permissions,
+    FakeBluetoothGateway? bluetooth,
   }) {
     service = FakeTripServiceGateway(pendingRequest: pendingRequest);
     received = [];
@@ -68,7 +84,6 @@ void main() {
       settings: AppSettings(
         vehicles: vehicles,
         interval: const Duration(milliseconds: 10),
-        headUnitAddress: 'AA:BB:CC:DD:EE:FF',
         setupDone: true,
       ),
     )..webhookUrl = 'https://example.com/api/webhook/x';
@@ -89,7 +104,7 @@ void main() {
           permissions ?? FakePermissionGateway(),
         ),
         bluetoothGatewayProvider.overrideWithValue(
-          FakeBluetoothGateway(adapter: adapter),
+          bluetooth ?? FakeBluetoothGateway(adapter: adapter),
         ),
         tripServiceGatewayProvider.overrideWithValue(service),
         tripTimingProvider.overrideWithValue(_fast),
@@ -100,6 +115,16 @@ void main() {
   }
 
   /// Waits until the trip is back to idle.
+  /// Waits until the trip is running, connected to a vehicle.
+  Future<TripState> running(ProviderContainer c) async {
+    for (var i = 0; i < 200; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      final trip = c.read(tripProvider);
+      if (trip.phase == TripPhase.running) return trip;
+    }
+    fail('The trip did not start');
+  }
+
   Future<TripState> ended(ProviderContainer c) async {
     for (var i = 0; i < 200; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -109,23 +134,22 @@ void main() {
     fail('The trip did not end');
   }
 
-  test('tells Android which head unit starts a trip', () async {
-    final c = container();
+  test('tells Android which head units start a trip', () async {
+    final c = container(vehicles: const [_tucson, _mazda]);
     c.read(tripProvider);
     await Future<void>.delayed(const Duration(milliseconds: 20));
 
-    expect(service.headUnitAddress, 'AA:BB:CC:DD:EE:FF');
+    expect(service.headUnitAddresses, {_tucsonStereo, _mazdaStereo});
   });
 
   test('a trip reads, sends, and closes with connected: false', () async {
     final c = container(adapter: (_) => _Adapter());
     c.read(tripProvider);
 
-    service.send(TripCommand.start);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
-    expect(c.read(tripProvider).phase, TripPhase.running);
+    service.send(const StartTrip(_tucsonStereo));
+    await running(c);
 
-    service.send(TripCommand.stop);
+    c.read(tripProvider.notifier).stop();
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.stopped);
@@ -140,11 +164,12 @@ void main() {
   });
 
   test('a request made before Dart was ready still starts a trip', () async {
-    final c = container(adapter: (_) => _Adapter(), pendingRequest: true);
+    final c = container(
+      adapter: (_) => _Adapter(),
+      pendingRequest: const StartTrip(_tucsonStereo),
+    );
     c.read(tripProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
-
-    expect(c.read(tripProvider).phase, TripPhase.running);
+    await running(c);
     c.read(tripProvider.notifier).stop();
     await ended(c);
   });
@@ -153,7 +178,7 @@ void main() {
     final c = container(adapter: (_) => null);
     c.read(tripProvider);
 
-    service.send(TripCommand.start);
+    service.send(const StartTrip(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.adapterNotFound);
@@ -165,7 +190,7 @@ void main() {
     final c = container(adapter: (_) => _Adapter(carOn: false));
     c.read(tripProvider);
 
-    service.send(TripCommand.start);
+    service.send(const StartTrip(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.carOff);
@@ -173,15 +198,16 @@ void main() {
       service.notifications,
       contains('Waiting for Hyundai Tucson to answer'),
     );
-    // The trip reached the adapter, so its end is still marked.
-    expect(received.single['connected'], isFalse);
+    // Nothing was sent, so there's nothing to close: a stereo waking with
+    // the car parked leaves no trace at the receiver.
+    expect(received, isEmpty);
   });
 
   test('without a vehicle there is nothing to start', () async {
     final c = container(vehicles: const []);
     c.read(tripProvider);
 
-    service.send(TripCommand.start);
+    service.send(const StartTrip(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.noVehicle);
@@ -197,7 +223,7 @@ void main() {
       final c = container(adapter: (_) => _Adapter(), permissions: permissions);
       c.read(tripProvider);
 
-      service.send(TripCommand.start);
+      service.send(const StartTrip(_tucsonStereo));
       final trip = await ended(c);
 
       expect(trip.lastEnd, TripEnd.permissionMissing);
@@ -205,4 +231,104 @@ void main() {
       expect(permissions.granted[AppPermission.bluetooth], isFalse);
     },
   );
+
+  test('a head unit starts a trip with its own vehicle only', () async {
+    final bluetooth = FakeBluetoothGateway(adapter: (_) => _Adapter());
+    final c = container(
+      vehicles: [
+        _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+        _mazda,
+      ],
+      bluetooth: bluetooth,
+    );
+    c.read(tripProvider);
+
+    service.send(const StartTrip(_mazdaStereo));
+    expect((await running(c)).vehicleId, 'mazda');
+    expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
+    c.read(tripProvider.notifier).stop();
+    await ended(c);
+  });
+
+  test('a head unit connecting during a trip changes nothing', () async {
+    final c = container(
+      vehicles: const [_tucson, _mazda],
+      adapter: (_) => _Adapter(),
+    );
+    c.read(tripProvider);
+
+    service.send(const StartTrip(_tucsonStereo));
+    await running(c);
+    service.send(const StartTrip(_mazdaStereo));
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    expect(c.read(tripProvider).vehicleId, 'tucson');
+    c.read(tripProvider.notifier).stop();
+    await ended(c);
+  });
+
+  test('a head unit no vehicle uses starts nothing', () async {
+    final c = container(adapter: (_) => _Adapter());
+    c.read(tripProvider);
+
+    service.send(const StartTrip('99:99:99:99:99:99'));
+    expect((await ended(c)).lastEnd, TripEnd.noVehicle);
+  });
+
+  test('a trip started from the app tries every vehicle', () async {
+    final bluetooth = FakeBluetoothGateway(
+      adapter: (address) =>
+          address == _mazda.adapterAddress ? _Adapter() : null,
+    );
+    final c = container(
+      vehicles: [
+        _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+        _mazda,
+      ],
+      bluetooth: bluetooth,
+    );
+    c.read(tripProvider);
+
+    await c.read(tripProvider.notifier).startManually();
+    expect((await running(c)).vehicleId, 'mazda');
+    // The most recently seen car is tried first.
+    expect(bluetooth.connected.first, _tucson.adapterAddress);
+    c.read(tripProvider.notifier).stop();
+    await ended(c);
+  });
+
+  test('Android hears when a vehicle\'s head unit changes', () async {
+    final c = container();
+    c.read(tripProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    await c
+        .read(appSettingsProvider.notifier)
+        .setHeadUnit('tucson', address: '77:77:77:77:77:77', name: 'NEW');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(service.headUnitAddresses, {'77:77:77:77:77:77'});
+  });
+
+  test('an adapter that drops and stays away ends the trip', () async {
+    final adapters = <_Adapter>[];
+    final c = container(
+      // The first connection works; afterwards the adapter is out of reach.
+      adapter: (_) {
+        if (adapters.isNotEmpty) return null;
+        final adapter = _Adapter();
+        adapters.add(adapter);
+        return adapter;
+      },
+    );
+    c.read(tripProvider);
+
+    service.send(const StartTrip(_tucsonStereo));
+    await running(c);
+
+    await adapters.single.disconnect();
+    final trip = await ended(c);
+
+    expect(trip.lastEnd, TripEnd.adapterLost);
+    expect(received.last['connected'], isFalse);
+  });
+
 }

@@ -11,6 +11,8 @@ void main() {
     modelYear: 2023,
     selectedKeys: {'fuel_level_l', 'battery_v'},
     profileName: 'default.json',
+    headUnitAddress: 'AA:BB:CC:DD:EE:FF',
+    headUnitName: 'TUCSON BT',
   );
 
   test('settings survive a round trip through JSON', () {
@@ -30,6 +32,73 @@ void main() {
     expect(vehicle.modelYear, 2023);
     expect(vehicle.selectedKeys, {'fuel_level_l', 'battery_v'});
     expect(vehicle.profileName, 'default.json');
+    expect(vehicle.tripStart, TripStart.carBluetooth);
+    expect(vehicle.headUnitAddress, 'AA:BB:CC:DD:EE:FF');
+    expect(vehicle.headUnitName, 'TUCSON BT');
+  });
+
+  group('trip start', () {
+    final older = Vehicle(
+      id: 'b2',
+      name: 'mazda',
+      lastSeen: DateTime(2026, 10, 1),
+    );
+    final recent = Vehicle(
+      id: 'a1',
+      name: 'tucson',
+      lastSeen: DateTime(2026, 11, 1),
+    );
+
+    test('the app-wide head unit moves to the car seen most recently', () {
+      final settings = AppSettings.fromJson({
+        'vehicles': [older.toJson(), recent.toJson()],
+        'wakeTrigger': 'carBluetooth',
+        'headUnitAddress': 'AA:BB:CC:DD:EE:FF',
+        'headUnitName': 'TUCSON BT',
+      });
+
+      expect(settings.vehicleById('a1')!.headUnitName, 'TUCSON BT');
+      expect(settings.vehicleById('b2')!.headUnitAddress, isNull);
+      // Saved again, the app-wide fields are gone.
+      expect(settings.toJson().containsKey('headUnitAddress'), isFalse);
+    });
+
+    test('a vehicle\'s own head unit wins over the app-wide one', () {
+      final settings = AppSettings.fromJson({
+        'vehicles': [
+          older.copyWith(headUnitAddress: '11:22:33:44:55:66').toJson(),
+          recent.toJson(),
+        ],
+        'headUnitAddress': 'AA:BB:CC:DD:EE:FF',
+      });
+
+      expect(settings.vehicleById('a1')!.headUnitAddress, isNull);
+    });
+
+    test('head units are found without regard to case', () {
+      final settings = AppSettings(
+        vehicles: [recent.copyWith(headUnitAddress: 'aa:bb:cc:dd:ee:ff')],
+      );
+
+      expect(settings.vehicleForHeadUnit('AA:BB:CC:DD:EE:FF')?.id, 'a1');
+      expect(settings.startingHeadUnits, {'AA:BB:CC:DD:EE:FF'});
+    });
+
+    test('only vehicles started by their head unit are watched for', () {
+      final settings = AppSettings(
+        vehicles: [
+          recent.copyWith(
+            headUnitAddress: 'AA:BB:CC:DD:EE:FF',
+            tripStart: TripStart.drivingDetection,
+          ),
+        ],
+      );
+
+      expect(settings.startingHeadUnits, isEmpty);
+      expect(settings.vehicles.single.hasTripStart, isFalse);
+      // It still belongs to the vehicle, so no other can take it.
+      expect(settings.headUnitOwner('AA:BB:CC:DD:EE:FF')?.id, 'a1');
+    });
   });
 
   test('the earlier single-car format becomes one vehicle', () {

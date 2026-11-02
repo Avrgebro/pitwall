@@ -13,9 +13,7 @@ class SetupChecklist {
     required int missingPermissions,
   }) {
     final vehicles = settings.vehicles;
-    final headUnit = settings.wakeTrigger == WakeTrigger.carBluetooth
-        ? settings.headUnitName
-        : null;
+    final missingStart = vehicles.where((v) => !v.hasTripStart).toList();
     return SetupChecklist([
       (
         step: SetupStep.vehicle,
@@ -25,6 +23,7 @@ class SetupChecklist {
           [final only] => only.name,
           _ => '${vehicles.length} vehicles',
         },
+        vehicleId: null,
       ),
       (
         step: SetupStep.webhook,
@@ -32,13 +31,21 @@ class SetupChecklist {
         detail: hasWebhook
             ? 'Readings go to your webhook'
             : 'Where readings go',
+        vehicleId: null,
       ),
       (
         step: SetupStep.headUnit,
-        done: headUnit != null,
-        detail: headUnit == null
-            ? 'So trips start on their own'
-            : 'Trips start when $headUnit connects',
+        done: vehicles.isNotEmpty && missingStart.isEmpty,
+        detail: switch ((vehicles, missingStart)) {
+          ([], _) => 'So trips start on their own',
+          ([final only], []) =>
+            'Trips start when ${only.headUnitName} connects',
+          (_, []) => 'Every vehicle has one',
+          (_, [final one]) => '${one.name} needs one',
+          (_, final several) => '${several.length} vehicles need one',
+        },
+        // The one vehicle to fix, if there's just one.
+        vehicleId: missingStart.length == 1 ? missingStart.single.id : null,
       ),
       (
         step: SetupStep.permissions,
@@ -46,11 +53,13 @@ class SetupChecklist {
         detail: missingPermissions == 0
             ? 'All allowed'
             : '$missingPermissions to allow',
+        vehicleId: null,
       ),
     ]);
   }
 
-  final List<({SetupStep step, bool done, String detail})> items;
+  final List<({SetupStep step, bool done, String detail, String? vehicleId})>
+  items;
 
   bool get complete => items.every((item) => item.done);
 
