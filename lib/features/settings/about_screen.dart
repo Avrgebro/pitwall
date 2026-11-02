@@ -42,7 +42,7 @@ class AboutScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.balance_rounded,
               title: 'Open-source licence',
-              subtitle: 'MIT',
+              subtitle: 'GPLv3',
               trailing: external,
               onTap: () => launchUrl(Links.licence),
             ),

@@ -69,7 +69,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         steps: steps,
         primaryLabel: 'Get started',
         onPrimary: () => _go(_Step.adapter),
-        footnote: 'Free and open source, MIT licence',
+        footnote: 'Free and open source, GPLv3 licence',
         children: const [WelcomeStep()],
       ),
       _Step.adapter => StepScaffold(

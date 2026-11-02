@@ -84,4 +84,8 @@ Bluetooth doesn't work in emulators or simulators. Use a real phone.
 
 ## License
 
-[MIT](LICENSE)
+Copyright (C) 2026 Jose Bejarano
+
+Pitwall is free software: you can redistribute it and/or modify it under the
+terms of the [GNU General Public License](LICENSE), version 3 or (at your
+option) any later version.
