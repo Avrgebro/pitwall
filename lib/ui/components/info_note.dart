@@ -3,13 +3,16 @@ import 'package:material_ui/material_ui.dart';
 import '../theme/tokens.dart';
 import 'line_icon.dart';
 
-/// A small icon and a line of help text, set apart from the content around
-/// it.
+/// A small icon and a line of text beside it, the icon centred on the
+/// text's first line: help under content, a field's helper, a short status.
 class InfoNote extends StatelessWidget {
   const InfoNote({
     super.key,
     required this.text,
     this.icon = Icons.info_outline,
+    this.iconColor,
+    this.textColor,
+    this.dense = false,
     this.padding = const EdgeInsets.symmetric(
       horizontal: Insets.xs,
       vertical: Insets.m,
@@ -19,20 +22,34 @@ class InfoNote extends StatelessWidget {
   /// The text, as a span so parts can be styled or linked.
   final InlineSpan text;
   final IconData icon;
+
+  /// Default to the muted text colour.
+  final Color? iconColor;
+  final Color? textColor;
+
+  /// The smaller size of a form field's helper text.
+  final bool dense;
   final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
-    final style = theme.textTheme.bodyMedium?.copyWith(color: color);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final style =
+        (dense ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
+            ?.copyWith(color: textColor ?? muted);
     return Padding(
       padding: padding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LineIcon(icon, style: style, size: Sizes.iconSmall, color: color),
-          const SizedBox(width: Insets.m),
+          LineIcon(
+            icon,
+            style: style,
+            size: dense ? 14 : Sizes.iconSmall,
+            color: iconColor ?? textColor ?? muted,
+          ),
+          SizedBox(width: dense ? Insets.xsPlus : Insets.m),
           Expanded(child: Text.rich(text, style: style)),
         ],
       ),

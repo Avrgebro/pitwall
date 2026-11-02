@@ -80,28 +80,18 @@ class ProfileCard extends StatelessWidget {
                   if (value != null) onModelYear(value);
                 },
               ),
-              const SizedBox(height: Insets.m),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LineIcon(
-                    year == null ? Icons.info_outline : Icons.check_circle,
-                    style: theme.textTheme.bodyMedium,
-                    size: Sizes.iconSmall,
-                    color: year == null
-                        ? theme.colorScheme.onSurfaceVariant
-                        : healthy.accent,
-                  ),
-                  const SizedBox(width: Insets.s),
-                  Expanded(
-                    child: Text(
-                      year == null
-                          ? 'Choose the year to use this profile'
-                          : ProfileText.applies(profile, year),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
+              InfoNote(
+                icon: year == null ? Icons.info_outline : Icons.check_circle,
+                iconColor: year == null
+                    ? theme.colorScheme.onSurfaceVariant
+                    : healthy.accent,
+                textColor: theme.colorScheme.onSurface,
+                text: TextSpan(
+                  text: year == null
+                      ? 'Choose the year to use this profile'
+                      : ProfileText.applies(profile, year),
+                ),
+                padding: const EdgeInsets.only(top: Insets.m),
               ),
             ],
           ),

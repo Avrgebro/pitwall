@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
-import 'line_icon.dart';
+import 'info_note.dart';
 
 /// A text field for secrets (webhook URL, tokens): hidden by default with a
 /// show/hide toggle, a reassurance line, and room for a warning.
@@ -49,7 +49,6 @@ class _SecretTextFieldState extends State<SecretTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final warning = context.tone(StatusTone.warning);
     final hasWarning = widget.warning != null && widget.errorText == null;
     final warningBorder = OutlineInputBorder(
@@ -90,43 +89,22 @@ class _SecretTextFieldState extends State<SecretTextField> {
           ),
         ),
         if (hasWarning)
-          _Helper(
+          InfoNote(
             icon: Icons.warning_amber_rounded,
-            color: warning.accent,
+            textColor: warning.accent,
             text: widget.warning!,
+            dense: true,
+            // Lined up with the field's edge, a little apart from it.
+            padding: const EdgeInsets.only(top: Insets.s),
           )
         else if (widget.helperText != null && widget.errorText == null)
-          _Helper(
+          InfoNote(
             icon: Icons.lock_outline,
-            color: theme.colorScheme.onSurfaceVariant,
             text: TextSpan(text: widget.helperText),
+            dense: true,
+            padding: const EdgeInsets.only(top: Insets.s),
           ),
       ],
-    );
-  }
-}
-
-class _Helper extends StatelessWidget {
-  const _Helper({required this.icon, required this.color, required this.text});
-
-  final IconData icon;
-  final Color color;
-  final InlineSpan text;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall?.copyWith(color: color);
-    return Padding(
-      // Lined up with the field's edge, a little apart from it.
-      padding: const EdgeInsets.only(top: Insets.s),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LineIcon(icon, style: style, size: 14, color: color),
-          const SizedBox(width: Insets.xsPlus),
-          Expanded(child: Text.rich(text, style: style)),
-        ],
-      ),
     );
   }
 }
