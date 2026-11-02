@@ -50,6 +50,14 @@ class WebhookSender {
 
   final status = ValueNotifier(const DeliveryStatus());
 
+  /// How the last attempts went, which only deliveries change.
+  _Outcome _outcome = (
+    failedAttempts: 0,
+    lastSuccess: null,
+    lastFailure: null,
+    lastError: null,
+  );
+
   /// Oldest first; sequence numbers only go up.
   List<QueuedReading> _queue = [];
   int _seq = 0;
@@ -61,7 +69,7 @@ class WebhookSender {
     final state = await _storage.load();
     _queue = [...state.queue];
     _seq = state.seq;
-    _queueChanged();
+    _publish();
     unawaited(flush());
   }
 
@@ -103,7 +111,7 @@ class WebhookSender {
       _queue.removeRange(0, _queue.length - maxQueued);
     }
     await _persist();
-    _queueChanged();
+    _publish();
     return reading.seq;
   }
 
@@ -226,53 +234,38 @@ class WebhookSender {
   };
 
   void _succeeded() {
-    final current = status.value;
-    _publish(
+    _outcome = (
       failedAttempts: 0,
       lastSuccess: _clock(),
-      lastFailure: current.lastFailure,
+      lastFailure: _outcome.lastFailure,
       lastError: null,
     );
+    _publish();
   }
 
   void _failed(DeliveryError error) {
-    final current = status.value;
-    final attempts = current.failedAttempts + 1;
-    _publish(
+    final attempts = _outcome.failedAttempts + 1;
+    _outcome = (
       failedAttempts: attempts,
-      lastSuccess: current.lastSuccess,
+      lastSuccess: _outcome.lastSuccess,
       lastFailure: _clock(),
       lastError: error,
     );
+    _publish();
     // Only the user can fix the rest; delivery resumes on the next send,
     // when the webhook settings change, or on Retry.
     if (!error.kind.retryable) return;
     _retry = Timer(_backoff(attempts - 1), () => unawaited(flush()));
   }
 
-  /// The queue or the latest reading changed; delivery itself didn't.
-  void _queueChanged() {
-    final current = status.value;
-    _publish(
-      failedAttempts: current.failedAttempts,
-      lastSuccess: current.lastSuccess,
-      lastFailure: current.lastFailure,
-      lastError: current.lastError,
-    );
-  }
-
-  void _publish({
-    required int failedAttempts,
-    required DateTime? lastSuccess,
-    required DateTime? lastFailure,
-    required DeliveryError? lastError,
-  }) {
+  /// Shows the queue and the last delivery outcome as they are now.
+  void _publish() {
     status.value = DeliveryStatus(
       queued: _queue.length,
-      failedAttempts: failedAttempts,
-      lastSuccess: lastSuccess,
-      lastFailure: lastFailure,
-      lastError: lastError,
+      failedAttempts: _outcome.failedAttempts,
+      lastSuccess: _outcome.lastSuccess,
+      lastFailure: _outcome.lastFailure,
+      lastError: _outcome.lastError,
       // The queue is in sequence order, so everything before its oldest
       // reading is delivered.
       deliveredThrough: _queue.isEmpty ? _seq : _queue.first.seq - 1,
@@ -282,3 +275,11 @@ class WebhookSender {
   Future<void> _persist() =>
       _storage.save(DeliveryState(queue: List.of(_queue), seq: _seq));
 }
+
+/// The part of [DeliveryStatus] that deliveries decide.
+typedef _Outcome = ({
+  int failedAttempts,
+  DateTime? lastSuccess,
+  DateTime? lastFailure,
+  DeliveryError? lastError,
+});
