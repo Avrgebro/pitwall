@@ -9,6 +9,9 @@ import 'pinned_bottom.dart';
 /// The frame of every screen: a title (with a back button on sub-screens),
 /// an optional subtitle, and scrolling content with page padding.
 ///
+/// Content is a list of [children], or, for pages with long lists that
+/// should only build what's on screen, [slivers] (see [AppPage.slivers]).
+///
 /// Content scrolls under the top bar. The bar is transparent at the top of
 /// the page and fills in, frosted and with rounded bottom corners, once
 /// content passes beneath it.
@@ -16,16 +19,29 @@ class AppPage extends StatelessWidget {
   const AppPage({
     super.key,
     required this.title,
-    required this.children,
+    required List<Widget> this.children,
     this.subtitle,
     this.actions,
     this.floatingActionButton,
     this.bottom,
-  });
+  }) : slivers = null;
+
+  /// A page whose content is slivers, such as a `SliverRowGroup`, mixed
+  /// with `SliverList.list` for ordinary content.
+  const AppPage.slivers({
+    super.key,
+    required this.title,
+    required List<Widget> this.slivers,
+    this.subtitle,
+    this.actions,
+    this.floatingActionButton,
+    this.bottom,
+  }) : children = null;
 
   final String title;
   final String? subtitle;
-  final List<Widget> children;
+  final List<Widget>? children;
+  final List<Widget>? slivers;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
 
@@ -121,15 +137,24 @@ class AppPage extends StatelessWidget {
   Widget _content() => Builder(
     builder: (context) {
       final overlap = MediaQuery.paddingOf(context);
-      return ListView(
-        padding: EdgeInsets.fromLTRB(
-          Insets.l,
-          overlap.top + Insets.s,
-          Insets.l,
-          overlap.bottom + Insets.l,
-        ),
-        children: children,
+      final padding = EdgeInsets.fromLTRB(
+        Insets.l,
+        overlap.top + Insets.s,
+        Insets.l,
+        overlap.bottom + Insets.l,
       );
+      return switch ((children, slivers)) {
+        (final children?, _) => ListView(padding: padding, children: children),
+        (_, final slivers?) => CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: padding,
+              sliver: SliverMainAxisGroup(slivers: slivers),
+            ),
+          ],
+        ),
+        _ => throw StateError('AppPage needs children or slivers'),
+      };
     },
   );
 }

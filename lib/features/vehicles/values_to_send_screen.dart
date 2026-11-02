@@ -57,7 +57,9 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _closeSearch();
       },
-      child: AppPage(
+      // Slivers, so a profile's hundreds of signals build only as they
+      // scroll into view.
+      child: AppPage.slivers(
         title: 'Values to send',
         subtitle: '${vehicle.name}, ${selected.length} selected',
         actions: [
@@ -72,63 +74,70 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
           ),
           const SizedBox(width: Insets.s),
         ],
-        children: [
-          if (_searching)
-            SearchBar(
-              autoFocus: true,
-              hintText: 'Search values',
-              leading: const Icon(Symbols.search_rounded),
-              onChanged: (text) => setState(() => _query = text),
-            )
-          else
-            _IntroPanel(
-              canReset: vehicle.selectedKeys != null,
-              onReset: () => ref
-                  .read(appSettingsProvider.notifier)
-                  .saveVehicle(vehicle.copyWith(selectedKeys: null)),
-            ),
-          if (shown.isEmpty) ...[
-            const SizedBox(height: Insets.m),
-            InfoNote(
-              text: TextSpan(text: 'No values match "${_query.trim()}".'),
-            ),
-          ],
-          if (standard.isNotEmpty) ...[
-            const SectionHeader('Standard', trailing: 'Works on most cars'),
-            RowGroup(children: [for (final option in standard) row(option)]),
-          ],
-          if (fromProfile.isNotEmpty) ...[
-            SectionHeader('Profile signals', trailing: _profileLabel(vehicle)),
-          ],
-          if (fromProfile.isNotEmpty && filtering) ...[
-            // Matches are what was searched for; no need to expand them.
-            RowGroup(children: [for (final option in fromProfile) row(option)]),
-          ] else if (fromProfile.isNotEmpty) ...[
-            RowGroup(
-              children: [
-                GroupTile(
-                  icon: Symbols.manage_search_rounded,
-                  title: _showProfile
-                      ? 'Hide ${fromProfile.length} signals'
-                      : 'Show ${fromProfile.length} signals',
-                  subtitle:
-                      'Sent under their OBDb names, in the profile\'s units. '
-                      'Each one adds a request to every reading.',
-                  trailing: Icon(
-                    _showProfile ? Icons.expand_less : Icons.expand_more,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  onTap: () => setState(() => _showProfile = !_showProfile),
+        slivers: [
+          SliverList.list(
+            children: [
+              if (_searching)
+                SearchBar(
+                  autoFocus: true,
+                  hintText: 'Search values',
+                  leading: const Icon(Symbols.search_rounded),
+                  onChanged: (text) => setState(() => _query = text),
+                )
+              else
+                _IntroPanel(
+                  canReset: vehicle.selectedKeys != null,
+                  onReset: () => ref
+                      .read(appSettingsProvider.notifier)
+                      .saveVehicle(vehicle.copyWith(selectedKeys: null)),
+                ),
+              if (shown.isEmpty) ...[
+                const SizedBox(height: Insets.m),
+                InfoNote(
+                  text: TextSpan(text: 'No values match "${_query.trim()}".'),
                 ),
               ],
-            ),
-            if (_showProfile) ...[
-              const SizedBox(height: Insets.m),
-              RowGroup(
-                children: [for (final option in fromProfile) row(option)],
-              ),
+              if (standard.isNotEmpty) ...[
+                const SectionHeader('Standard', trailing: 'Works on most cars'),
+                RowGroup(
+                  children: [for (final option in standard) row(option)],
+                ),
+              ],
+              if (fromProfile.isNotEmpty) ...[
+                SectionHeader(
+                  'Profile signals',
+                  trailing: _profileLabel(vehicle),
+                ),
+              ],
+              // Matches are what was searched for; no need to expand them.
+              if (fromProfile.isNotEmpty && !filtering) ...[
+                RowGroup(
+                  children: [
+                    GroupTile(
+                      icon: Symbols.manage_search_rounded,
+                      title: _showProfile
+                          ? 'Hide ${fromProfile.length} signals'
+                          : 'Show ${fromProfile.length} signals',
+                      subtitle:
+                          'Sent under their OBDb names, in the profile\'s units. '
+                          'Each one adds a request to every reading.',
+                      trailing: Icon(
+                        _showProfile ? Icons.expand_less : Icons.expand_more,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onTap: () => setState(() => _showProfile = !_showProfile),
+                    ),
+                  ],
+                ),
+                if (_showProfile) const SizedBox(height: Insets.m),
+              ],
             ],
-          ],
+          ),
+          if (fromProfile.isNotEmpty && (filtering || _showProfile))
+            SliverRowGroup(
+              itemCount: fromProfile.length,
+              itemBuilder: (context, index) => row(fromProfile[index]),
+            ),
         ],
       ),
     );

@@ -232,4 +232,39 @@ void main() {
     final title = tester.getCenter(find.text('Add it here')).dy;
     expect(number, moreOrLessEquals(title, epsilon: 0.5));
   });
+
+  group('sliver row group', () {
+    Widget sliverFrame(int count, IndexedWidgetBuilder builder) => _frame(
+      CustomScrollView(
+        slivers: [SliverRowGroup(itemCount: count, itemBuilder: builder)],
+      ),
+    );
+
+    testWidgets('builds only the rows on screen', (tester) async {
+      final built = <int>{};
+      await tester.pumpWidget(
+        sliverFrame(300, (context, index) {
+          built.add(index);
+          return SizedBox(height: 56, child: Text('Row $index'));
+        }),
+      );
+
+      expect(built, contains(0));
+      expect(built.length, lessThan(30));
+    });
+
+    testWidgets('keeps the group\'s outer and inner corners', (tester) async {
+      await tester.pumpWidget(
+        sliverFrame(3, (context, index) => Text('Row $index')),
+      );
+      BorderRadius corners(int index) =>
+          RowSegment.borderRadiusOf(tester.element(find.text('Row $index')));
+      const outer = Radius.circular(Corners.extraLarge);
+
+      expect(corners(0).topLeft, outer);
+      expect(corners(1).topLeft, isNot(outer));
+      expect(corners(1).bottomLeft, isNot(outer));
+      expect(corners(2).bottomLeft, outer);
+    });
+  });
 }

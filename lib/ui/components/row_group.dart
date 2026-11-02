@@ -16,29 +16,47 @@ class RowGroup extends StatelessWidget {
   static const _inner = Radius.circular(Corners.small - 2);
 
   @override
-  Widget build(BuildContext context) {
-    final last = children.length - 1;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i <= last; i++)
-          Padding(
-            padding: EdgeInsets.only(top: i == 0 ? 0 : _gap),
-            child: _segment(
-              BorderRadius.vertical(
-                top: i == 0 ? _outer : _inner,
-                bottom: i == last ? _outer : _inner,
-              ),
-              children[i],
-            ),
-          ),
-      ],
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < children.length; i++)
+        _segment(i, children.length, children[i]),
+    ],
+  );
+
+  /// Row [index] of [count] in its segment, spaced from the one before.
+  static Widget _segment(int index, int count, Widget child) {
+    final borderRadius = BorderRadius.vertical(
+      top: index == 0 ? _outer : _inner,
+      bottom: index == count - 1 ? _outer : _inner,
+    );
+    return Padding(
+      padding: EdgeInsets.only(top: index == 0 ? 0 : _gap),
+      child: GlassSurface(
+        borderRadius: borderRadius,
+        child: RowSegment(borderRadius: borderRadius, child: child),
+      ),
     );
   }
+}
 
-  Widget _segment(BorderRadius borderRadius, Widget child) => GlassSurface(
-    borderRadius: borderRadius,
-    child: RowSegment(borderRadius: borderRadius, child: child),
+/// A [RowGroup] for long lists, as a sliver: only the rows on screen are
+/// built. Use it in `AppPage.slivers`.
+class SliverRowGroup extends StatelessWidget {
+  const SliverRowGroup({
+    super.key,
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
+  @override
+  Widget build(BuildContext context) => SliverList.builder(
+    itemCount: itemCount,
+    itemBuilder: (context, index) =>
+        RowGroup._segment(index, itemCount, itemBuilder(context, index)),
   );
 }
 
