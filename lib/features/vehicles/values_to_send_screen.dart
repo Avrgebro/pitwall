@@ -119,7 +119,8 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                   hideLabel: 'Hide ${fromProfile.length} signals',
                   subtitle:
                       'Sent under their OBDb names, in the profile\'s units. '
-                      'Each one adds a request to every reading.',
+                      'Values from the same request share it, so they cost '
+                      'one request between them.',
                   onToggle: () => setState(() => _showProfile = !_showProfile),
                 ),
             ],
@@ -174,8 +175,8 @@ class _IntroPanel extends StatelessWidget {
         const InfoNote(
           text: TextSpan(
             text:
-                'Only values your car actually reports are sent. Each value '
-                'adds one request to every reading.',
+                'Only values your car actually reports are sent. The more '
+                'requests the values need, the longer each reading takes.',
           ),
         ),
         if (canReset)

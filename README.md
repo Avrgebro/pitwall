@@ -69,8 +69,8 @@ accents removed, everything else turned into dashes. A car named
 
 | | Android | iOS |
 |---|---|---|
+| Classic Bluetooth (serial) adapters | Yes | Not possible: iOS doesn't allow them |
 | Bluetooth LE adapters | Planned | Planned |
-| Classic Bluetooth (serial) adapters | Planned | Not possible: iOS doesn't allow them |
 
 Android needs version 12 or later.
 
