@@ -105,6 +105,25 @@ void main() {
     });
   });
 
+  test('a head unit another vehicle has is that vehicle\'s', () {
+    const settings = AppSettings(
+      vehicles: [
+        Vehicle(id: 'tucson', headUnitAddress: 'AA:BB:CC:DD:EE:FF'),
+        Vehicle(id: 'mazda'),
+      ],
+    );
+
+    expect(
+      settings.otherHeadUnitOwner('aa:bb:cc:dd:ee:ff', vehicleId: 'mazda')?.id,
+      'tucson',
+    );
+    // Its own head unit isn't another's.
+    expect(
+      settings.otherHeadUnitOwner('AA:BB:CC:DD:EE:FF', vehicleId: 'tucson'),
+      isNull,
+    );
+  });
+
   group('trip candidates', () {
     final tucson = Vehicle(
       id: 'tucson',

@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/bluetooth/device_kind.dart';
-import '../../core/settings/settings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
@@ -63,8 +62,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
                     ? 'Choose the car\'s stereo or hands-free system'
                     : vehicle.headUnitAddress,
                 trailing: TextButton(
-                  onPressed: () =>
-                      chooseHeadUnit(context, ref, settings, vehicle),
+                  onPressed: () => chooseHeadUnit(context, ref, vehicle),
                   child: Text(headUnit == null ? 'Choose' : 'Change'),
                 ),
               ),
@@ -90,7 +88,6 @@ class VehicleTripStartScreen extends ConsumerWidget {
   static Future<void> chooseHeadUnit(
     BuildContext context,
     WidgetRef ref,
-    AppSettings settings,
     Vehicle vehicle,
   ) async {
     final device = await showModalBottomSheet<BondedDevice>(
@@ -108,10 +105,12 @@ class VehicleTripStartScreen extends ConsumerWidget {
             title: 'Paired devices',
             role: DeviceRole.headUnit,
             selectedAddress: vehicle.headUnitAddress,
-            ownerOf: (address) => switch (settings.headUnitOwner(address)) {
-              final owner? when owner.id != vehicle.id => owner.name,
-              _ => null,
-            },
+            // Asked as the list shows, not from when the sheet opened.
+            ownerOf: (address) => ref
+                .read(appSettingsProvider)
+                .value
+                ?.otherHeadUnitOwner(address, vehicleId: vehicle.id)
+                ?.name,
             onSelected: (device) => Navigator.pop(context, device),
           ),
         ),

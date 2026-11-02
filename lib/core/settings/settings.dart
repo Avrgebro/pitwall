@@ -47,6 +47,14 @@ class AppSettings {
       .where((v) => _sameAddress(v.headUnitAddress, address))
       .firstOrNull;
 
+  /// The vehicle other than [vehicleId] the head unit at [address] belongs
+  /// to, if any: then [vehicleId] can't have it.
+  Vehicle? otherHeadUnitOwner(String address, {required String vehicleId}) =>
+      switch (headUnitOwner(address)) {
+        final owner? when owner.id != vehicleId => owner,
+        _ => null,
+      };
+
   /// Every head unit that starts a trip, for Android to watch for.
   Set<String> get startingHeadUnits => {
     for (final vehicle in vehicles)

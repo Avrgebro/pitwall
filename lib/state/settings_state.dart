@@ -97,10 +97,8 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }) async {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) return;
-    final owner = _current.headUnitOwner(address);
-    if (owner != null && owner.id != vehicleId) {
-      throw StateError('${owner.name} already uses $name');
-    }
+    final owner = _current.otherHeadUnitOwner(address, vehicleId: vehicleId);
+    if (owner != null) throw StateError('${owner.name} already uses $name');
     await saveVehicle(
       vehicle.copyWith(
         tripStart: TripStart.carBluetooth,
