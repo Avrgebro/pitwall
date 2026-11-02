@@ -22,8 +22,8 @@ void main() {
         .record('mazda', {'rpm': 900}, later);
 
     expect(values.of('tucson')['rpm']!.value, 800);
-    expect(values.without('tucson').of('tucson'), isEmpty);
-    expect(values.without('tucson').of('mazda')['rpm']!.value, 900);
+    expect(values.only({'mazda'}).of('tucson'), isEmpty);
+    expect(values.only({'mazda'}).of('mazda')['rpm']!.value, 900);
   });
 
   test('a round trip through JSON keeps values and times', () {

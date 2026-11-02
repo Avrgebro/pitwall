@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/readings/last_values.dart';
 import 'infrastructure.dart';
+import 'settings_state.dart';
 
 /// The last value of each key every vehicle reported, kept across
-/// restarts. Home shows a vehicle's from here.
+/// restarts. Home shows a vehicle's from here. Follows the settings, so a
+/// deleted vehicle's values go with it.
 final lastValuesProvider =
     AsyncNotifierProvider<LastValuesNotifier, LastValues>(
       LastValuesNotifier.new,
@@ -14,7 +18,14 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
   LastValuesStorage get _storage => ref.read(lastValuesStorageProvider);
 
   @override
-  Future<LastValues> build() => _storage.load();
+  Future<LastValues> build() {
+    ref.listen(appSettingsProvider, (_, settings) {
+      if (settings.value case final settings?) {
+        unawaited(_keepOnly({for (final v in settings.vehicles) v.id}));
+      }
+    }, fireImmediately: true);
+    return _storage.load();
+  }
 
   /// Keeps [values], read [at], as sent in the reading numbered [seq].
   Future<void> record(
@@ -27,8 +38,11 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     await _save((await future).record(vehicleId, values, at, seq: seq));
   }
 
-  Future<void> forget(String vehicleId) async =>
-      _save((await future).without(vehicleId));
+  Future<void> _keepOnly(Set<String> vehicleIds) async {
+    final current = await future;
+    final kept = current.only(vehicleIds);
+    if (kept.byVehicle.length != current.byVehicle.length) await _save(kept);
+  }
 
   Future<void> _save(LastValues values) async {
     state = AsyncData(values);

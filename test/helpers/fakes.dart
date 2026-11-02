@@ -159,6 +159,7 @@ List<Override> testOverrides({
   Map<AppPermission, bool>? permissions,
   FakeSettingsStore? store,
   FakeBluetoothGateway? bluetooth,
+  FakeLastValuesStorage? lastValues,
 }) {
   final sender = WebhookSender(
     storage: FakeDeliveryStorage(),
@@ -170,7 +171,9 @@ List<Override> testOverrides({
       store ?? FakeSettingsStore(settings: settings),
     ),
     webhookSenderProvider.overrideWithValue(sender),
-    lastValuesStorageProvider.overrideWithValue(FakeLastValuesStorage()),
+    lastValuesStorageProvider.overrideWithValue(
+      lastValues ?? FakeLastValuesStorage(),
+    ),
     permissionGatewayProvider.overrideWithValue(
       FakePermissionGateway(permissions),
     ),

@@ -54,8 +54,11 @@ class LastValues {
     },
   });
 
-  LastValues without(String vehicleId) =>
-      LastValues({...byVehicle}..remove(vehicleId));
+  /// Only the vehicles in [vehicleIds].
+  LastValues only(Set<String> vehicleIds) => LastValues({
+    for (final MapEntry(:key, :value) in byVehicle.entries)
+      if (vehicleIds.contains(key)) key: value,
+  });
 
   Map<String, Object?> toJson() => {
     for (final MapEntry(key: vehicleId, value: values) in byVehicle.entries)

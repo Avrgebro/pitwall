@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/file_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
+import 'package:pitwall/state/last_values_state.dart';
 import 'package:pitwall/state/settings_state.dart';
 
 import '../core/profiles/test_profile.dart';
@@ -239,5 +241,32 @@ void main() {
       expect(vehicle.profileName, 'default.json');
       expect(vehicle.modelYear, 2023);
     });
+  });
+
+  test('a deleted vehicle\'s last values go with it', () async {
+    final storage = FakeLastValuesStorage()
+      ..saved = const LastValues()
+          .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2))
+          .record('mazda', {'rpm': 900}, DateTime(2026, 11, 2));
+    final container = ProviderContainer(
+      overrides: testOverrides(
+        settings: const AppSettings(
+          vehicles: [
+            Vehicle(id: 'tucson', name: 'Tucson'),
+            Vehicle(id: 'mazda', name: 'Mazda'),
+          ],
+        ),
+        lastValues: storage,
+      ),
+    );
+    addTearDown(container.dispose);
+    await container.read(appSettingsProvider.future);
+    await container.read(lastValuesProvider.future);
+
+    await container.read(appSettingsProvider.notifier).deleteVehicle('tucson');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(storage.saved.of('tucson'), isEmpty);
+    expect(storage.saved.of('mazda'), isNotEmpty);
   });
 }
