@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/logging/adapter_log.dart';
-import '../../core/vehicles/vehicle.dart';
+import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
-import '../../state/trip_state.dart';
 import '../../ui/ui.dart';
+import '../common/widgets/vehicle_picker_sheet.dart';
 import 'widgets/log_view.dart';
 import 'widgets/session_panel.dart';
 
@@ -23,9 +23,6 @@ class DeveloperScreen extends ConsumerStatefulWidget {
 
 class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
   final _command = TextEditingController();
-
-  /// The vehicle picked here, when no session or trip decides.
-  String? _chosenId;
 
   @override
   void dispose() {
@@ -44,68 +41,13 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
     _command.clear();
   }
 
-  Future<void> _chooseVehicle(List<Vehicle> vehicles, Vehicle? current) async {
-    final id = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => SingleChildScrollView(
-        padding: Insets.page.copyWith(bottom: Insets.xl),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SectionHeader(
-                'Connect to',
-                padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
-              ),
-              RadioGroup<String>(
-                groupValue: current?.id,
-                onChanged: (id) => Navigator.pop(context, id),
-                child: RowGroup(
-                  children: [
-                    for (final vehicle in vehicles)
-                      ChoiceRow<String>(
-                        value: vehicle.id,
-                        title: vehicle.name,
-                        subtitle: vehicle.adapterName,
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (id != null) setState(() => _chosenId = id);
-  }
-
   @override
   Widget build(BuildContext context) {
     final log = ref.watch(adapterLogProvider);
     final session = ref.watch(sessionProvider);
-    final trip = ref.watch(tripProvider);
-    final settings = ref.watch(appSettingsProvider).value;
-    final withAdapter = [
-      for (final vehicle in settings?.vehicles ?? const <Vehicle>[])
-        if (vehicle.adapterAddress != null) vehicle,
-    ];
-    Vehicle? find(String? id) =>
-        withAdapter.where((v) => v.id == id).firstOrNull;
-    // A session or trip in progress decides the vehicle; otherwise the one
-    // picked here, or the one seen most recently.
-    final liveId = session.vehicleId ?? trip.vehicleId;
-    final vehicle =
-        find(liveId) ??
-        find(_chosenId) ??
-        find(settings?.mostRecentVehicle?.id) ??
-        withAdapter.firstOrNull;
-    final canChoose =
-        liveId == null && !trip.isActive && withAdapter.length > 1;
+    final vehicleCount = ref.watch(
+      appSettingsProvider.select((s) => s.value?.vehicles.length ?? 0),
+    );
 
     return ValueListenableBuilder<List<LogEntry>>(
       valueListenable: log.entries,
@@ -122,9 +64,9 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
             padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
           ),
           SessionPanel(
-            vehicle: vehicle,
-            onChooseVehicle: canChoose
-                ? () => _chooseVehicle(withAdapter, vehicle)
+            vehicle: ref.watch(focusedVehicleProvider),
+            onChooseVehicle: vehicleCount > 1
+                ? () => VehiclePickerSheet.show(context, title: 'Connect to')
                 : null,
           ),
           Padding(

@@ -14,7 +14,7 @@ import '../../../ui/ui.dart';
 class SessionPanel extends ConsumerWidget {
   const SessionPanel({super.key, required this.vehicle, this.onChooseVehicle});
 
-  /// The vehicle to connect to, or null if there's none with an adapter.
+  /// The vehicle to connect to, or null if there's none.
   final Vehicle? vehicle;
 
   /// Picks another vehicle; null when there's no choice, or while a session
@@ -30,7 +30,8 @@ class SessionPanel extends ConsumerWidget {
     final vehicle = this.vehicle;
     // Assumed on until Android says otherwise, so nothing flashes.
     final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
-    final canConnect = vehicle != null && bluetoothOn;
+    final canConnect =
+        vehicle != null && vehicle.adapterAddress != null && bluetoothOn;
 
     final (chip, detail) = switch (session.phase) {
       SessionPhase.connected => (
@@ -61,7 +62,9 @@ class SessionPanel extends ConsumerWidget {
           icon: Symbols.bluetooth_disabled_rounded,
         ),
         switch (vehicle) {
-          null => 'Add a vehicle with an adapter first.',
+          null => 'Add a vehicle first.',
+          Vehicle(adapterAddress: null, :final name) =>
+            'Choose $name\'s adapter first.',
           _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
           final vehicle =>
             _problem(session.problem) ??

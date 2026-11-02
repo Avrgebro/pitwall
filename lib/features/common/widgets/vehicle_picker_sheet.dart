@@ -2,41 +2,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/vehicles/vehicle.dart';
-import '../../../state/home_state.dart';
+import '../../../state/focus_state.dart';
 import '../../../state/infrastructure.dart';
 import '../../../state/session_state.dart';
 import '../../../state/settings_state.dart';
 import '../../../ui/ui.dart';
 
-/// A sheet for choosing which vehicle Home shows. While a car is connected,
-/// Home shows that one, so the others wait until it disconnects.
-abstract final class VehicleSwitcher {
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (context) => const SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(Insets.l, 0, Insets.l, Insets.xl),
-      child: SafeArea(top: false, child: _Choices()),
-    ),
-  );
+/// A sheet for choosing the vehicle in focus, shared by Home and Developer
+/// tools. While a car is live, the app follows it, so the others wait.
+abstract final class VehiclePickerSheet {
+  static Future<void> show(BuildContext context, {required String title}) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (context) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(Insets.l, 0, Insets.l, Insets.xl),
+          child: SafeArea(top: false, child: _Choices(title: title)),
+        ),
+      );
 }
 
 class _Choices extends ConsumerWidget {
-  const _Choices();
+  const _Choices({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final vehicles = ref.watch(appSettingsProvider).value?.vehicles ?? [];
-    final shown = ref.watch(homeVehicleProvider);
-    final session = ref.watch(sessionProvider);
+    final focused = ref.watch(focusedVehicleProvider);
+    final liveId = ref.watch(liveVehicleIdProvider);
+    final connected = ref.watch(sessionProvider).isConnected;
     final now = ref.watch(nowProvider);
-    final live = vehicles.where((v) => v.id == session.vehicleId).firstOrNull;
+    final live = vehicles.where((v) => v.id == liveId).firstOrNull;
 
     String state(Vehicle vehicle) => switch (vehicle.lastSeen) {
-      _ when vehicle.id == live?.id =>
-        session.isConnected ? 'Connected' : 'Connecting',
+      _ when vehicle.id == live?.id => connected ? 'Connected' : 'Connecting',
       final seen? => 'Last seen ${Formatters.ago(seen, now)}',
       null => 'Never connected',
     };
@@ -45,15 +48,15 @@ class _Choices extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SectionHeader(
-          'Show on Home',
-          padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
+        SectionHeader(
+          title,
+          padding: const EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
         ),
         RadioGroup<String>(
-          groupValue: shown?.id,
+          groupValue: focused?.id,
           onChanged: (id) {
             if (id == null) return;
-            ref.read(homePickProvider.notifier).pick(id);
+            ref.read(focusPickProvider.notifier).pick(id);
             Navigator.pop(context);
           },
           child: RowGroup(
@@ -71,8 +74,8 @@ class _Choices extends ConsumerWidget {
         InfoNote(
           text: TextSpan(
             text: live == null
-                ? 'Home goes back to following your cars when one connects.'
-                : 'While ${live.name} is connected, Home shows it.',
+                ? 'When a car connects, Pitwall switches to it.'
+                : 'While ${live.name} is connected, Pitwall stays on it.',
           ),
         ),
       ],

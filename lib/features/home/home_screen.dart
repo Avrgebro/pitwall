@@ -4,18 +4,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../core/readings/readings.dart';
-import '../../state/home_state.dart';
+import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/permissions_state.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/webhook_state.dart';
 import '../../ui/ui.dart';
+import '../common/widgets/vehicle_picker_sheet.dart';
 import 'home_view_model.dart';
 import 'setup_checklist.dart';
 import 'widgets/delivery_status_card.dart';
 import 'widgets/setup_checklist_card.dart';
-import 'widgets/vehicle_switcher.dart';
 import 'widgets/vehicle_hero_card.dart';
 
 /// Status at a glance: what's left to set up, the vehicle seen most
@@ -31,7 +31,7 @@ class HomeScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final session = ref.watch(sessionProvider);
-    final vehicle = ref.watch(homeVehicleProvider);
+    final vehicle = ref.watch(focusedVehicleProvider);
 
     // Before the first vehicle, Home walks through setup. After, problems
     // show where they belong: the vehicle, the delivery card, Settings.
@@ -74,7 +74,7 @@ class HomeScreen extends ConsumerWidget {
           model: model.hero,
           // With more than one vehicle, its name switches between them.
           onSwitch: settings.vehicles.length > 1
-              ? () => VehicleSwitcher.show(context)
+              ? () => VehiclePickerSheet.show(context, title: 'Show on Home')
               : null,
         ),
         if (model.delivery.isProblem) ...[

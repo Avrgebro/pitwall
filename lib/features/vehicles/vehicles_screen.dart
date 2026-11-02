@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
-import '../../state/home_state.dart';
+import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/session_state.dart';
 import '../../state/settings_state.dart';
@@ -24,7 +24,7 @@ class VehiclesScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final now = ref.watch(nowProvider);
     final vehicles = settings.vehicles;
-    final homeVehicle = ref.watch(homeVehicleProvider);
+    final homeVehicle = ref.watch(focusedVehicleProvider);
 
     if (vehicles.isEmpty) {
       return AppPage(

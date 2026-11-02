@@ -491,6 +491,41 @@ void main() {
     expect(bluetooth.connected, ['BB']);
   });
 
+  testWidgets('developer tools follow the vehicle picked on Home', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      settings: AppSettings(
+        vehicles: [
+          _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
+          const Vehicle(
+            id: 'mazda',
+            name: 'Mazda',
+            adapterAddress: 'BB',
+            adapterName: 'Mazda OBD',
+          ),
+        ],
+        setupDone: true,
+      ),
+    );
+    // Home's vehicle name opens the shared picker.
+    await tester.tap(find.text('Tucson'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mazda'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final developer = find.text('Developer tools');
+    await Scrollable.ensureVisible(tester.element(developer), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(developer);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mazda OBD'), findsOneWidget);
+  });
+
   testWidgets('developer tools say when Bluetooth is off', (tester) async {
     await _pumpApp(
       tester,
