@@ -63,8 +63,8 @@ class VehicleProfileScreen extends ConsumerWidget {
           .importProfile(vehicle.id, file);
       final year = vehicle.modelYear;
       message = year == null
-          ? 'Profile imported · choose the model year'
-          : 'Profile imported · ${ProfileText.applies(profile, year)}';
+          ? 'Profile imported. Choose the model year.'
+          : 'Profile imported: ${ProfileText.applies(profile, year)}';
     } on UnreadableFileException catch (e) {
       message = e.tooLarge
           ? 'That file is too large to be a profile.'

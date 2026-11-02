@@ -153,7 +153,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
             null => ChoiceRow<String>(
               value: device.address,
               title: device.name,
-              subtitle: 'Classic · ${device.address}',
+              subtitle: 'Classic, ${device.address}',
             ),
           },
       ],

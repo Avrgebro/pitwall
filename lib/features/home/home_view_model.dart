@@ -364,10 +364,10 @@ class HomeViewModel {
       title: reading.delivered ? 'Last values sent' : 'Latest readings',
       meta: switch ((reading.delivered, status.lastError)) {
         (true, _) => 'Updated $ago',
-        (false, null) => 'Read $ago · sending',
+        (false, null) => 'Read $ago, sending',
         (false, final error?) when error.isTransient =>
-          'Read $ago · not sent yet',
-        (false, _) => 'Read $ago · not delivered',
+          'Read $ago, not sent yet',
+        (false, _) => 'Read $ago, not delivered',
       },
       tiles: ValueDisplay.tiles(reading.values, options),
     );

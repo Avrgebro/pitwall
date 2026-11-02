@@ -64,7 +64,7 @@ class ProfileCard extends StatelessWidget {
                             vehicle.profileName ?? 'profile.json',
                             if (imported != null)
                               'imported ${Formatters.date(imported)}',
-                          ].join(' · '),
+                          ].join(', '),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

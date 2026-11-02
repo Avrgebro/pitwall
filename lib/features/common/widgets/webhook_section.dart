@@ -145,7 +145,7 @@ class _WebhookSectionState extends ConsumerState<WebhookSection> {
               title: 'Test reading delivered',
               message:
                   'The server accepted it in '
-                  '${Formatters.elapsed(result.elapsed)} · '
+                  '${Formatters.elapsed(result.elapsed)}, at '
                   '${Formatters.clock(at)}',
             ),
         ],

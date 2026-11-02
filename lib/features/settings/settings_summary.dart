@@ -5,7 +5,8 @@ import '../common/delivery_text.dart';
 
 /// The one-line state shown under each row of the Settings overview.
 abstract final class SettingsSummary {
-  /// "Not set yet", "Set · last sent 2 min ago", or the problem.
+  /// "Not set yet", "Nothing sent yet", "Last sent 2 min ago", or the
+  /// problem.
   static ({String text, bool problem}) webhook(
     WebhookConfig config,
     DeliveryStatus status,
@@ -19,8 +20,8 @@ abstract final class SettingsSummary {
     final lastSuccess = status.lastSuccess;
     return (
       text: lastSuccess == null
-          ? 'Set · nothing sent yet'
-          : 'Set · last sent ${Formatters.ago(lastSuccess, now)}',
+          ? 'Nothing sent yet'
+          : 'Last sent ${Formatters.ago(lastSuccess, now)}',
       problem: false,
     );
   }

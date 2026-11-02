@@ -39,7 +39,7 @@ class SettingsScreen extends ConsumerWidget {
       title: 'Settings',
       children: [
         const SectionHeader(
-          'Delivery',
+          'Sending',
           icon: Symbols.cloud_upload_rounded,
           padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.m),
         ),
@@ -60,19 +60,19 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const SectionHeader('Trips', icon: Symbols.route_rounded),
+        const SectionHeader('Phone', icon: Symbols.smartphone_rounded),
         RowGroup(
           children: [
             GroupTile(
               icon: Symbols.verified_user_rounded,
-              title: 'Background checks',
+              title: 'Permissions',
               subtitle: checks.text,
               subtitleTone: tone(checks.problem),
               onTap: () => context.push(Routes.backgroundChecks),
             ),
           ],
         ),
-        const SectionHeader('About', icon: Symbols.info_rounded),
+        const SectionHeader('App', icon: Symbols.info_rounded),
         RowGroup(
           children: [
             GroupTile(
@@ -80,18 +80,13 @@ class SettingsScreen extends ConsumerWidget {
               title: 'About Pitwall',
               subtitle: info == null
                   ? 'Licence and credits'
-                  : 'Version ${info.version} · licence and credits',
+                  : 'Version ${info.version}, licence and credits',
               onTap: () => context.push(Routes.about),
             ),
-          ],
-        ),
-        const SectionHeader('Developer', icon: Symbols.code_rounded),
-        RowGroup(
-          children: [
             GroupTile(
               icon: Symbols.terminal_rounded,
               title: 'Developer tools',
-              subtitle: 'Adapter log, raw commands and test trips',
+              subtitle: 'Adapter log, raw commands, simulate auto-start',
               onTap: () => context.push(Routes.developer),
             ),
           ],

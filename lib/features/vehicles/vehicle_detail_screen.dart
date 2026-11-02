@@ -102,16 +102,16 @@ class VehicleDetailScreen extends ConsumerWidget {
   static String _adapterSummary(Vehicle vehicle) =>
       switch ((vehicle.adapterName, vehicle.adapterType)) {
         (null, _) => 'Not chosen yet',
-        (final name?, AdapterType.classic) => '$name · Classic',
-        (final name?, AdapterType.ble) => '$name · Bluetooth LE',
+        (final name?, AdapterType.classic) => '$name (Classic)',
+        (final name?, AdapterType.ble) => '$name (Bluetooth LE)',
       };
 
   static String _profileSummary(Vehicle vehicle, SignalSet? profile) =>
       switch ((profile, vehicle.modelYear)) {
         (null, _) => 'Standard values only',
-        (_, null) => 'OBDb profile · choose the model year',
+        (_, null) => 'OBDb profile: choose the model year',
         (final profile?, final year?) =>
-          'OBDb profile · ${ProfileText.applies(profile, year)}',
+          'OBDb profile: ${ProfileText.applies(profile, year)}',
       };
 
   Future<void> _delete(

@@ -21,7 +21,7 @@ class BackgroundChecksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = ref.watch(permissionsProvider).value ?? const {};
     return AppPage(
-      title: 'Background checks',
+      title: 'Permissions',
       children: [
         RowGroup(
           children: [

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -92,7 +93,7 @@ void main() {
 
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
-    expect(find.text('Background checks'), findsOneWidget);
+    expect(find.text('Permissions'), findsOneWidget);
     // Trip start lives on each vehicle now.
     expect(find.text('What wakes Pitwall'), findsNothing);
   });
@@ -516,4 +517,32 @@ void main() {
     expect(find.text('vLinker MC+'), findsNothing);
   });
 
+  testWidgets('licences open in the app\'s own pages', (tester) async {
+    LicenseRegistry.addLicense(
+      () => Stream.value(
+        const LicenseEntryWithLineBreaks(['zz_test_package'], 'Test licence'),
+      ),
+    );
+    await _pumpApp(tester, settings: const AppSettings(setupDone: true));
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final about = find.text('About Pitwall');
+    await Scrollable.ensureVisible(tester.element(about), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(about);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open-source libraries'));
+    await tester.pumpAndSettle();
+
+    final package = find.text('zz_test_package');
+    await tester.scrollUntilVisible(
+      package,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(package);
+    await tester.pumpAndSettle();
+    expect(find.text('Test licence'), findsOneWidget);
+    expect(find.byType(LicensePage), findsNothing);
+  });
 }

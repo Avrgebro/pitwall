@@ -44,7 +44,7 @@ class SessionPanel extends ConsumerWidget {
           ?session.adapterVersion,
           _carState(session.carState),
           '${session.supportedPids.length} standard values',
-        ].join(' · '),
+        ].join(', '),
       ),
       SessionPhase.connecting => (
         const StatusChip(

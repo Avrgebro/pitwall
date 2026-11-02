@@ -142,7 +142,7 @@ void main() {
       '3',
     ]);
     expect(model.values!.title, 'Latest readings');
-    expect(model.values!.meta, 'Read 40 s ago · not sent yet');
+    expect(model.values!.meta, 'Read 40 s ago, not sent yet');
   });
 
   test('1d webhook refusing readings: needs the user', () {
@@ -166,7 +166,7 @@ void main() {
     expect(model.delivery.canOpenSettings, isTrue);
     expect(model.delivery.canRetry, isTrue);
     expect(model.delivery.stats.map((s) => s.value), ['yesterday', '12', '12']);
-    expect(model.values!.meta, 'Read 40 s ago · not delivered');
+    expect(model.values!.meta, 'Read 40 s ago, not delivered');
   });
 
   test('first use: nothing sent yet, no values', () {

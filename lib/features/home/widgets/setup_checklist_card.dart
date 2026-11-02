@@ -39,7 +39,7 @@ class SetupChecklistCard extends StatelessWidget {
   static String _title(SetupStep step) => switch (step) {
     SetupStep.vehicle => 'Add a vehicle',
     SetupStep.webhook => 'Set the webhook',
-    SetupStep.permissions => 'Allow background checks',
+    SetupStep.permissions => 'Allow permissions',
   };
 
   static String _action(SetupStep step) => switch (step) {

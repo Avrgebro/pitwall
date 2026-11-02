@@ -7,6 +7,7 @@ import '../features/home/home_screen.dart';
 import '../features/settings/about_screen.dart';
 import '../features/settings/background_checks_screen.dart';
 import '../features/settings/interval_screen.dart';
+import '../features/settings/licences_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/settings/webhook_screen.dart';
 import '../features/setup/setup_screen.dart';
@@ -105,7 +106,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                   subScreen('webhook', (_) => const WebhookScreen()),
                   subScreen('interval', (_) => const IntervalScreen()),
                   subScreen('checks', (_) => const BackgroundChecksScreen()),
-                  subScreen('about', (_) => const AboutScreen()),
+                  GoRoute(
+                    path: 'about',
+                    parentNavigatorKey: _rootNavigator,
+                    builder: (_, _) => const AboutScreen(),
+                    routes: [
+                      subScreen('licences', (_) => const LicencesScreen()),
+                      subScreen(
+                        'licences/:package',
+                        (state) => PackageLicencesScreen(
+                          package: state.pathParameters['package']!,
+                        ),
+                      ),
+                    ],
+                  ),
                   subScreen('developer', (_) => const DeveloperScreen()),
                 ],
               ),

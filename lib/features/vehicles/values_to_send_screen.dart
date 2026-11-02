@@ -45,7 +45,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
 
     return AppPage(
       title: 'Values to send',
-      subtitle: '${vehicle.name} · ${selected.length} selected',
+      subtitle: '${vehicle.name}, ${selected.length} selected',
       actions: [
         // Material 3 search: the icon opens a full-screen search view over
         // every value, standard and profile alike.
@@ -131,7 +131,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   }
 
   static String _profileLabel(Vehicle vehicle) => switch (vehicle.modelYear) {
-    final year? => 'Profile · $year',
+    final year? => '$year profile',
     null => 'Profile',
   };
 }

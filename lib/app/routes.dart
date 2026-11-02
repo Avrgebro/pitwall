@@ -18,5 +18,8 @@ abstract final class Routes {
   static const intervalSettings = '/settings/interval';
   static const backgroundChecks = '/settings/checks';
   static const about = '/settings/about';
+  static const licences = '/settings/about/licences';
+  static String packageLicences(String package) =>
+      '/settings/about/licences/${Uri.encodeComponent(package)}';
   static const developer = '/settings/developer';
 }

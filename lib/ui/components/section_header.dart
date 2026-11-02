@@ -5,7 +5,7 @@ import '../theme/tokens.dart';
 import 'line_icon.dart';
 
 /// Title of a group on a page, with optional meta text on the right
-/// ("Last values sent ······ Updated 40 s ago").
+/// ("Last values sent" on the left, "Updated 40 s ago" on the right).
 ///
 /// With an [icon], it's the quieter settings style: an accent icon and a
 /// plain label. Without one, the label itself carries the accent colour.

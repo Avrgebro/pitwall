@@ -69,7 +69,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         steps: steps,
         primaryLabel: 'Get started',
         onPrimary: () => _go(_Step.adapter),
-        footnote: 'Free and open source · MIT licence',
+        footnote: 'Free and open source, MIT licence',
         children: const [WelcomeStep()],
       ),
       _Step.adapter => StepScaffold(
@@ -108,7 +108,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             'except the readings sent to your webhook.',
         primaryLabel: 'Continue',
         // Bluetooth is essential; the others can be fixed later from the
-        // background checks in Settings.
+        // Permissions in Settings.
         onPrimary:
             ref.watch(permissionsProvider).value?[AppPermission.bluetooth] ??
                 false

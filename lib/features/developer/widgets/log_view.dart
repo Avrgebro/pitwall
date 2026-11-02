@@ -55,7 +55,7 @@ class LogView extends StatelessWidget {
         ],
         LogEntryKind.note => [
           TextSpan(
-            text: '· ${entry.text}',
+            text: '- ${entry.text}',
             style: TextStyle(color: entry.warning ? warning : muted),
           ),
         ],
@@ -96,7 +96,7 @@ String logAsText(List<LogEntry> entries) => entries
         LogEntryKind.exchange =>
           '$time → ${entry.text} ← ${LogView._compact(entry.reply ?? '')}',
         LogEntryKind.value => '$time = ${entry.text}',
-        LogEntryKind.note => '$time · ${entry.text}',
+        LogEntryKind.note => '$time - ${entry.text}',
         LogEntryKind.delivery => '$time ${entry.text}',
       };
     })

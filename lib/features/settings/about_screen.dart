@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/links.dart';
+import '../../app/routes.dart';
 import '../../state/infrastructure.dart';
 import '../../ui/ui.dart';
 
@@ -52,10 +54,7 @@ class AboutScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.database_rounded,
               title: 'OBDb',
-              subtitle:
-                  'Community documentation of vehicle signals. Pitwall reads '
-                  'its signal-set files, which you download yourself; none are '
-                  'bundled. OBDb data is licensed CC BY-SA 4.0.',
+              subtitle: 'Vehicle profiles, CC BY-SA 4.0. Not bundled.',
               trailing: external,
               onTap: () => launchUrl(Links.obdb),
             ),
@@ -63,11 +62,7 @@ class AboutScreen extends ConsumerWidget {
               icon: Symbols.library_books_rounded,
               title: 'Open-source libraries',
               subtitle: 'Licences of the packages Pitwall is built with',
-              onTap: () => showLicensePage(
-                context: context,
-                applicationName: 'Pitwall',
-                applicationVersion: info?.version,
-              ),
+              onTap: () => context.push(Routes.licences),
             ),
           ],
         ),

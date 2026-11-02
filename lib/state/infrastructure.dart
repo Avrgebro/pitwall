@@ -65,10 +65,10 @@ void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
   final target = attempt.test ? 'webhook (test)' : 'webhook';
   final elapsed = '${attempt.elapsed.inMilliseconds} ms';
   if (attempt.error case final error? when attempt.statusCode == null) {
-    log.delivery('POST $target ✕ ${error.kind.name} · $elapsed', warning: true);
+    log.delivery('POST $target ✕ ${error.kind.name}, $elapsed', warning: true);
   } else {
     log.delivery(
-      'POST $target ← ${attempt.statusCode} · $elapsed',
+      'POST $target ← ${attempt.statusCode}, $elapsed',
       warning: attempt.error != null,
     );
   }
