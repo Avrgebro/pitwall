@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
+import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/state/infrastructure.dart';
@@ -82,19 +83,19 @@ class FakeBluetoothGateway implements BluetoothGateway {
 class FakeTripServiceGateway implements TripServiceGateway {
   FakeTripServiceGateway({this.pendingRequest});
 
-  StartTrip? pendingRequest;
+  TripTarget? pendingRequest;
   final calls = <String>[];
   final notifications = <String>[];
   Set<String>? headUnitAddresses;
-  final _starts = StreamController<StartTrip>.broadcast();
+  final _starts = StreamController<TripTarget>.broadcast();
 
-  void send(StartTrip start) => _starts.add(start);
-
-  @override
-  Stream<StartTrip> get starts => _starts.stream;
+  void send(TripTarget target) => _starts.add(target);
 
   @override
-  Future<StartTrip?> takeTripRequest() async {
+  Stream<TripTarget> get starts => _starts.stream;
+
+  @override
+  Future<TripTarget?> takeTripRequest() async {
     final pending = pendingRequest;
     pendingRequest = null;
     return pending;
@@ -105,9 +106,9 @@ class FakeTripServiceGateway implements TripServiceGateway {
       this.headUnitAddresses = headUnitAddresses;
 
   @override
-  Future<void> startService() async {
+  Future<void> startService(TripTarget target) async {
     calls.add('startService');
-    send(const StartTrip());
+    send(target);
   }
 
   @override

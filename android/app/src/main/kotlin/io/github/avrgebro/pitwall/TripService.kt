@@ -35,7 +35,10 @@ class TripService : Service() {
             tripActive = true
             acquireWakeLock()
             EngineHolder.get(this)
-            ServiceBridge.requestTripStart(intent?.getStringExtra(EXTRA_HEAD_UNIT))
+            ServiceBridge.requestTripStart(
+                headUnit = intent?.getStringExtra(EXTRA_HEAD_UNIT),
+                vehicleId = intent?.getStringExtra(EXTRA_VEHICLE_ID),
+            )
         }
         // Without a trip request there's nothing to resume after a restart.
         return START_NOT_STICKY
@@ -61,6 +64,7 @@ class TripService : Service() {
     companion object {
         const val ACTION_START = "io.github.avrgebro.pitwall.TRIP_START"
         private const val EXTRA_HEAD_UNIT = "head_unit"
+        private const val EXTRA_VEHICLE_ID = "vehicle_id"
         private const val CHANNEL_ID = "trip"
         private const val NOTIFICATION_ID = 1
         private const val MAX_TRIP_MS = 12 * 60 * 60 * 1000L
@@ -70,12 +74,16 @@ class TripService : Service() {
         @Volatile
         private var tripActive = false
 
-        /** Starts a trip; [headUnit] is the car's head unit that connected, or null from the app. */
-        fun start(context: Context, headUnit: String? = null) {
+        /**
+         * Starts a trip for the car whose [headUnit] connected, or, from the
+         * app, for [vehicleId], or any vehicle when both are null.
+         */
+        fun start(context: Context, headUnit: String? = null, vehicleId: String? = null) {
             context.startForegroundService(
                 Intent(context, TripService::class.java)
                     .setAction(ACTION_START)
-                    .putExtra(EXTRA_HEAD_UNIT, headUnit),
+                    .putExtra(EXTRA_HEAD_UNIT, headUnit)
+                    .putExtra(EXTRA_VEHICLE_ID, vehicleId),
             )
         }
 

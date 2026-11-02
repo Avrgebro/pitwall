@@ -11,8 +11,9 @@ import io.flutter.plugin.common.MethodChannel
  *
  * Dart → Android: `configure`, `startService`, `stopService`,
  * `updateNotification`, `takeTripRequest`.
- * Android → Dart: `tripStart`, with the `headUnit` that connected (null
- * when the app asked).
+ * Android → Dart: `tripStart`, naming the trip's target: the `headUnit`
+ * that connected, or the `vehicleId` the app asked for, or neither for any
+ * vehicle. `startService` passes the app's target the same way.
  *
  * A trip can be requested before Dart has finished starting, so requests
  * wait until Dart asks for them with `takeTripRequest`.
@@ -26,7 +27,7 @@ object ServiceBridge {
     private const val KEY_OLD_HEAD_UNIT = "head_unit_address"
 
     /** A trip asked for before Dart was listening. */
-    private class PendingStart(val headUnit: String?)
+    private class PendingStart(val target: Map<String, String>)
 
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
@@ -46,7 +47,10 @@ object ServiceBridge {
                         result.success(null)
                     }
                     "startService" -> {
-                        TripService.start(context)
+                        TripService.start(
+                            context,
+                            vehicleId = call.argument<String>("vehicleId"),
+                        )
                         result.success(null)
                     }
                     "stopService" -> {
@@ -59,7 +63,7 @@ object ServiceBridge {
                     }
                     "takeTripRequest" -> {
                         dartReady = true
-                        result.success(pendingStart?.let { mapOf("headUnit" to it.headUnit) })
+                        result.success(pendingStart?.target)
                         pendingStart = null
                     }
                     else -> result.notImplemented()
@@ -76,11 +80,15 @@ object ServiceBridge {
         return address.uppercase() in addresses
     }
 
-    fun requestTripStart(headUnit: String?) = main.post {
+    fun requestTripStart(headUnit: String?, vehicleId: String?) = main.post {
+        val target = buildMap {
+            headUnit?.let { put("headUnit", it) }
+            vehicleId?.let { put("vehicleId", it) }
+        }
         if (dartReady) {
-            channel?.invokeMethod("tripStart", mapOf("headUnit" to headUnit))
+            channel?.invokeMethod("tripStart", target)
         } else {
-            pendingStart = PendingStart(headUnit)
+            pendingStart = PendingStart(target)
         }
     }
 

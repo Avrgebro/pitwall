@@ -1,3 +1,4 @@
+import '../trips/trip_target.dart';
 import '../vehicles/vehicle.dart';
 
 /// The user's settings, except the webhook URL and credentials. Those work
@@ -64,6 +65,21 @@ class AppSettings {
       if (recent == null || seen.isAfter(recent.lastSeen!)) recent = vehicle;
     }
     return recent ?? vehicles.firstOrNull;
+  }
+
+  /// The vehicles a trip for [target] may connect to, in the order to try
+  /// them. Only vehicles with an adapter count.
+  List<Vehicle> tripCandidates(TripTarget target) => switch (target) {
+    HeadUnitTarget(:final address) => [?vehicleForHeadUnit(address)],
+    VehicleTarget(:final id) => [?vehicleById(id)],
+    // The car seen most recently is the likeliest to be this one.
+    AnyVehicleTarget() => [...vehicles]..sort(_mostRecentFirst),
+  }.where((v) => v.adapterAddress != null).toList();
+
+  static int _mostRecentFirst(Vehicle a, Vehicle b) {
+    final seenA = a.lastSeen, seenB = b.lastSeen;
+    if (seenA == null) return seenB == null ? 0 : 1;
+    return seenB == null ? -1 : seenB.compareTo(seenA);
   }
 
   /// Adds [vehicle], or replaces the one with the same id.

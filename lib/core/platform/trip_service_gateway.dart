@@ -2,32 +2,27 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-/// Android started the trip service: a car's head unit connected, or the
-/// app started a trip itself. Android only ever starts trips; the trip
-/// decides when it's over.
-final class StartTrip {
-  const StartTrip([this.headUnit]);
-
-  /// The head unit's Bluetooth address; null when the app asked.
-  final String? headUnit;
-}
+import '../trips/trip_target.dart';
 
 /// The Android trip service, behind an interface so the trip controller can
 /// be tested without a phone. Backed by `ServiceBridge.kt`.
+///
+/// Android only ever starts trips; the trip decides when it's over.
 abstract interface class TripServiceGateway {
-  /// Trips Android started.
-  Stream<StartTrip> get starts;
+  /// Trips Android started: a car's head unit connected, or the app asked.
+  Stream<TripTarget> get starts;
 
   /// The trip Android asked for before Dart was ready to hear it, if any.
   /// Asking also tells Android that Dart is now listening.
-  Future<StartTrip?> takeTripRequest();
+  Future<TripTarget?> takeTripRequest();
 
   /// The head units whose connection starts a trip, one per vehicle at
   /// most. Android keeps them, so it can start a trip with the app closed.
   Future<void> configure({required Set<String> headUnitAddresses});
 
-  /// Starts the service from the app, as if the head unit had connected.
-  Future<void> startService();
+  /// Starts the service from the app. The [target] comes back through
+  /// [starts], as a head unit's does.
+  Future<void> startService(TripTarget target);
 
   /// Stops the service once the trip is over.
   Future<void> stopService();
@@ -40,24 +35,38 @@ class AndroidTripServiceGateway implements TripServiceGateway {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'tripStart':
-          _starts.add(StartTrip(_headUnit(call.arguments)));
+          _starts.add(_decode(call.arguments));
       }
     });
   }
 
   static const _channel = MethodChannel('pitwall/service');
-  final _starts = StreamController<StartTrip>.broadcast();
+  final _starts = StreamController<TripTarget>.broadcast();
 
   @override
-  Stream<StartTrip> get starts => _starts.stream;
+  Stream<TripTarget> get starts => _starts.stream;
 
-  static String? _headUnit(Object? arguments) =>
-      arguments is Map ? arguments['headUnit'] as String? : null;
+  /// A target travels as `headUnit` or `vehicleId`, or neither for any
+  /// vehicle.
+  static TripTarget _decode(Object? arguments) {
+    final map = arguments is Map ? arguments : const {};
+    return switch ((map['headUnit'], map['vehicleId'])) {
+      (final String address, _) => HeadUnitTarget(address),
+      (_, final String id) => VehicleTarget(id),
+      _ => const AnyVehicleTarget(),
+    };
+  }
+
+  static Map<String, String> _encode(TripTarget target) => switch (target) {
+    HeadUnitTarget(:final address) => {'headUnit': address},
+    VehicleTarget(:final id) => {'vehicleId': id},
+    AnyVehicleTarget() => const {},
+  };
 
   @override
-  Future<StartTrip?> takeTripRequest() async {
+  Future<TripTarget?> takeTripRequest() async {
     final request = await _channel.invokeMethod<Object?>('takeTripRequest');
-    return request == null ? null : StartTrip(_headUnit(request));
+    return request == null ? null : _decode(request);
   }
 
   @override
@@ -67,7 +76,8 @@ class AndroidTripServiceGateway implements TripServiceGateway {
       });
 
   @override
-  Future<void> startService() => _channel.invokeMethod<void>('startService');
+  Future<void> startService(TripTarget target) =>
+      _channel.invokeMethod<void>('startService', _encode(target));
 
   @override
   Future<void> stopService() => _channel.invokeMethod<void>('stopService');

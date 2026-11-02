@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/platform/trip_service_gateway.dart';
 import '../core/session/car_state.dart';
+import '../core/trips/trip_target.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'session_state.dart';
@@ -17,8 +18,7 @@ enum TripEnd {
   /// The user stopped it.
   stopped,
 
-  /// No vehicle has an adapter set, or none goes with the head unit that
-  /// connected.
+  /// No vehicle the trip is for has an adapter set.
   noVehicle,
 
   /// Bluetooth permission is missing, and there's no screen to ask on.
@@ -97,10 +97,6 @@ class TripController extends Notifier<TripState> {
   /// close.
   bool _open = false;
 
-  /// The vehicle a trip started from the app is for, until Android hands
-  /// the start back.
-  String? _manualVehicleId;
-
   TripServiceGateway get _gateway => ref.read(tripServiceGatewayProvider);
   SessionController get _session => ref.read(sessionProvider.notifier);
   SessionState get _sessionState => ref.read(sessionProvider);
@@ -109,9 +105,7 @@ class TripController extends Notifier<TripState> {
   @override
   TripState build() {
     final gateway = ref.watch(tripServiceGatewayProvider);
-    final starts = gateway.starts.listen(
-      (start) => unawaited(_run(headUnit: start.headUnit)),
-    );
+    final starts = gateway.starts.listen((target) => unawaited(_run(target)));
     ref.onDispose(starts.cancel);
     // Android needs to know which head units start a trip, even while the
     // app isn't running.
@@ -124,8 +118,8 @@ class TripController extends Notifier<TripState> {
     }, fireImmediately: true);
     // Android may have started the service before Dart was listening.
     Future.microtask(() async {
-      if (await gateway.takeTripRequest() case StartTrip(:final headUnit)) {
-        unawaited(_run(headUnit: headUnit));
+      if (await gateway.takeTripRequest() case final target?) {
+        unawaited(_run(target));
       }
     });
     return const TripState();
@@ -134,10 +128,9 @@ class TripController extends Notifier<TripState> {
   /// Starts a trip from the app, through the service, as if [vehicleId]'s
   /// head unit had connected. Without a vehicle, it tries every vehicle's
   /// adapter.
-  Future<void> startManually({String? vehicleId}) {
-    _manualVehicleId = vehicleId;
-    return _gateway.startService();
-  }
+  Future<void> startManually({String? vehicleId}) => _gateway.startService(
+    vehicleId == null ? const AnyVehicleTarget() : VehicleTarget(vehicleId),
+  );
 
   /// Ends the trip after the current step; the last reading is still sent.
   void stop() {
@@ -146,37 +139,15 @@ class TripController extends Notifier<TripState> {
     if (wake != null && !wake.isCompleted) wake.complete();
   }
 
-  /// Runs a trip for the vehicle whose head unit is [headUnit], or, when
-  /// the app started it, for the vehicle it named or whichever vehicle's
+  /// Runs a trip for the vehicle [target] names, or whichever vehicle's
   /// adapter answers.
-  Future<void> _run({String? headUnit}) async {
+  Future<void> _run(TripTarget target) async {
     if (state.isActive) return;
     _stopRequested = false;
     _open = false;
-    final manualVehicleId = _manualVehicleId;
-    _manualVehicleId = null;
     state = TripState(phase: TripPhase.connecting, startedAt: DateTime.now());
     final settings = await ref.read(appSettingsProvider.future);
-    // A head unit or the app names the vehicle; otherwise any may answer.
-    final targeted = headUnit != null || manualVehicleId != null;
-    final named = headUnit != null
-        ? settings.vehicleForHeadUnit(headUnit)
-        : manualVehicleId == null
-        ? null
-        : settings.vehicleById(manualVehicleId);
-    final List<Vehicle> candidates;
-    if (targeted) {
-      candidates = [if (named != null && named.adapterAddress != null) named];
-    } else {
-      candidates =
-          settings.vehicles.where((v) => v.adapterAddress != null).toList()
-            // The car seen most recently is the likeliest to be this one.
-            ..sort((a, b) {
-              final seenA = a.lastSeen, seenB = b.lastSeen;
-              if (seenA == null) return seenB == null ? 0 : 1;
-              return seenB == null ? -1 : seenB.compareTo(seenA);
-            });
-    }
+    final candidates = settings.tripCandidates(target);
     if (candidates.isEmpty) return _finish(TripEnd.noVehicle);
 
     final (vehicle, problem) = await _connect(candidates);

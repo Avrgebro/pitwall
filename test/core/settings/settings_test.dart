@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 
 void main() {
@@ -101,6 +102,51 @@ void main() {
       );
       // It still belongs to the vehicle, so no other can take it.
       expect(settings.headUnitOwner('AA:BB:CC:DD:EE:FF')?.id, 'a1');
+    });
+  });
+
+  group('trip candidates', () {
+    final tucson = Vehicle(
+      id: 'tucson',
+      adapterAddress: 'T1',
+      headUnitAddress: 'AA:BB:CC:DD:EE:FF',
+      lastSeen: DateTime(2026, 10, 30),
+    );
+    final mazda = Vehicle(
+      id: 'mazda',
+      adapterAddress: 'M1',
+      lastSeen: DateTime(2026, 11, 1),
+    );
+    const neverSeen = Vehicle(id: 'kia', adapterAddress: 'K1');
+    const noAdapter = Vehicle(id: 'bike');
+    final settings = AppSettings(
+      vehicles: [neverSeen, tucson, noAdapter, mazda],
+    );
+
+    test('a head unit names its own vehicle only', () {
+      expect(
+        settings
+            .tripCandidates(const HeadUnitTarget('aa:bb:cc:dd:ee:ff'))
+            .map((v) => v.id),
+        ['tucson'],
+      );
+      expect(settings.tripCandidates(const HeadUnitTarget('99')), isEmpty);
+    });
+
+    test('the app can name one vehicle', () {
+      expect(
+        settings.tripCandidates(const VehicleTarget('mazda')).map((v) => v.id),
+        ['mazda'],
+      );
+      // Without an adapter there is nothing to connect to.
+      expect(settings.tripCandidates(const VehicleTarget('bike')), isEmpty);
+    });
+
+    test('any vehicle tries the most recently seen first', () {
+      expect(
+        settings.tripCandidates(const AnyVehicleTarget()).map((v) => v.id),
+        ['mazda', 'tucson', 'kia'],
+      );
     });
   });
 

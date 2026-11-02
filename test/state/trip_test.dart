@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
-import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_auth.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
@@ -74,7 +74,7 @@ void main() {
   ProviderContainer container({
     ClosableTransport? Function(String)? adapter,
     List<Vehicle> vehicles = const [_tucson],
-    StartTrip? pendingRequest,
+    TripTarget? pendingRequest,
     FakePermissionGateway? permissions,
     FakeBluetoothGateway? bluetooth,
   }) {
@@ -155,7 +155,7 @@ void main() {
     final c = container(adapter: (_) => _Adapter());
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     await running(c);
 
     c.read(tripProvider.notifier).stop();
@@ -176,7 +176,7 @@ void main() {
   test('a request made before Dart was ready still starts a trip', () async {
     final c = container(
       adapter: (_) => _Adapter(),
-      pendingRequest: const StartTrip(_tucsonStereo),
+      pendingRequest: const HeadUnitTarget(_tucsonStereo),
     );
     c.read(tripProvider);
     await running(c);
@@ -188,7 +188,7 @@ void main() {
     final c = container(adapter: (_) => null);
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.adapterNotFound);
@@ -200,7 +200,7 @@ void main() {
     final c = container(adapter: (_) => _Adapter(carOn: false));
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.carOff);
@@ -217,7 +217,7 @@ void main() {
     final c = container(vehicles: const []);
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     final trip = await ended(c);
 
     expect(trip.lastEnd, TripEnd.noVehicle);
@@ -233,7 +233,7 @@ void main() {
       final c = container(adapter: (_) => _Adapter(), permissions: permissions);
       c.read(tripProvider);
 
-      service.send(const StartTrip(_tucsonStereo));
+      service.send(const HeadUnitTarget(_tucsonStereo));
       final trip = await ended(c);
 
       expect(trip.lastEnd, TripEnd.permissionMissing);
@@ -253,7 +253,7 @@ void main() {
     );
     c.read(tripProvider);
 
-    service.send(const StartTrip(_mazdaStereo));
+    service.send(const HeadUnitTarget(_mazdaStereo));
     expect((await running(c)).vehicleId, 'mazda');
     expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
     c.read(tripProvider.notifier).stop();
@@ -267,9 +267,9 @@ void main() {
     );
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     await running(c);
-    service.send(const StartTrip(_mazdaStereo));
+    service.send(const HeadUnitTarget(_mazdaStereo));
     await Future<void>.delayed(const Duration(milliseconds: 40));
     expect(c.read(tripProvider).vehicleId, 'tucson');
     c.read(tripProvider.notifier).stop();
@@ -280,7 +280,7 @@ void main() {
     final c = container(adapter: (_) => _Adapter());
     c.read(tripProvider);
 
-    service.send(const StartTrip('99:99:99:99:99:99'));
+    service.send(const HeadUnitTarget('99:99:99:99:99:99'));
     expect((await ended(c)).lastEnd, TripEnd.noVehicle);
   });
 
@@ -331,7 +331,7 @@ void main() {
     );
     c.read(tripProvider);
 
-    service.send(const StartTrip(_tucsonStereo));
+    service.send(const HeadUnitTarget(_tucsonStereo));
     await running(c);
 
     await adapters.single.disconnect();
@@ -347,7 +347,7 @@ void main() {
       late _Adapter adapter;
       final c = container(adapter: (_) => adapter = _Adapter());
       c.read(tripProvider);
-      service.send(const StartTrip(_tucsonStereo));
+      service.send(const HeadUnitTarget(_tucsonStereo));
       await running(c);
       await until(() => received.isNotEmpty, 'a reading');
 
