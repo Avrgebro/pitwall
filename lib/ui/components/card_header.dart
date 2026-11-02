@@ -1,0 +1,57 @@
+import 'package:material_ui/material_ui.dart';
+
+import '../theme/tokens.dart';
+import 'glass_surface.dart';
+
+/// A card's heading: an icon badge, a title and an optional line under it,
+/// and an optional widget at the end, such as a button.
+class CardHeader extends StatelessWidget {
+  const CardHeader({
+    super.key,
+    required this.badge,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+  });
+
+  /// Usually an `IconBadge`.
+  final Widget badge;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final ink = GlassInk.of(context);
+    final subtitle = this.subtitle;
+    final trailing = this.trailing;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        badge,
+        const SizedBox(width: Insets.l),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: text.titleMedium?.copyWith(
+                  color: ink.strong,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  style: text.bodyMedium?.copyWith(color: ink.muted),
+                ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: Insets.s), trailing],
+      ],
+    );
+  }
+}

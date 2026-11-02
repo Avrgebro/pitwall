@@ -59,32 +59,13 @@ class ProfileCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const IconBadge(icon: Symbols.data_object_rounded),
-                  const SizedBox(width: Insets.l),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'OBDb profile',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        Text(
-                          [
-                            vehicle.profileName ?? 'profile.json',
-                            if (imported != null)
-                              'imported ${Formatters.date(imported)}',
-                          ].join(', '),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              CardHeader(
+                badge: const IconBadge(icon: Symbols.data_object_rounded),
+                title: 'OBDb profile',
+                subtitle: [
+                  vehicle.profileName ?? 'profile.json',
+                  if (imported != null) 'imported ${Formatters.date(imported)}',
+                ].join(', '),
               ),
               const SizedBox(height: Insets.l),
               DropdownButtonFormField<int>(
@@ -187,40 +168,21 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ContentCard(
       dashed: true,
       padding: Insets.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const IconBadge(
-                icon: Symbols.data_object_rounded,
-                tone: StatusTone.neutral,
-              ),
-              const SizedBox(width: Insets.l),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Standard values only',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    Text(
-                      'Import a profile to add your car\'s own signals to the '
-                      'values you can send.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const CardHeader(
+            badge: IconBadge(
+              icon: Symbols.data_object_rounded,
+              tone: StatusTone.neutral,
+            ),
+            title: 'Standard values only',
+            subtitle:
+                'Import a profile to add your car\'s own signals to the '
+                'values you can send.',
           ),
           const SizedBox(height: Insets.l),
           Align(

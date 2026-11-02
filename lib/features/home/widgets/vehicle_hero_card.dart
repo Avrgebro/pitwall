@@ -17,51 +17,41 @@ class VehicleHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final running = model.state == HeroState.running;
     // Running tints the glass in the accent; otherwise it's neutral glass.
-    final tint = running
-        ? context.tone(StatusTone.active).container.withValues(alpha: 0.7)
-        : null;
-    final foreground = running
-        ? context.tone(StatusTone.active).onContainer
-        : scheme.onSurface;
-    final panel = scheme.surface.withValues(alpha: 0.4);
-
     return GlassSurface(
       borderRadius: Corners.heroRadius,
-      color: tint,
-      child: Padding(
-        padding: const EdgeInsets.all(Insets.lPlus),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _chip(),
-            const SizedBox(height: Insets.l),
-            _title(theme.textTheme.displaySmall?.copyWith(color: foreground)),
-            if (model.subtitle case final subtitle?) ...[
-              const SizedBox(height: Insets.xs),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
-              ),
-            ],
-            const SizedBox(height: Insets.l),
-            DetailRows(
-              background: panel,
-              color: foreground,
-              rows: [
-                for (final stat in model.stats)
-                  (
-                    icon: _icon(stat.kind),
-                    label: stat.label,
-                    value: stat.value,
-                  ),
-              ],
+      tone: model.state == HeroState.running ? StatusTone.active : null,
+      // Below the surface, so the text takes its colours.
+      child: Builder(builder: _content),
+    );
+  }
+
+  Widget _content(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = GlassInk.of(context).strong;
+    return Padding(
+      padding: const EdgeInsets.all(Insets.lPlus),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _chip(),
+          const SizedBox(height: Insets.l),
+          _title(theme.textTheme.displaySmall?.copyWith(color: foreground)),
+          if (model.subtitle case final subtitle?) ...[
+            const SizedBox(height: Insets.xs),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
             ),
           ],
-        ),
+          const SizedBox(height: Insets.l),
+          DetailRows(
+            rows: [
+              for (final stat in model.stats)
+                (icon: _icon(stat.kind), label: stat.label, value: stat.value),
+            ],
+          ),
+        ],
       ),
     );
   }

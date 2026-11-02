@@ -2,14 +2,16 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
+import 'card_header.dart';
 import 'detail_rows.dart';
 import 'glass_surface.dart';
 import 'icon_badge.dart';
 import 'line_icon.dart';
 
 /// A status with an icon, an optional sentence and details: delivery
-/// health, queued readings, failures. Warning and error states are filled
-/// so problems stand out; other states are glass like the cards around.
+/// health, queued readings, failures. Warning and error states tint the
+/// glass so problems stand out; other states are glass like the cards
+/// around.
 class StatusCard extends StatelessWidget {
   const StatusCard({
     super.key,
@@ -38,66 +40,30 @@ class StatusCard extends StatelessWidget {
   /// A widget beside the text, such as a compact action.
   final Widget? trailing;
 
-  bool get _filled => tone == StatusTone.warning || tone == StatusTone.error;
+  bool get _tinted => tone == StatusTone.warning || tone == StatusTone.error;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = context.tone(tone);
-    final scheme = theme.colorScheme;
-    final titleColor = _filled ? colors.onContainer : scheme.onSurface;
-    final bodyColor = _filled ? colors.onContainer : scheme.onSurfaceVariant;
-
-    final content = Padding(
+  Widget build(BuildContext context) => GlassSurface(
+    tone: _tinted ? tone : null,
+    child: Padding(
       padding: Insets.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              IconBadge(
-                icon: icon,
-                tone: tone,
-                shape: BoxShape.circle,
-                strong: _filled,
-              ),
-              const SizedBox(width: Insets.m),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: titleColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (message case final message?)
-                      Text(
-                        message,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: bodyColor,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: Insets.s),
-                trailing!,
-              ],
-            ],
+          CardHeader(
+            badge: IconBadge(
+              icon: icon,
+              tone: tone,
+              shape: BoxShape.circle,
+              strong: _tinted,
+            ),
+            title: title,
+            subtitle: message,
+            trailing: trailing,
           ),
           if (stats.isNotEmpty) ...[
             const SizedBox(height: Insets.l),
-            DetailRows(
-              rows: stats,
-              color: titleColor,
-              background: _filled
-                  ? colors.onContainer.withValues(alpha: 0.08)
-                  : scheme.surface.withValues(alpha: 0.4),
-            ),
+            DetailRows(rows: stats),
           ],
           if (actions.isNotEmpty) ...[
             const SizedBox(height: Insets.m),
@@ -105,16 +71,8 @@ class StatusCard extends StatelessWidget {
           ],
         ],
       ),
-    );
-    if (!_filled) return GlassSurface(child: content);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.container,
-        borderRadius: Corners.extraLargeRadius,
-      ),
-      child: content,
-    );
-  }
+    ),
+  );
 }
 
 /// The outcome of an action, right below it ("Test reading delivered").

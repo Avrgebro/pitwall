@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
+import 'glass_surface.dart';
 import 'line_icon.dart';
 
 /// Monospace text on a soft background: payload samples, raw traffic.
@@ -41,7 +42,6 @@ class SummaryRow extends StatelessWidget {
     required this.value,
     this.caption,
     this.valueColor,
-    this.color,
     this.stacked = false,
   });
 
@@ -53,22 +53,18 @@ class SummaryRow extends StatelessWidget {
   final String? caption;
   final Color? valueColor;
 
-  /// The text colour on a tinted surface; the icon and label take a softer
-  /// shade of it.
-  final Color? color;
-
   /// Value under the label instead of on the right, for long values.
   final bool stacked;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted =
-        color?.withValues(alpha: 0.75) ?? theme.colorScheme.onSurfaceVariant;
+    final ink = GlassInk.of(context);
+    final muted = ink.muted;
     final valueText = Text(
       value,
       style: theme.textTheme.bodyMedium?.copyWith(
-        color: valueColor ?? color ?? theme.colorScheme.onSurface,
+        color: valueColor ?? ink.strong,
         fontWeight: FontWeight.w600,
       ),
     );
