@@ -7,17 +7,24 @@ import '../storage/app_files.dart';
 /// A value as last read from the car, and when.
 @immutable
 class LastValue {
-  const LastValue(this.value, this.readAt);
+  const LastValue(this.value, this.readAt, {this.seq});
 
   final num value;
   final DateTime readAt;
 
-  @override
-  bool operator ==(Object other) =>
-      other is LastValue && other.value == value && other.readAt == readAt;
+  /// The sequence number of the reading it went out in, to tell whether
+  /// it's delivered. Null for values kept by earlier versions.
+  final int? seq;
 
   @override
-  int get hashCode => Object.hash(value, readAt);
+  bool operator ==(Object other) =>
+      other is LastValue &&
+      other.value == value &&
+      other.readAt == readAt &&
+      other.seq == seq;
+
+  @override
+  int get hashCode => Object.hash(value, readAt, seq);
 }
 
 /// The last value of each key every vehicle reported, by vehicle id.
@@ -33,15 +40,19 @@ class LastValues {
   Map<String, LastValue> of(String vehicleId) =>
       byVehicle[vehicleId] ?? const {};
 
-  LastValues record(String vehicleId, Map<String, num> values, DateTime at) =>
-      LastValues({
-        ...byVehicle,
-        vehicleId: {
-          ...of(vehicleId),
-          for (final MapEntry(:key, :value) in values.entries)
-            key: LastValue(value, at),
-        },
-      });
+  LastValues record(
+    String vehicleId,
+    Map<String, num> values,
+    DateTime at, {
+    int? seq,
+  }) => LastValues({
+    ...byVehicle,
+    vehicleId: {
+      ...of(vehicleId),
+      for (final MapEntry(:key, :value) in values.entries)
+        key: LastValue(value, at, seq: seq),
+    },
+  });
 
   LastValues without(String vehicleId) =>
       LastValues({...byVehicle}..remove(vehicleId));
@@ -50,7 +61,11 @@ class LastValues {
     for (final MapEntry(key: vehicleId, value: values) in byVehicle.entries)
       vehicleId: {
         for (final MapEntry(:key, :value) in values.entries)
-          key: {'value': value.value, 'at': value.readAt.toIso8601String()},
+          key: {
+            'value': value.value,
+            'at': value.readAt.toIso8601String(),
+            'seq': ?value.seq,
+          },
       },
   };
 
@@ -65,7 +80,14 @@ class LastValues {
               {'value': final num v, 'at': final String at},
             ))
               if (DateTime.tryParse(at) case final readAt?)
-                key: LastValue(v, readAt),
+                key: LastValue(
+                  v,
+                  readAt,
+                  seq: switch (values[key]) {
+                    {'seq': final int seq} => seq,
+                    _ => null,
+                  },
+                ),
         },
   });
 }

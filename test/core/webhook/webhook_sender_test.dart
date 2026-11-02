@@ -243,23 +243,32 @@ void main() {
     pitwall.dispose();
   });
 
-  test('the end-of-trip message never replaces the latest reading', () async {
-    failNext = 1000;
-    final pitwall = sender();
-    await pitwall.init();
+  test(
+    'a queued reading is delivered once deliveredThrough reaches it',
+    () async {
+      failNext = 1000;
+      final pitwall = sender();
+      await pitwall.init();
 
-    await sendFuel(pitwall, 47.5);
-    await pitwall.send(device: 'tucson', values: const {}, connected: false);
+      final first = await pitwall.queue(
+        device: 'tucson',
+        values: const {'tucson_fli_vol': 47.5},
+        connected: true,
+      );
+      final second = await pitwall.queue(
+        device: 'tucson',
+        values: const {},
+        connected: false,
+      );
+      await pitwall.flush();
+      expect(pitwall.status.value.deliveredThrough, lessThan(first));
+      expect(pitwall.status.value.queued, 2);
 
-    final latest = pitwall.status.value.latest!;
-    expect(latest.values, {'tucson_fli_vol': 47.5});
-    expect(latest.delivered, isFalse);
-    expect(pitwall.status.value.queued, 2);
-
-    failNext = 0;
-    await pitwall.flush();
-    expect(pitwall.status.value.latest!.delivered, isTrue);
-    expect(pitwall.status.value.latest!.values, {'tucson_fli_vol': 47.5});
-    pitwall.dispose();
-  });
+      failNext = 0;
+      await pitwall.flush();
+      expect(pitwall.status.value.deliveredThrough, second);
+      expect(received.map((p) => p['seq']), [first, second]);
+      pitwall.dispose();
+    },
+  );
 }

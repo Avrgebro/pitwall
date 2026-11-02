@@ -4,27 +4,20 @@ import '../storage/app_files.dart';
 import 'queued_reading.dart';
 
 /// What the sender keeps across restarts: the readings still to deliver,
-/// oldest first, the last sequence number used, and the newest reading
-/// that carried values (shown on Home).
+/// oldest first, and the last sequence number used.
 class DeliveryState {
-  const DeliveryState({this.queue = const [], this.seq = 0, this.latest});
+  const DeliveryState({this.queue = const [], this.seq = 0});
 
   final List<QueuedReading> queue;
   final int seq;
 
-  /// The newest reading with values. End-of-trip messages carry none, so
-  /// they never replace it.
-  final QueuedReading? latest;
-
   Map<String, Object?> toJson() => {
     'seq': seq,
     'queue': [for (final reading in queue) reading.toJson()],
-    'latest': latest?.toJson(),
   };
 
   /// Also reads the earlier format, where each reading was kept as its
-  /// encoded payload and the latest was `lastReading`. Entries that don't
-  /// parse are left out.
+  /// encoded payload. Entries that don't parse are left out.
   factory DeliveryState.fromJson(Map<String, Object?> json) => DeliveryState(
     queue: [
       for (final entry in json['queue'] as List? ?? const []) ?_reading(entry),
@@ -33,7 +26,6 @@ class DeliveryState {
       final int seq => seq,
       _ => 0,
     },
-    latest: _reading(json['latest'] ?? json['lastReading']),
   );
 
   static QueuedReading? _reading(Object? entry) => switch (entry) {

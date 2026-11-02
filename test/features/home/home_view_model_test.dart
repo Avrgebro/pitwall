@@ -24,53 +24,47 @@ void main() {
     since: now.subtract(const Duration(minutes: 24)),
     carState: CarState.engineRunning,
   );
-  Reading reading({required bool delivered, DateTime? at}) => Reading(
-    device: 'tucson',
-    timestamp: at ?? now.subtract(const Duration(seconds: 40)),
-    values: const {
+
+  /// This car's last values, all from reading 1, read [at].
+  Map<String, LastValue> lastReading({DateTime? at}) => {
+    for (final MapEntry(:key, :value) in const {
       'fuel_level_pct': 46.27,
       'battery_v': 13.6,
       'coolant_temp_c': 89,
       'speed_kmh': 52,
       'odometer_km': 33999.7,
-    },
-    delivered: delivered,
-  );
+    }.entries)
+      key: LastValue(
+        value,
+        at ?? now.subtract(const Duration(seconds: 40)),
+        seq: 1,
+      ),
+  };
 
-  /// Without [lastValues], this car's last values are those of the
-  /// delivery's latest reading, when it's this car's.
   HomeViewModel build({
     LiveActivity activity = const NoActivity(),
     DeliveryStatus delivery = const DeliveryStatus(),
     bool hasWebhook = true,
-    Map<String, LastValue>? lastValues,
-  }) {
-    final latest = delivery.latest;
-    return HomeViewModel.build(
-      vehicle: vehicle,
-      settings: settings,
-      activity: activity,
-      delivery: delivery,
-      hasWebhook: hasWebhook,
-      options: options,
-      lastValues:
-          lastValues ??
-          {
-            if (latest != null && latest.device == vehicle.deviceId)
-              for (final MapEntry(:key, :value) in latest.values.entries)
-                key: LastValue(value, latest.timestamp),
-          },
-      now: now,
-    );
-  }
+    Map<String, LastValue> lastValues = const {},
+  }) => HomeViewModel.build(
+    vehicle: vehicle,
+    settings: settings,
+    activity: activity,
+    delivery: delivery,
+    hasWebhook: hasWebhook,
+    options: options,
+    lastValues: lastValues,
+    now: now,
+  );
 
   test('1a driving, all healthy', () {
     final model = build(
       activity: driving,
       delivery: DeliveryStatus(
         lastSuccess: now.subtract(const Duration(seconds: 40)),
-        latest: reading(delivered: true),
+        deliveredThrough: 1,
       ),
+      lastValues: lastReading(),
     );
 
     expect(model.hero.state, HeroState.running);
@@ -99,11 +93,9 @@ void main() {
     final model = build(
       delivery: DeliveryStatus(
         lastSuccess: now.subtract(const Duration(hours: 2)),
-        latest: reading(
-          delivered: true,
-          at: now.subtract(const Duration(hours: 2)),
-        ),
+        deliveredThrough: 1,
       ),
+      lastValues: lastReading(at: now.subtract(const Duration(hours: 2))),
     );
 
     expect(model.hero.state, HeroState.waiting);
@@ -119,14 +111,7 @@ void main() {
 
   test('another car\'s newer reading doesn\'t hide this car\'s values', () {
     final model = build(
-      delivery: DeliveryStatus(
-        latest: Reading(
-          device: 'mazda',
-          timestamp: now.subtract(const Duration(minutes: 5)),
-          values: const {'rpm': 800},
-          delivered: true,
-        ),
-      ),
+      delivery: DeliveryStatus(),
       lastValues: {
         'odometer_km': LastValue(
           33999.7,
@@ -189,8 +174,8 @@ void main() {
         failedAttempts: 4,
         lastSuccess: now.subtract(const Duration(minutes: 3)),
         lastError: const DeliveryError(DeliveryErrorKind.unreachable),
-        latest: reading(delivered: false),
       ),
+      lastValues: lastReading(),
     );
 
     expect(model.hero.subtitle, 'Reading the car every minute');
@@ -215,8 +200,8 @@ void main() {
           DeliveryErrorKind.refused,
           statusCode: 401,
         ),
-        latest: reading(delivered: false),
       ),
+      lastValues: lastReading(),
     );
 
     expect(model.delivery.kind, DeliveryCardKind.failing);
@@ -238,16 +223,7 @@ void main() {
   });
 
   test('readings from another vehicle are not shown', () {
-    final model = build(
-      delivery: DeliveryStatus(
-        latest: Reading(
-          device: 'work-van',
-          timestamp: now,
-          values: const {'rpm': 800},
-          delivered: true,
-        ),
-      ),
-    );
+    final model = build(delivery: DeliveryStatus());
 
     expect(model.values, isNull);
   });
@@ -282,5 +258,32 @@ void main() {
     );
 
     expect(model.hero.state, HeroState.waiting);
+  });
+
+  test('delivered goes by the reading\'s number, not the vehicle\'s name', () {
+    // The vehicle was renamed since; its values still know their reading.
+    final model = build(
+      delivery: DeliveryStatus(lastSuccess: now, deliveredThrough: 1),
+      lastValues: lastReading(),
+    );
+    expect(model.values!.title, 'Last values sent');
+
+    final waiting = build(
+      delivery: DeliveryStatus(lastSuccess: now, deliveredThrough: 0),
+      lastValues: lastReading(),
+    );
+    expect(waiting.values!.title, 'Latest readings');
+  });
+
+  test('a value no longer sent says nothing about the last reading', () {
+    final model = build(
+      lastValues: {
+        'battery_v': LastValue(12.4, now.subtract(const Duration(hours: 1))),
+        // Fresher, but a profile value that's off.
+        'tucson_fli_vol': LastValue(47.5, now),
+      },
+    );
+
+    expect(model.hero.stats.last.value, '1 h ago');
   });
 }

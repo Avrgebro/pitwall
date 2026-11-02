@@ -14,15 +14,14 @@ void main() {
     engineRunning: true,
   );
 
-  test('a round trip keeps the queue, the sequence and the latest', () {
-    final state = DeliveryState(queue: [reading], seq: 7, latest: reading);
+  test('a round trip keeps the queue and the sequence', () {
+    final state = DeliveryState(queue: [reading], seq: 7);
     final back = DeliveryState.fromJson(
       jsonDecode(jsonEncode(state.toJson())) as Map<String, Object?>,
     );
 
     expect(back.seq, 7);
     expect(back.queue.single.toJson(), reading.toJson());
-    expect(back.latest!.toJson(), reading.toJson());
   });
 
   test('the earlier format, payloads as text, still loads', () {
@@ -39,7 +38,6 @@ void main() {
       'battery_v': 14.1,
     });
     expect(back.queue.single.engineRunning, isTrue);
-    expect(back.latest!.device, 'hyundai-tucson');
   });
 
   test('what goes out is the payload itself', () {

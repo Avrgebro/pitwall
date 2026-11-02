@@ -53,7 +53,6 @@ class WebhookSender {
   /// Oldest first; sequence numbers only go up.
   List<QueuedReading> _queue = [];
   int _seq = 0;
-  QueuedReading? _latest;
   bool _flushing = false;
   Timer? _retry;
 
@@ -62,13 +61,30 @@ class WebhookSender {
     final state = await _storage.load();
     _queue = [...state.queue];
     _seq = state.seq;
-    _latest = state.latest;
     _queueChanged();
     unawaited(flush());
   }
 
   /// Queues a reading and tries to deliver everything queued.
   Future<void> send({
+    required String device,
+    required Map<String, double> values,
+    required bool connected,
+    bool? engineRunning,
+  }) async {
+    await queue(
+      device: device,
+      values: values,
+      connected: connected,
+      engineRunning: engineRunning,
+    );
+    await flush();
+  }
+
+  /// Queues a reading without delivering it yet, and returns its sequence
+  /// number: it's delivered once the status's `deliveredThrough` reaches
+  /// it. [flush] delivers.
+  Future<int> queue({
     required String device,
     required Map<String, double> values,
     required bool connected,
@@ -83,13 +99,12 @@ class WebhookSender {
       engineRunning: engineRunning,
     );
     _queue.add(reading);
-    if (values.isNotEmpty) _latest = reading;
     if (_queue.length > maxQueued) {
       _queue.removeRange(0, _queue.length - maxQueued);
     }
     await _persist();
     _queueChanged();
-    await flush();
+    return reading.seq;
   }
 
   /// Delivers queued readings, oldest first, until the queue is empty or a
@@ -255,27 +270,18 @@ class WebhookSender {
     required DateTime? lastFailure,
     required DeliveryError? lastError,
   }) {
-    final latest = _latest;
     status.value = DeliveryStatus(
       queued: _queue.length,
       failedAttempts: failedAttempts,
       lastSuccess: lastSuccess,
       lastFailure: lastFailure,
       lastError: lastError,
-      latest: latest == null
-          ? null
-          : Reading(
-              device: latest.device,
-              timestamp: latest.timestamp,
-              values: latest.values,
-              // The queue is in sequence order, so the reading is
-              // delivered once everything left came after it.
-              delivered: _queue.isEmpty || _queue.first.seq > latest.seq,
-            ),
+      // The queue is in sequence order, so everything before its oldest
+      // reading is delivered.
+      deliveredThrough: _queue.isEmpty ? _seq : _queue.first.seq - 1,
     );
   }
 
-  Future<void> _persist() => _storage.save(
-    DeliveryState(queue: List.of(_queue), seq: _seq, latest: _latest),
-  );
+  Future<void> _persist() =>
+      _storage.save(DeliveryState(queue: List.of(_queue), seq: _seq));
 }

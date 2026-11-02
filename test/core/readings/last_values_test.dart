@@ -51,4 +51,16 @@ void main() {
     expect(values.of('tucson').keys, ['battery_v']);
     expect(values.of('mazda'), isEmpty);
   });
+
+  test('each value keeps the number of the reading it went out in', () {
+    final values = const LastValues().record(
+      'tucson',
+      {'battery_v': 12.4},
+      later,
+      seq: 42,
+    );
+
+    final back = LastValues.fromJson(values.toJson()).of('tucson');
+    expect(back['battery_v']!.seq, 42);
+  });
 }

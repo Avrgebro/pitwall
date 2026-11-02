@@ -16,13 +16,15 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
   @override
   Future<LastValues> build() => _storage.load();
 
+  /// Keeps [values], read [at], as sent in the reading numbered [seq].
   Future<void> record(
     String vehicleId,
     Map<String, num> values,
-    DateTime at,
-  ) async {
+    DateTime at, {
+    int? seq,
+  }) async {
     if (values.isEmpty) return;
-    await _save((await future).record(vehicleId, values, at));
+    await _save((await future).record(vehicleId, values, at, seq: seq));
   }
 
   Future<void> forget(String vehicleId) async =>

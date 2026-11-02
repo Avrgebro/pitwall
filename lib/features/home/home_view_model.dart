@@ -117,26 +117,32 @@ class HomeViewModel {
     required DateTime now,
   }) {
     final card = _delivery(delivery, hasWebhook, now);
-    final lastReading = lastValues.values
-        .map((value) => value.readAt)
-        .fold<DateTime?>(
-          null,
-          (newest, at) => newest == null || at.isAfter(newest) ? at : newest,
-        );
+    // Only the values it still sends: one that's no longer sent says nothing
+    // about the car now.
+    final keys = keysToSend(vehicle, options);
+    final sent = {
+      for (final MapEntry(:key, :value) in lastValues.entries)
+        if (keys.contains(key)) key: value,
+    };
+    final newest = sent.values.fold<LastValue?>(
+      null,
+      (newest, value) => newest == null || value.readAt.isAfter(newest.readAt)
+          ? value
+          : newest,
+    );
     return HomeViewModel(
       hero: _hero(
         vehicle: vehicle,
         settings: settings,
         activity: activity.forVehicle(vehicle.id),
         deliveryHealthy: !card.isProblem,
-        lastReading: lastReading,
+        lastReading: newest?.readAt,
         now: now,
       ),
       delivery: card,
       values: _values(
-        vehicle: vehicle,
-        lastValues: lastValues,
-        newest: lastReading,
+        sent: sent,
+        newest: newest,
         status: delivery,
         options: options,
         now: now,
@@ -289,7 +295,9 @@ class HomeViewModel {
       }
       return DeliveryCardModel(
         kind: DeliveryCardKind.healthy,
-        title: status.latest == null ? 'Ready to send' : 'Delivery healthy',
+        title: status.lastSuccess == null
+            ? 'Ready to send'
+            : 'Delivery healthy',
         stats: stats(),
       );
     }
@@ -334,31 +342,27 @@ class HomeViewModel {
   /// before the newest, say ones the car stopped reporting as it switched
   /// off, say when they were read.
   static ValuesModel? _values({
-    required Vehicle vehicle,
-    required Map<String, LastValue> lastValues,
-    required DateTime? newest,
+    required Map<String, LastValue> sent,
+    required LastValue? newest,
     required DeliveryStatus status,
     required List<ValueOption> options,
     required DateTime now,
   }) {
-    final keys = keysToSend(vehicle, options);
-    final shown = {
-      for (final MapEntry(:key, :value) in lastValues.entries)
-        if (keys.contains(key)) key: value,
+    if (newest == null) return null;
+    final ago = Formatters.ago(newest.readAt, now);
+    // Whether the reading it went out in is delivered; unknown for values
+    // kept before readings were numbered.
+    final delivered = switch (newest.seq) {
+      final seq? => seq <= status.deliveredThrough,
+      null => null,
     };
-    if (shown.isEmpty || newest == null) return null;
-    final ago = Formatters.ago(newest, now);
-    // The sender knows whether the newest reading went out, when it was
-    // this car's.
-    final reading = status.latest;
-    final sent = reading?.device == vehicle.deviceId ? reading : null;
     return ValuesModel(
-      title: switch (sent?.delivered) {
+      title: switch (delivered) {
         true => 'Last values sent',
         false => 'Latest readings',
         null => 'Last values',
       },
-      meta: switch ((sent?.delivered, status.lastError)) {
+      meta: switch ((delivered, status.lastError)) {
         (true, _) => 'Updated $ago',
         (null, _) => 'Read $ago',
         (false, null) => 'Read $ago, sending',
@@ -367,11 +371,11 @@ class HomeViewModel {
         (false, _) => 'Read $ago, not delivered',
       },
       tiles: ValueDisplay.tiles(
-        {for (final MapEntry(:key, :value) in shown.entries) key: value.value},
+        {for (final MapEntry(:key, :value) in sent.entries) key: value.value},
         options,
         notes: {
-          for (final MapEntry(:key, :value) in shown.entries)
-            if (newest.difference(value.readAt) >= _staleAfter)
+          for (final MapEntry(:key, :value) in sent.entries)
+            if (newest.readAt.difference(value.readAt) >= _staleAfter)
               key: 'Read ${Formatters.ago(value.readAt, now)}',
         },
       ),

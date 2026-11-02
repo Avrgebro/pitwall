@@ -62,24 +62,6 @@ class DeliveryError {
   int get hashCode => Object.hash(kind, statusCode, authProblem);
 }
 
-/// A reading as it was queued for sending.
-@immutable
-class Reading {
-  const Reading({
-    required this.device,
-    required this.timestamp,
-    required this.values,
-    required this.delivered,
-  });
-
-  final String device;
-  final DateTime timestamp;
-  final Map<String, num> values;
-
-  /// Whether the webhook has accepted it.
-  final bool delivered;
-}
-
 /// How delivery is going, for the status shown to the user.
 @immutable
 class DeliveryStatus {
@@ -89,7 +71,7 @@ class DeliveryStatus {
     this.lastSuccess,
     this.lastFailure,
     this.lastError,
-    this.latest,
+    this.deliveredThrough = 0,
   });
 
   /// Readings waiting to be delivered.
@@ -103,9 +85,9 @@ class DeliveryStatus {
   /// Why the last attempt failed. Null after a success.
   final DeliveryError? lastError;
 
-  /// The newest reading with values, delivered or not. End-of-trip
-  /// messages carry no values and never replace it.
-  final Reading? latest;
+  /// Every reading up to this sequence number is delivered; see
+  /// `WebhookSender.queue`.
+  final int deliveredThrough;
 }
 
 /// One POST to the webhook, for the developer log.

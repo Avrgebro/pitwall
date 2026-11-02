@@ -298,18 +298,18 @@ class SessionController extends Notifier<SessionState> {
         if (values.isEmpty) {
           log.note('Nothing to send: the car reported none of the values');
         } else {
+          final sender = ref.read(webhookSenderProvider);
+          final seq = await sender.queue(
+            device: vehicle.deviceId,
+            values: values,
+            connected: true,
+            engineRunning: carState == CarState.engineRunning,
+          );
           await Future.wait([
             ref
                 .read(lastValuesProvider.notifier)
-                .record(vehicle.id, values, DateTime.now()),
-            ref
-                .read(webhookSenderProvider)
-                .send(
-                  device: vehicle.deviceId,
-                  values: values,
-                  connected: true,
-                  engineRunning: carState == CarState.engineRunning,
-                ),
+                .record(vehicle.id, values, DateTime.now(), seq: seq),
+            sender.flush(),
           ]);
         }
     }
