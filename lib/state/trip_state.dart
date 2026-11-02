@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/platform/trip_service_gateway.dart';
 import '../core/session/car_state.dart';
+import '../core/trips/trip_notification_text.dart';
 import '../core/trips/trip_target.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
@@ -169,7 +170,7 @@ class TripController extends Notifier<TripState> {
     while (!_stopRequested) {
       for (final vehicle in candidates) {
         if (_stopRequested) break;
-        await _notify(_Stage.connecting, vehicle);
+        await _notify(TripNotificationText.connecting(vehicle));
         await _session.connect(vehicle, askPermission: false);
         if (_sessionState.isConnected) return (vehicle, null);
         if (_sessionState.problem == SessionProblem.permissionDenied) {
@@ -200,14 +201,14 @@ class TripController extends Notifier<TripState> {
         if (DateTime.now().difference(quietSince) > _timing.carOffWindow) {
           return TripEnd.carOff;
         }
-        await _notify(_Stage.waitingForCar, vehicle);
+        await _notify(TripNotificationText.waitingForCar(vehicle));
         await _session.checkCar();
       } else {
         final values = await _session.readAndSend();
         if (values != null && values.isNotEmpty) {
           quietSince = null;
           _open = true;
-          await _notify(_Stage.reading, vehicle, interval: interval);
+          await _notify(TripNotificationText.reading(vehicle, interval));
         }
       }
       if (_sessionState.isConnected) await _sleep(interval);
@@ -219,7 +220,7 @@ class TripController extends Notifier<TripState> {
   Future<void> _close(Vehicle vehicle) async {
     if (!_open) return;
     _open = false;
-    await _notify(_Stage.ending, vehicle);
+    await _notify(TripNotificationText.ending);
     try {
       await ref
           .read(webhookSenderProvider)
@@ -254,26 +255,5 @@ class TripController extends Notifier<TripState> {
     return wake.future.whenComplete(timer.cancel);
   }
 
-  Future<void> _notify(
-    _Stage stage,
-    Vehicle vehicle, {
-    Duration? interval,
-  }) async {
-    final text = switch (stage) {
-      _Stage.connecting =>
-        'Connecting to ${vehicle.adapterName ?? 'the adapter'}…',
-      _Stage.reading => 'Reading ${vehicle.name} ${_every(interval!)}',
-      _Stage.waitingForCar => 'Waiting for ${vehicle.name} to answer',
-      _Stage.ending => 'Sending the last reading…',
-    };
-    await _gateway.updateNotification(text);
-  }
-
-  static String _every(Duration interval) => interval.inSeconds < 60
-      ? 'every ${interval.inSeconds} s'
-      : interval.inMinutes == 1
-      ? 'every minute'
-      : 'every ${interval.inMinutes} min';
+  Future<void> _notify(String text) => _gateway.updateNotification(text);
 }
-
-enum _Stage { connecting, reading, waitingForCar, ending }

@@ -7,9 +7,9 @@ import '../../core/settings/settings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../state/session_state.dart';
-import '../../ui/components/value_tile.dart';
-import '../../ui/format/formatters.dart';
-import '../../ui/theme/status_colors.dart';
+import '../../ui/components/value_tile_data.dart';
+import '../../core/format/formatters.dart';
+import '../../ui/theme/status_tone.dart';
 import '../common/delivery_text.dart';
 import '../common/value_display.dart';
 

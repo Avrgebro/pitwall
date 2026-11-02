@@ -173,7 +173,10 @@ void main() {
     expect(received.last['values'], isEmpty);
     expect(service.calls, contains('stopService'));
     expect(service.notifications.first, 'Connecting to vLinker MC+…');
-    expect(service.notifications, contains('Reading Hyundai Tucson every 0 s'));
+    expect(
+      service.notifications,
+      contains('Reading Hyundai Tucson every 0 seconds'),
+    );
     // What was read is kept for Home, by vehicle.
     expect(lastValues.saved.of(_tucson.id)['battery_v']?.value, 13.6);
   });

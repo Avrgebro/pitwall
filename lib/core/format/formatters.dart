@@ -1,5 +1,5 @@
-/// Formatting shared by screens: numbers, durations and times in the
-/// app's plain style.
+/// Formatting shared by screens and notifications: numbers, durations and
+/// times in the app's plain style. Plain Dart, so state can use it too.
 abstract final class Formatters {
   /// `33999.7` → `33,999.7`; whole numbers lose the decimal (`52`).
   static String number(num value, {int decimals = 1}) {
@@ -18,18 +18,13 @@ abstract final class Formatters {
     return '${negative ? '-' : ''}$grouped${fraction.isEmpty ? '' : '.$fraction'}';
   }
 
-  /// "every 30 seconds", "every minute", "every 5 minutes".
-  static String every(Duration interval) {
-    if (interval.inSeconds < 60) return 'every ${interval.inSeconds} seconds';
-    if (interval.inMinutes == 1) return 'every minute';
-    return 'every ${interval.inMinutes} minutes';
-  }
-
-  /// "Every 30 s", "Every minute", "Every 5 minutes", for pickers.
-  static String interval(Duration interval) {
-    if (interval.inSeconds < 60) return 'Every ${interval.inSeconds} s';
-    final minutes = interval.inMinutes;
-    return minutes == 1 ? 'Every minute' : 'Every $minutes minutes';
+  /// "every 30 seconds", "every minute", "every 5 minutes"; [capitalised]
+  /// for the start of a label ("Every minute").
+  static String every(Duration interval, {bool capitalised = false}) {
+    final word = capitalised ? 'Every' : 'every';
+    if (interval.inSeconds < 60) return '$word ${interval.inSeconds} seconds';
+    if (interval.inMinutes == 1) return '$word minute';
+    return '$word ${interval.inMinutes} minutes';
   }
 
   /// "just now", "40 s ago", "3 min ago", "2 h ago", "yesterday", "12 Oct".

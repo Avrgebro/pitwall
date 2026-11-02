@@ -55,7 +55,7 @@ class SettingsScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.timer_rounded,
               title: 'Reading interval',
-              subtitle: Formatters.interval(settings.interval),
+              subtitle: Formatters.every(settings.interval, capitalised: true),
               onTap: () => context.push(Routes.intervalSettings),
             ),
           ],

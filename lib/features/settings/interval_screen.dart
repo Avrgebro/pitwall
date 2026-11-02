@@ -28,7 +28,7 @@ class IntervalScreen extends ConsumerWidget {
               for (final choice in AppSettings.intervalChoices)
                 ChoiceRow<Duration>(
                   value: choice,
-                  title: Formatters.interval(choice),
+                  title: Formatters.every(choice, capitalised: true),
                   subtitle: choice == AppSettings.defaultInterval
                       ? 'Recommended'
                       : null,

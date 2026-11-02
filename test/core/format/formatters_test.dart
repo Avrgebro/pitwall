@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pitwall/ui/format/formatters.dart';
+import 'package:pitwall/core/format/formatters.dart';
 
 void main() {
   test('numbers get thousands separators and lose trailing zeros', () {
@@ -37,7 +37,10 @@ void main() {
   test('intervals and durations', () {
     expect(Formatters.every(const Duration(minutes: 1)), 'every minute');
     expect(Formatters.every(const Duration(seconds: 30)), 'every 30 seconds');
-    expect(Formatters.interval(const Duration(minutes: 5)), 'Every 5 minutes');
+    expect(
+      Formatters.every(const Duration(minutes: 5), capitalised: true),
+      'Every 5 minutes',
+    );
     expect(Formatters.duration(const Duration(minutes: 24)), '24 min');
     expect(Formatters.duration(const Duration(minutes: 65)), '1 h 5 min');
     expect(Formatters.elapsed(const Duration(milliseconds: 312)), '0.3 s');

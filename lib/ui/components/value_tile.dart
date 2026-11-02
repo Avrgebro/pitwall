@@ -2,26 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
-
-/// One value to show in a [ValueGrid].
-@immutable
-class ValueTileData {
-  const ValueTileData({
-    required this.label,
-    required this.value,
-    this.unit,
-    this.note,
-  });
-
-  final String label;
-
-  /// The formatted value, or null if the car didn't report it.
-  final String? value;
-  final String? unit;
-
-  /// A short line under the value, such as when it was read.
-  final String? note;
-}
+import 'value_tile_data.dart';
 
 /// A value with its label and unit. Values are the biggest type on screen;
 /// labels and units step back.

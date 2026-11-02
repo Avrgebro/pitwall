@@ -1,6 +1,6 @@
 import '../../core/readings/readings.dart';
-import '../../ui/components/value_tile.dart';
-import '../../ui/format/formatters.dart';
+import '../../ui/components/value_tile_data.dart';
+import '../../core/format/formatters.dart';
 
 /// How readings are shown: which order, which labels, how many decimals.
 abstract final class ValueDisplay {
