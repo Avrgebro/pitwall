@@ -9,6 +9,7 @@ void main() {
       timestamp: DateTime.utc(2026, 10, 31, 19, 40, 0, 123),
       values: {'fuel_level_l': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
       connected: true,
+      engineRunning: true,
     );
 
     expect(payload, {
@@ -16,8 +17,23 @@ void main() {
       'seq': 1284,
       'timestamp': '2026-10-31T19:40:00Z',
       'values': {'fuel_level_l': 47.5, 'rpm': 800.5, 'speed_kmh': 52},
+      'engine': 'running',
       'connected': true,
     });
+  });
+
+  test('the engine field appears only on readings from the car', () {
+    Map<String, Object?> build({bool? engineRunning}) => buildPayload(
+      device: 'tucson',
+      seq: 1,
+      timestamp: DateTime.utc(2026),
+      values: const {},
+      connected: engineRunning != null,
+      engineRunning: engineRunning,
+    );
+
+    expect(build(engineRunning: false)['engine'], 'off');
+    expect(build().containsKey('engine'), isFalse);
   });
 
   test('values are rounded and whole numbers lose the decimal', () {

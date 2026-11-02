@@ -40,9 +40,14 @@ Example payload (not final yet):
     "coolant_temp_c": 89,
     "battery_v": 14.1
   },
+  "engine": "running",
   "connected": true
 }
 ```
+
+`engine` is `"running"` or `"off"` (ignition on, engine stopped). When the
+car is switched off, a last message with `"connected": false` and no values
+follows.
 
 `device` comes from the vehicle's name, made API-friendly: lower case,
 accents removed, everything else turned into dashes. A car named

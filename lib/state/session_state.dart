@@ -187,14 +187,28 @@ class SessionController extends Notifier<SessionState> {
         modelYear: vehicle.modelYear,
       );
       values.forEach(log.value);
-      state = state.copyWith(carState: carStateFrom(values), busy: false);
+      // Values the adapter measures itself come back with the car switched
+      // off too; without any from the car, make sure it still answers.
+      if (values.keys.every((key) => key == batteryVoltageKey)) {
+        await elm.requestPid(0x00);
+      }
+      // The engine's state needs the battery voltage, sent or not.
+      final voltage =
+          values[batteryVoltageKey] ?? await elm.readBatteryVoltage();
+      final carState = carStateFrom({...values, batteryVoltageKey: ?voltage});
+      state = state.copyWith(carState: carState, busy: false);
       if (values.isEmpty) {
         log.note('Nothing to send: the car reported none of the values');
         return values;
       }
       await ref
           .read(webhookSenderProvider)
-          .send(device: vehicle.deviceId, values: values, connected: true);
+          .send(
+            device: vehicle.deviceId,
+            values: values,
+            connected: true,
+            engineRunning: carState == CarState.engineRunning,
+          );
       return values;
     } on ElmException catch (e) {
       // The car going quiet mid-read means the ignition went off; the

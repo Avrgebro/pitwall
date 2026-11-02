@@ -71,6 +71,7 @@ class WebhookSender {
     required String device,
     required Map<String, double> values,
     required bool connected,
+    bool? engineRunning,
   }) async {
     _seq++;
     final payload = jsonEncode(
@@ -80,6 +81,7 @@ class WebhookSender {
         timestamp: _clock(),
         values: values,
         connected: connected,
+        engineRunning: engineRunning,
       ),
     );
     _queue.add(payload);

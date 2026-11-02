@@ -115,6 +115,15 @@ void main() {
   }
 
   /// Waits until the trip is back to idle.
+  /// Waits until [condition] holds.
+  Future<void> until(bool Function() condition, String what) async {
+    for (var i = 0; i < 400; i++) {
+      if (condition()) return;
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    fail('Timed out waiting for $what');
+  }
+
   /// Waits until the trip is running, connected to a vehicle.
   Future<TripState> running(ProviderContainer c) async {
     for (var i = 0; i < 200; i++) {
@@ -156,6 +165,7 @@ void main() {
     expect(received.where((p) => p['connected'] == true), isNotEmpty);
     expect(received.first['device'], 'hyundai-tucson');
     expect(received.first['values'], {'battery_v': 13.6});
+    expect(received.first['engine'], 'running');
     expect(received.last['connected'], isFalse);
     expect(received.last['values'], isEmpty);
     expect(service.calls, contains('stopService'));
@@ -330,5 +340,26 @@ void main() {
     expect(trip.lastEnd, TripEnd.adapterLost);
     expect(received.last['connected'], isFalse);
   });
+
+  test(
+    'a car switched off after readings ends the trip, marked once',
+    () async {
+      late _Adapter adapter;
+      final c = container(adapter: (_) => adapter = _Adapter());
+      c.read(tripProvider);
+      service.send(const StartTrip(_tucsonStereo));
+      await running(c);
+      await until(() => received.isNotEmpty, 'a reading');
+
+      // The car stops answering; the adapter itself still reads the battery.
+      adapter.replies['0100'] = 'SEARCHING...\rUNABLE TO CONNECT';
+      adapter.replies['ATRV'] = '12.4V';
+      final trip = await ended(c);
+
+      expect(trip.lastEnd, TripEnd.carOff);
+      expect(received.last['connected'], isFalse);
+      expect(received.where((p) => p['connected'] == false), hasLength(1));
+    },
+  );
 
 }
