@@ -145,7 +145,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (devices.length > AdapterPicker.filterAbove) ...[
-          SearchBar(
+          GlassSearchBar(
             hintText: 'Filter by name or address',
             leading: const Icon(Symbols.search_rounded),
             onChanged: (text) => setState(() => _query = text),

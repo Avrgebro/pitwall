@@ -92,7 +92,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
           SliverList.list(
             children: [
               if (_searching)
-                SearchBar(
+                GlassSearchBar(
                   autoFocus: true,
                   hintText: 'Search values',
                   leading: const Icon(Symbols.search_rounded),

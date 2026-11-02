@@ -57,20 +57,6 @@ abstract final class AppTheme {
           color: scheme.onSurfaceVariant,
         ),
       ),
-      // Flat, on the strongest surface and outlined, so a search bar stands
-      // out from the frosted cards around it; the outline turns to the
-      // accent while typing.
-      searchBarTheme: SearchBarThemeData(
-        elevation: const WidgetStatePropertyAll(0),
-        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
-        side: WidgetStateProperty.resolveWith(
-          (states) => BorderSide(
-            color: states.contains(WidgetState.focused)
-                ? scheme.primary
-                : scheme.outline,
-          ),
-        ),
-      ),
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: Corners.smallRadius),
       ),

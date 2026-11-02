@@ -14,6 +14,7 @@ export 'components/disclosure_group.dart';
 export 'components/floating_nav_bar.dart';
 export 'components/glass_bar.dart';
 export 'components/glass_button.dart';
+export 'components/glass_search_bar.dart';
 export 'components/glass_surface.dart';
 export 'components/group_tile.dart';
 export 'components/row_group.dart';
