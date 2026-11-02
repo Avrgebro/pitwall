@@ -3,14 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
-import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/platform/permission_gateway.dart';
-import '../../core/vehicles/vehicle.dart';
 import '../../state/permissions_state.dart';
 import '../../state/settings_state.dart';
 import '../../state/webhook_state.dart';
-import '../common/widgets/adapter_picker.dart';
-import '../common/widgets/vehicle_name_field.dart';
+import '../common/widgets/new_vehicle_form.dart';
 import 'steps/done_step.dart';
 import 'steps/permissions_step.dart';
 import 'steps/webhook_step.dart';
@@ -29,8 +26,7 @@ class SetupScreen extends ConsumerStatefulWidget {
 
 class _SetupScreenState extends ConsumerState<SetupScreen> {
   _Step _step = _Step.welcome;
-  BondedDevice? _adapter;
-  String _name = '';
+  VehicleDraft _draft = const VehicleDraft();
   String? _vehicleId;
   bool _testPassed = false;
 
@@ -38,19 +34,18 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
 
   /// Creates the vehicle, or updates it when coming back to this step.
   Future<void> _saveVehicle() async {
-    final adapter = _adapter!;
-    final settings = ref.read(appSettingsProvider).requireValue;
-    final existing = _vehicleId == null
-        ? null
-        : settings.vehicleById(_vehicleId!);
-    final vehicle = (existing ?? Vehicle.create()).copyWith(
-      name: _name.trim(),
-      adapterAddress: adapter.address,
-      adapterName: adapter.name,
-      adapterType: AdapterType.classic,
-    );
-    await ref.read(appSettingsProvider.notifier).saveVehicle(vehicle);
-    _vehicleId = vehicle.id;
+    final notifier = ref.read(appSettingsProvider.notifier);
+    final adapter = _draft.adapter!;
+    if (_vehicleId case final id?) {
+      await notifier.renameVehicle(id, _draft.name);
+      await notifier.setAdapter(id, adapter);
+    } else {
+      final vehicle = await notifier.addVehicle(
+        name: _draft.name,
+        adapter: adapter,
+      );
+      _vehicleId = vehicle.id;
+    }
     _go(_Step.permissions);
   }
 
@@ -75,27 +70,22 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
       _Step.adapter => StepScaffold(
         step: step,
         steps: steps,
-        title: 'Choose your adapter',
+        title: 'Add your vehicle',
         message:
             'Plug it into the port under the dashboard and switch the '
             'ignition on.',
         primaryLabel: 'Continue',
-        onPrimary: _adapter != null && _name.trim().isNotEmpty
-            ? _saveVehicle
-            : null,
+        onPrimary: _draft.isComplete ? _saveVehicle : null,
         onBack: () => _go(_Step.welcome),
         // The vehicle can be added later from the Vehicles tab.
         onSkip: () => _go(_Step.permissions),
         children: [
-          AdapterPicker(
-            selectedAddress: _adapter?.address,
-            onSelected: (device) => setState(() => _adapter = device),
-          ),
-          const SizedBox(height: 8),
-          VehicleNameField(
-            initialName: _name,
-            note: 'You can change it later.',
-            onChanged: (name) => setState(() => _name = name),
+          NewVehicleForm(
+            draft: _draft,
+            onNameChanged: (name) =>
+                setState(() => _draft = _draft.withName(name)),
+            onAdapterChanged: (device) =>
+                setState(() => _draft = _draft.withAdapter(device)),
           ),
         ],
       ),
@@ -134,7 +124,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         onSkip: () => _go(_Step.done),
         children: [
           WebhookStep(
-            vehicleName: _name.trim(),
+            vehicleName: _draft.name.trim(),
             onTested: (passed) => setState(() => _testPassed = passed),
           ),
         ],

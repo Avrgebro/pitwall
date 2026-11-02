@@ -4,12 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
-import '../../core/bluetooth/bluetooth_gateway.dart';
-import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
-import '../common/widgets/adapter_picker.dart';
-import '../common/widgets/vehicle_name_field.dart';
+import '../common/widgets/new_vehicle_form.dart';
 
 /// Names a new vehicle and chooses its adapter.
 class AddVehicleScreen extends ConsumerStatefulWidget {
@@ -20,19 +17,12 @@ class AddVehicleScreen extends ConsumerStatefulWidget {
 }
 
 class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
-  BondedDevice? _adapter;
-  String _name = '';
-
-  bool get _canSave => _adapter != null && _name.trim().isNotEmpty;
+  VehicleDraft _draft = const VehicleDraft();
 
   Future<void> _save() async {
-    final adapter = _adapter!;
-    final vehicle = Vehicle.create(name: _name.trim()).copyWith(
-      adapterAddress: adapter.address,
-      adapterName: adapter.name,
-      adapterType: AdapterType.classic,
-    );
-    await ref.read(appSettingsProvider.notifier).saveVehicle(vehicle);
+    final vehicle = await ref
+        .read(appSettingsProvider.notifier)
+        .addVehicle(name: _draft.name, adapter: _draft.adapter!);
     if (!mounted) return;
     // The phone is usually in the car right now, the best moment to pick
     // its stereo.
@@ -76,26 +66,18 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         child: SizedBox(
           width: double.infinity,
           child: GlassButton(
-            onPressed: _canSave ? _save : null,
+            onPressed: _draft.isComplete ? _save : null,
             child: const Text('Add vehicle'),
           ),
         ),
       ),
     ),
     children: [
-      const SectionHeader(
-        'Name this vehicle',
-        padding: EdgeInsets.fromLTRB(Insets.xs, 0, Insets.xs, Insets.s),
-      ),
-      VehicleNameField(
-        initialName: _name,
-        onChanged: (name) => setState(() => _name = name),
-        note: 'You can change it later.',
-      ),
-      const SizedBox(height: Insets.xl),
-      AdapterPicker(
-        selectedAddress: _adapter?.address,
-        onSelected: (device) => setState(() => _adapter = device),
+      NewVehicleForm(
+        draft: _draft,
+        onNameChanged: (name) => setState(() => _draft = _draft.withName(name)),
+        onAdapterChanged: (device) =>
+            setState(() => _draft = _draft.withAdapter(device)),
       ),
     ],
   );

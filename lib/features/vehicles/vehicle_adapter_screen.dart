@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
@@ -23,13 +22,7 @@ class VehicleAdapterScreen extends ConsumerWidget {
           selectedAddress: vehicle.adapterAddress,
           onSelected: (device) => ref
               .read(appSettingsProvider.notifier)
-              .saveVehicle(
-                vehicle.copyWith(
-                  adapterAddress: device.address,
-                  adapterName: device.name,
-                  adapterType: AdapterType.classic,
-                ),
-              ),
+              .setAdapter(vehicle.id, device),
         ),
         const InfoNote(
           text: TextSpan(

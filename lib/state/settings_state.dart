@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/settings/settings.dart';
@@ -25,6 +26,36 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   Future<void> saveVehicle(Vehicle vehicle) =>
       _save(_current.withVehicle(vehicle));
+
+  /// Adds a vehicle named [name] whose adapter is [adapter].
+  Future<Vehicle> addVehicle({
+    required String name,
+    required BondedDevice adapter,
+  }) async {
+    final vehicle = _withAdapter(Vehicle.create(name: name.trim()), adapter);
+    await saveVehicle(vehicle);
+    return vehicle;
+  }
+
+  Future<void> renameVehicle(String vehicleId, String name) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle != null) await saveVehicle(vehicle.copyWith(name: name.trim()));
+  }
+
+  /// Makes [adapter] the vehicle's adapter.
+  Future<void> setAdapter(String vehicleId, BondedDevice adapter) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle != null) await saveVehicle(_withAdapter(vehicle, adapter));
+  }
+
+  /// The one place a device becomes a vehicle's adapter. Paired devices
+  /// are classic adapters.
+  static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
+      vehicle.copyWith(
+        adapterAddress: adapter.address,
+        adapterName: adapter.name,
+        adapterType: AdapterType.classic,
+      );
 
   /// Removes the vehicle and its profile file.
   Future<void> deleteVehicle(String id) async {

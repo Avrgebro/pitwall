@@ -24,7 +24,7 @@ class VehicleNameScreen extends ConsumerWidget {
             if (name.trim().isEmpty) return;
             ref
                 .read(appSettingsProvider.notifier)
-                .saveVehicle(vehicle.copyWith(name: name.trim()));
+                .renameVehicle(vehicle.id, name);
           },
         ),
         const InfoNote(
