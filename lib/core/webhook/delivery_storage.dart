@@ -6,27 +6,53 @@ import 'queued_reading.dart';
 /// What the sender keeps across restarts: the readings still to deliver,
 /// oldest first, and the last sequence number used.
 class DeliveryState {
-  const DeliveryState({this.queue = const [], this.seq = 0});
+  const DeliveryState({
+    this.queue = const [],
+    this.seq = 0,
+    this.deliveredThrough = 0,
+  });
+
+  /// After the saved state was lost: numbering resumes above anything it
+  /// could have reached, so readings keep going up for the receiver, and
+  /// numbers kept elsewhere, as with the last values, still read right.
+  DeliveryState.afterLoss(DateTime now)
+    : this(
+        seq: now.millisecondsSinceEpoch,
+        deliveredThrough: now.millisecondsSinceEpoch,
+      );
 
   final List<QueuedReading> queue;
   final int seq;
 
+  /// The newest reading delivered; see `DeliveryStatus.deliveredThrough`.
+  final int deliveredThrough;
+
   Map<String, Object?> toJson() => {
     'seq': seq,
+    'deliveredThrough': deliveredThrough,
     'queue': [for (final reading in queue) reading.toJson()],
   };
 
   /// Also reads the earlier format, where each reading was kept as its
   /// encoded payload. Entries that don't parse are left out.
-  factory DeliveryState.fromJson(Map<String, Object?> json) => DeliveryState(
-    queue: [
+  factory DeliveryState.fromJson(Map<String, Object?> json) {
+    final queue = [
       for (final entry in json['queue'] as List? ?? const []) ?_reading(entry),
-    ],
-    seq: switch (json['seq']) {
+    ];
+    final seq = switch (json['seq']) {
       final int seq => seq,
       _ => 0,
-    },
-  );
+    };
+    return DeliveryState(
+      queue: queue,
+      seq: seq,
+      deliveredThrough: switch (json['deliveredThrough']) {
+        final int through => through,
+        // Not kept by earlier versions: everything before the queue.
+        _ => queue.isEmpty ? seq : queue.first.seq - 1,
+      },
+    );
+  }
 
   static QueuedReading? _reading(Object? entry) => switch (entry) {
     final Map<String, Object?> json => QueuedReading.fromJson(json),
@@ -62,7 +88,7 @@ class FileDeliveryStorage implements DeliveryStorage {
     if (!await file.exists()) return const DeliveryState();
     return switch (DeliveryState._decode(await file.readAsString())) {
       final Map<String, Object?> json => DeliveryState.fromJson(json),
-      _ => const DeliveryState(),
+      _ => DeliveryState.afterLoss(DateTime.now()),
     };
   }
 

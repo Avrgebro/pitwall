@@ -65,11 +65,13 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
       );
 
   /// Removes the vehicle and its profile file; its last values follow.
+  /// The settings go first: a profile file left behind does no harm, but
+  /// a vehicle whose file is gone would.
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
-    await ref.read(settingsStoreProvider).deleteProfile(id);
     await _save(_current.withoutVehicle(id));
+    await ref.read(settingsStoreProvider).deleteProfile(id);
   }
 
   /// Called by a listener as a connection is made, which can be before
@@ -147,10 +149,11 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   /// Puts back the profile [before] had, after it was removed: the file,
-  /// its name, when it was imported, and the model year.
+  /// its name, when it was imported, and the model year. Does nothing once
+  /// the vehicle has another profile, so Undo can't replace a newer one.
   Future<void> restoreProfile(Vehicle before, SignalSet profile) async {
     final vehicle = _current.vehicleById(before.id);
-    if (vehicle == null) return;
+    if (vehicle == null || vehicle.profileName != null) return;
     await ref.read(settingsStoreProvider).saveProfile(before.id, profile);
     await saveVehicle(
       vehicle.copyWith(

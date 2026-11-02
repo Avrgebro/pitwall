@@ -29,15 +29,17 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
     super.dispose();
   }
 
-  void _send() {
+  /// Clears the commands once they went out; ones that didn't stay, to
+  /// send again.
+  Future<void> _send() async {
     final commands = _command.text
         .split(RegExp(r'[,\s]+'))
         .where((c) => c.isNotEmpty)
         .map((c) => c.toUpperCase())
         .toList();
     if (commands.isEmpty) return;
-    ref.read(sessionProvider.notifier).sendRaw(commands);
-    _command.clear();
+    final problem = await ref.read(sessionProvider.notifier).sendRaw(commands);
+    if (problem == null && mounted) _command.clear();
   }
 
   @override

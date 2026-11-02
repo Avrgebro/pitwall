@@ -61,6 +61,7 @@ class WebhookSender {
   /// Oldest first; sequence numbers only go up.
   List<QueuedReading> _queue = [];
   int _seq = 0;
+  int _deliveredThrough = 0;
   bool _flushing = false;
   Timer? _retry;
 
@@ -69,6 +70,7 @@ class WebhookSender {
     final state = await _storage.load();
     _queue = [...state.queue];
     _seq = state.seq;
+    _deliveredThrough = state.deliveredThrough;
     _publish();
     unawaited(flush());
   }
@@ -137,7 +139,7 @@ class WebhookSender {
           _failed(error);
           return;
         }
-        _queue.removeAt(0);
+        _deliveredThrough = _queue.removeAt(0).seq;
         await _persist();
         _succeeded();
       }
@@ -266,14 +268,17 @@ class WebhookSender {
       lastSuccess: _outcome.lastSuccess,
       lastFailure: _outcome.lastFailure,
       lastError: _outcome.lastError,
-      // The queue is in sequence order, so everything before its oldest
-      // reading is delivered.
-      deliveredThrough: _queue.isEmpty ? _seq : _queue.first.seq - 1,
+      deliveredThrough: _deliveredThrough,
     );
   }
 
-  Future<void> _persist() =>
-      _storage.save(DeliveryState(queue: List.of(_queue), seq: _seq));
+  Future<void> _persist() => _storage.save(
+    DeliveryState(
+      queue: List.of(_queue),
+      seq: _seq,
+      deliveredThrough: _deliveredThrough,
+    ),
+  );
 }
 
 /// The part of [DeliveryStatus] that deliveries decide.

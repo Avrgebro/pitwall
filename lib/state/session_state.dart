@@ -336,9 +336,12 @@ class SessionController extends Notifier<SessionState> {
   /// Sends raw commands to the adapter; replies show up in the log. AT
   /// commands can change settings the app relies on, so the adapter is
   /// reset afterwards.
-  Future<void> sendRaw(List<String> commands) async {
-    if (commands.isEmpty) return;
-    await _exclusive((session, elm) async {
+  ///
+  /// Returns why they weren't sent, if they weren't, and says so in the
+  /// log, where their replies would have been.
+  Future<SessionProblem?> sendRaw(List<String> commands) async {
+    if (commands.isEmpty) return null;
+    final (_, problem) = await _exclusive((session, elm) async {
       for (final command in commands) {
         try {
           await elm.send(command);
@@ -348,6 +351,18 @@ class SessionController extends Notifier<SessionState> {
       }
       if (commands.any((c) => c.startsWith('AT'))) await elm.initialize();
     });
+    switch (problem) {
+      case SessionProblem.busy:
+        ref
+            .read(adapterLogProvider)
+            .note('Not sent: the adapter is busy, as with a trip\'s reading');
+      case SessionProblem.notConnected:
+        ref.read(adapterLogProvider).note('Not sent: not connected');
+      default:
+        // Failures on the adapter are logged as they happen.
+        break;
+    }
+    return problem;
   }
 
   Future<void> disconnect() async {

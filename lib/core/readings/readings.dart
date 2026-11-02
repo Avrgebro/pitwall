@@ -79,34 +79,47 @@ List<ValueOption> valueOptions(SignalSet? profile, int? modelYear) {
 /// A vehicle's values: every one it can send, and the ones it does.
 @immutable
 class VehicleValues {
-  const VehicleValues._(this.options, this.sent, {required this.customised});
+  const VehicleValues._(
+    this.options,
+    this.sent,
+    this._chosen, {
+    required this.customised,
+  });
 
   factory VehicleValues.of(Vehicle vehicle, SignalSet? profile) {
     final options = valueOptions(profile, vehicle.modelYear);
-    final chosen = vehicle.selectedKeys;
+    final offered = {for (final option in options) option.key};
+    final chosen =
+        vehicle.selectedKeys ??
+        {
+          // Until the user chooses: the standard ones.
+          for (final option in options)
+            if (!option.fromProfile) option.key,
+        };
     return VehicleValues._(
       options,
-      chosen ??
-          {
-            // Until the user chooses: the standard ones.
-            for (final option in options)
-              if (!option.fromProfile) option.key,
-          },
-      customised: chosen != null,
+      chosen.intersection(offered),
+      chosen,
+      customised: vehicle.selectedKeys != null,
     );
   }
 
   final List<ValueOption> options;
 
-  /// The keys it sends.
+  /// The keys it sends: the chosen ones it offers.
   final Set<String> sent;
+
+  /// Everything chosen, including keys not offered right now, as a
+  /// profile's while it loads or after it was removed (Undo brings it
+  /// back). Kept as it is, so those choices survive.
+  final Set<String> _chosen;
 
   /// Whether the user chose them, so there's a choice to reset.
   final bool customised;
 
-  /// What's sent with [key] turned [on] or off, to save as the choice.
+  /// The choice with [key] turned [on] or off, to save.
   Set<String> withSent(String key, {required bool on}) =>
-      on ? {...sent, key} : ({...sent}..remove(key));
+      on ? {..._chosen, key} : ({..._chosen}..remove(key));
 }
 
 /// Reads the values in [keys]: battery voltage from the adapter, standard

@@ -271,4 +271,42 @@ void main() {
       pitwall.dispose();
     },
   );
+
+  test('what was delivered survives a restart', () async {
+    final first = sender();
+    await first.init();
+    await sendFuel(first, 47.5);
+    failNext = 1000;
+    await sendFuel(first, 47);
+    first.dispose();
+
+    final second = sender();
+    await second.init();
+    // Its first attempt, which fails too.
+    await Future<void>.delayed(Duration.zero);
+    expect(second.status.value.deliveredThrough, 1);
+    expect(second.status.value.queued, 1);
+    second.dispose();
+  });
+
+  test(
+    'readings dropped from a full queue don\'t count as delivered',
+    () async {
+      failNext = 1000;
+      final pitwall = sender();
+      await pitwall.init();
+
+      for (var i = 0; i <= WebhookSender.maxQueued; i++) {
+        await pitwall.queue(
+          device: 'tucson',
+          values: const {},
+          connected: true,
+        );
+      }
+
+      expect(pitwall.status.value.queued, WebhookSender.maxQueued);
+      expect(pitwall.status.value.deliveredThrough, 0);
+      pitwall.dispose();
+    },
+  );
 }

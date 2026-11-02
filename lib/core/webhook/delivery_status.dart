@@ -101,8 +101,10 @@ class DeliveryStatus {
   /// Why the last attempt failed. Null after a success.
   final DeliveryError? lastError;
 
-  /// Every reading up to this sequence number is delivered; see
-  /// `WebhookSender.queue`.
+  /// The newest reading delivered; see `WebhookSender.queue`. Readings go
+  /// out in order, so every one before it has left the queue too: delivered,
+  /// or dropped when the queue was full. Only the oldest are ever dropped,
+  /// never the newest.
   final int deliveredThrough;
 }
 

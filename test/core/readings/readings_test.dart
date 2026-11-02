@@ -91,5 +91,20 @@ void main() {
       expect(values.withSent('speed_kmh', on: true), {'rpm', 'speed_kmh'});
       expect(values.withSent('rpm', on: false), isEmpty);
     });
+
+    test('only offered values count as sent; the rest of the choice stays', () {
+      // A profile value, chosen, while the profile is gone.
+      final values = VehicleValues.of(
+        const Vehicle(id: 'tucson', selectedKeys: {'rpm', 'tucson_fli_vol'}),
+        null,
+      );
+
+      expect(values.sent, {'rpm'});
+      expect(values.withSent('speed_kmh', on: true), {
+        'rpm',
+        'tucson_fli_vol',
+        'speed_kmh',
+      });
+    });
   });
 }

@@ -241,6 +241,28 @@ void main() {
       expect(vehicle.profileName, 'default.json');
       expect(vehicle.modelYear, 2023);
     });
+
+    test('Undo doesn\'t replace a profile imported since', () async {
+      final (container, store) = await start(profileName: 'default.json');
+      store.profiles['tucson'] = testProfileJson;
+      final notifier = container.read(appSettingsProvider.notifier);
+      final before = container.read(vehicleProvider('tucson'))!;
+      final profile = (await container.read(
+        vehicleProfileProvider('tucson').future,
+      )).signals!;
+
+      await notifier.removeProfile('tucson');
+      await notifier.importProfile(
+        'tucson',
+        const PickedFile(name: 'newer.json', contents: testProfileJson),
+      );
+      await notifier.restoreProfile(before, profile);
+
+      expect(
+        container.read(vehicleProvider('tucson'))!.profileName,
+        'newer.json',
+      );
+    });
   });
 
   test('a deleted vehicle\'s last values go with it', () async {
@@ -268,5 +290,24 @@ void main() {
 
     expect(storage.saved.of('tucson'), isEmpty);
     expect(storage.saved.of('mazda'), isNotEmpty);
+  });
+
+  test('a reading for a vehicle deleted meanwhile keeps no values', () async {
+    final storage = FakeLastValuesStorage();
+    final container = ProviderContainer(
+      overrides: testOverrides(
+        settings: const AppSettings(
+          vehicles: [Vehicle(id: 'mazda', name: 'Mazda')],
+        ),
+        lastValues: storage,
+      ),
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(lastValuesProvider.notifier)
+        .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2), seq: 3);
+
+    expect(storage.saved.of('tucson'), isEmpty);
   });
 }

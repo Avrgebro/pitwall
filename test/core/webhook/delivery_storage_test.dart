@@ -14,14 +14,32 @@ void main() {
     engineRunning: true,
   );
 
-  test('a round trip keeps the queue and the sequence', () {
-    final state = DeliveryState(queue: [reading], seq: 7);
+  test('a round trip keeps the queue, the sequence and what was delivered', () {
+    final state = DeliveryState(queue: [reading], seq: 7, deliveredThrough: 5);
     final back = DeliveryState.fromJson(
       jsonDecode(jsonEncode(state.toJson())) as Map<String, Object?>,
     );
 
     expect(back.seq, 7);
+    expect(back.deliveredThrough, 5);
     expect(back.queue.single.toJson(), reading.toJson());
+  });
+
+  test('without what was delivered, it\'s everything before the queue', () {
+    expect(
+      DeliveryState.fromJson({
+        'seq': 7,
+        'queue': [reading.toJson()],
+      }).deliveredThrough,
+      6,
+    );
+    expect(DeliveryState.fromJson({'seq': 7}).deliveredThrough, 7);
+  });
+
+  test('after a loss, numbering resumes above anything before', () {
+    final state = DeliveryState.afterLoss(DateTime.utc(2026, 11, 2));
+    expect(state.seq, greaterThan(1000000000));
+    expect(state.deliveredThrough, state.seq);
   });
 
   test('the earlier format, payloads as text, still loads', () {

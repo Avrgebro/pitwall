@@ -73,10 +73,9 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       // scroll into view.
       child: AppPage.slivers(
         title: title,
-        subtitle: category == null
-            ? '${vehicle.name}, ${values.sent.length} selected'
-            : '${vehicle.name}, '
-                  '${view.sentCount(values.sent)} of ${view.options.length} on',
+        subtitle:
+            '${vehicle.name}, '
+            '${view.sentCount(values.sent)} of ${view.options.length} on',
         actions: [
           IconButton(
             icon: Icon(
