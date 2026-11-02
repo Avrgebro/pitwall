@@ -2,10 +2,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../core/format/text_query.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
+import 'values_view.dart';
 import 'widgets/vehicle_removed_page.dart';
 
 /// Which values go in each reading, grouped by where they come from.
@@ -40,19 +42,24 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     final title = category ?? 'Values to send';
     if (vehicle == null) return VehicleRemovedPage(title: title);
     final values = ref.watch(vehicleValuesProvider(widget.vehicleId))!;
-    final selected = values.sent;
-    final options = category == null
-        ? values.options
-        : [
-            for (final option in values.options)
-              if (option.category == category) option,
-          ];
-    // While searching, every section keeps only the values that match.
-    final query = _query.trim().toLowerCase();
-    final filtering = _searching && query.isNotEmpty;
-    final shown = filtering ? _matching(options, query) : options;
-    final standard = shown.where((o) => !o.fromProfile).toList();
-    final fromProfile = shown.where((o) => o.fromProfile).toList();
+    final query = TextQuery(_query);
+    final view = ValuesView.of(
+      values.options,
+      category: category,
+      query: query,
+    );
+    final profile = DisclosureGroup(
+      open: _showProfile,
+      forcedOpen: view.profileForcedOpen,
+      icon: Symbols.manage_search_rounded,
+      showLabel: 'Show ${view.profile.length} signals',
+      hideLabel: 'Hide ${view.profile.length} signals',
+      subtitle:
+          'Sent under their OBDb names, in the profile\'s units. '
+          'Values from the same request share it, so they cost '
+          'one request between them.',
+      onToggle: () => setState(() => _showProfile = !_showProfile),
+    );
     Widget row(ValueOption option) =>
         _SignalToggle(vehicleId: vehicle.id, option: option);
 
@@ -67,10 +74,9 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       child: AppPage.slivers(
         title: title,
         subtitle: category == null
-            ? '${vehicle.name}, ${selected.length} selected'
+            ? '${vehicle.name}, ${values.sent.length} selected'
             : '${vehicle.name}, '
-                  '${options.where((o) => selected.contains(o.key)).length} '
-                  'of ${options.length} on',
+                  '${view.sentCount(values.sent)} of ${view.options.length} on',
         actions: [
           IconButton(
             icon: Icon(
@@ -87,10 +93,12 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
           SliverList.list(
             children: [
               if (_searching)
-                GlassSearchBar(
+                FilterField(
                   autoFocus: true,
                   hintText: 'Search values',
-                  leading: const Icon(Symbols.search_rounded),
+                  noMatchText: view.nothingMatches
+                      ? 'No values match "${query.text}".'
+                      : null,
                   onChanged: (text) => setState(() => _query = text),
                 )
               else
@@ -100,60 +108,30 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                       .read(appSettingsProvider.notifier)
                       .resetValues(vehicle.id),
                 ),
-              if (shown.isEmpty) ...[
-                const SizedBox(height: Insets.m),
-                InfoNote(
-                  text: TextSpan(text: 'No values match "${_query.trim()}".'),
-                ),
-              ],
-              if (standard.isNotEmpty) ...[
+              if (view.standard.isNotEmpty) ...[
                 const SectionHeader('Standard', trailing: 'Works on most cars'),
                 RowGroup(
-                  children: [for (final option in standard) row(option)],
+                  children: [for (final option in view.standard) row(option)],
                 ),
               ],
-              if (fromProfile.isNotEmpty) ...[
+              if (view.profile.isNotEmpty) ...[
                 SectionHeader(
                   'Profile signals',
                   trailing: _profileLabel(vehicle),
                 ),
+                profile,
               ],
-              // Matches are what was searched for, and a category is what was
-              // asked for; no need to expand either.
-              if (fromProfile.isNotEmpty && !filtering && category == null)
-                DisclosureGroup(
-                  open: _showProfile,
-                  icon: Symbols.manage_search_rounded,
-                  showLabel: 'Show ${fromProfile.length} signals',
-                  hideLabel: 'Hide ${fromProfile.length} signals',
-                  subtitle:
-                      'Sent under their OBDb names, in the profile\'s units. '
-                      'Values from the same request share it, so they cost '
-                      'one request between them.',
-                  onToggle: () => setState(() => _showProfile = !_showProfile),
-                ),
             ],
           ),
-          if (fromProfile.isNotEmpty &&
-              (filtering || _showProfile || category != null))
+          if (view.profile.isNotEmpty && profile.listShown)
             SliverRowGroup(
-              itemCount: fromProfile.length,
-              itemBuilder: (context, index) => row(fromProfile[index]),
+              itemCount: view.profile.length,
+              itemBuilder: (context, index) => row(view.profile[index]),
             ),
         ],
       ),
     );
   }
-
-  /// Values whose name or payload key contains [query], which is
-  /// lowercase.
-  static List<ValueOption> _matching(List<ValueOption> options, String query) =>
-      [
-        for (final option in options)
-          if (option.name.toLowerCase().contains(query) ||
-              option.key.contains(query))
-            option,
-      ];
 
   static String _profileLabel(Vehicle vehicle) => switch (vehicle.modelYear) {
     final year? => '$year profile',

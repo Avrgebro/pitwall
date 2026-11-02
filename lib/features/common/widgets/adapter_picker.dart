@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../core/bluetooth/adapter_type.dart';
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
+import '../../../core/format/text_query.dart';
 import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
 
@@ -98,13 +99,10 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
   }
 
   Widget _list(List<BondedDevice> devices) {
-    final query = _query.trim().toLowerCase();
+    final query = TextQuery(_query);
     final matches = [
       for (final device in devices)
-        if (query.isEmpty ||
-            device.name.toLowerCase().contains(query) ||
-            device.address.toLowerCase().contains(query))
-          device,
+        if (query.matches([device.name, device.address])) device,
     ];
     final suited = [
       for (final device in matches)
@@ -117,11 +115,17 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     // Kept open while filtering, when nothing suits, or when the chosen
     // device is among them, so the choice is never hidden. Otherwise the
     // user opens and closes them.
-    final keptOpen =
-        query.isNotEmpty ||
-        suited.isEmpty ||
-        others.any((d) => d.address == widget.selectedAddress);
-    final othersOpen = keptOpen || _showOthers;
+    final disclosure = DisclosureGroup(
+      open: _showOthers,
+      forcedOpen:
+          !query.isEmpty ||
+          suited.isEmpty ||
+          others.any((d) => d.address == widget.selectedAddress),
+      icon: Symbols.devices_other_rounded,
+      showLabel: 'Show ${others.length} more',
+      hideLabel: 'Hide ${others.length} devices',
+      onToggle: () => setState(() => _showOthers = !_showOthers),
+    );
 
     Widget group(List<BondedDevice> list) => RowGroup(
       children: [
@@ -152,30 +156,21 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (devices.length > AdapterPicker.filterAbove) ...[
-          GlassSearchBar(
+          FilterField(
             hintText: 'Filter by name or address',
-            leading: const Icon(Symbols.search_rounded),
+            noMatchText: matches.isEmpty
+                ? 'No devices match "${query.text}".'
+                : null,
             onChanged: (text) => setState(() => _query = text),
           ),
           const SizedBox(height: Insets.m),
         ],
-        if (matches.isEmpty)
-          InfoNote(
-            text: TextSpan(text: 'No devices match "${_query.trim()}".'),
-          ),
         if (suited.isNotEmpty) group(suited),
         if (others.isNotEmpty && suited.isNotEmpty) ...[
           const SectionHeader('Other devices'),
-          if (!keptOpen)
-            DisclosureGroup(
-              open: _showOthers,
-              icon: Symbols.devices_other_rounded,
-              showLabel: 'Show ${others.length} more',
-              hideLabel: 'Hide ${others.length} devices',
-              onToggle: () => setState(() => _showOthers = !_showOthers),
-            ),
+          disclosure,
         ],
-        if (others.isNotEmpty && othersOpen) group(others),
+        if (others.isNotEmpty && disclosure.listShown) group(others),
       ],
     );
   }
