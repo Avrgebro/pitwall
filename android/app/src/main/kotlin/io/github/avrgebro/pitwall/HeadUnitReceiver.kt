@@ -23,7 +23,7 @@ class HeadUnitReceiver : BroadcastReceiver() {
             ?: return
         if (!ServiceBridge.startsTrip(context, device.address)) return
         if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
-            TripService.start(context, device.address)
+            TripService.start(context, TripTarget.HeadUnit(device.address))
         }
     }
 }

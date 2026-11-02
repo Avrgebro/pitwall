@@ -20,9 +20,9 @@ abstract interface class TripServiceGateway {
   /// most. Android keeps them, so it can start a trip with the app closed.
   Future<void> configure({required Set<String> headUnitAddresses});
 
-  /// Starts the service from the app. The [target] comes back through
-  /// [starts], as a head unit's does.
-  Future<void> startService(TripTarget target);
+  /// Starts the service from the app, for [vehicleId] or any vehicle. It
+  /// comes back through [starts], as a head unit's start does.
+  Future<void> startService({String? vehicleId});
 
   /// Stops the service once the trip is over.
   Future<void> stopService();
@@ -46,21 +46,18 @@ class AndroidTripServiceGateway implements TripServiceGateway {
   @override
   Stream<TripTarget> get starts => _starts.stream;
 
-  /// A target travels as `headUnit` or `vehicleId`, or neither for any
-  /// vehicle.
-  static TripTarget _decode(Object? arguments) {
-    final map = arguments is Map ? arguments : const {};
-    return switch ((map['headUnit'], map['vehicleId'])) {
-      (final String address, _) => HeadUnitTarget(address),
-      (_, final String id) => VehicleTarget(id),
-      _ => const AnyVehicleTarget(),
-    };
-  }
-
-  static Map<String, String> _encode(TripTarget target) => switch (target) {
-    HeadUnitTarget(:final address) => {'headUnit': address},
-    VehicleTarget(:final id) => {'vehicleId': id},
-    AnyVehicleTarget() => const {},
+  /// A target travels as `TripTarget.toArguments()` in `TripTarget.kt`:
+  /// one `headUnit` or one `vehicleId`, or nothing for any vehicle.
+  /// Anything else is a mistake in the bridge, and an error rather than a
+  /// trip for any vehicle.
+  static TripTarget _decode(Object? arguments) => switch (arguments) {
+    {'headUnit': final String address} when arguments.length == 1 =>
+      HeadUnitTarget(address),
+    {'vehicleId': final String id} when arguments.length == 1 => VehicleTarget(
+      id,
+    ),
+    Map(isEmpty: true) => const AnyVehicleTarget(),
+    _ => throw FormatException('Not a trip target', arguments),
   };
 
   @override
@@ -76,8 +73,8 @@ class AndroidTripServiceGateway implements TripServiceGateway {
       });
 
   @override
-  Future<void> startService(TripTarget target) =>
-      _channel.invokeMethod<void>('startService', _encode(target));
+  Future<void> startService({String? vehicleId}) =>
+      _channel.invokeMethod<void>('startService', {'vehicleId': ?vehicleId});
 
   @override
   Future<void> stopService() => _channel.invokeMethod<void>('stopService');

@@ -29,11 +29,11 @@ void main() {
         (_) {},
       );
 
-  test('the app\'s target travels to Android', () async {
+  test('the app\'s request travels to Android', () async {
     final gateway = AndroidTripServiceGateway();
 
-    await gateway.startService(const VehicleTarget('mazda'));
-    await gateway.startService(const AnyVehicleTarget());
+    await gateway.startService(vehicleId: 'mazda');
+    await gateway.startService();
 
     expect(calls.map((c) => c.arguments), [
       {'vehicleId': 'mazda'},
@@ -68,5 +68,15 @@ void main() {
     );
     pending = null;
     expect(await gateway.takeTripRequest(), isNull);
+  });
+
+  test('anything but one head unit, one vehicle or none is an error', () async {
+    final gateway = AndroidTripServiceGateway();
+    pending = {'headUnit': 'AA:BB', 'vehicleId': 'mazda'};
+    await expectLater(gateway.takeTripRequest(), throwsFormatException);
+    pending = {'vehicleId': 7};
+    await expectLater(gateway.takeTripRequest(), throwsFormatException);
+    pending = 'any';
+    await expectLater(gateway.takeTripRequest(), throwsFormatException);
   });
 }

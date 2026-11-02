@@ -11,9 +11,8 @@ import io.flutter.plugin.common.MethodChannel
  *
  * Dart → Android: `configure`, `startService`, `stopService`,
  * `updateNotification`, `takeTripRequest`.
- * Android → Dart: `tripStart`, naming the trip's target: the `headUnit`
- * that connected, or the `vehicleId` the app asked for, or neither for any
- * vehicle. `startService` passes the app's target the same way.
+ * Android → Dart: `tripStart`, with the trip's [TripTarget]. The app's
+ * `startService` names a `vehicleId`, or none for any vehicle.
  *
  * A trip can be requested before Dart has finished starting, so requests
  * wait until Dart asks for them with `takeTripRequest`.
@@ -26,13 +25,11 @@ object ServiceBridge {
     // configure, which Dart sends at every start.
     private const val KEY_OLD_HEAD_UNIT = "head_unit_address"
 
-    /** A trip asked for before Dart was listening. */
-    private class PendingStart(val target: Map<String, String>)
-
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
     private var dartReady = false
-    private var pendingStart: PendingStart? = null
+    /** A trip asked for before Dart was listening. */
+    private var pendingStart: TripTarget? = null
 
     fun attach(context: Context, messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, "pitwall/service").apply {
@@ -49,7 +46,7 @@ object ServiceBridge {
                     "startService" -> {
                         TripService.start(
                             context,
-                            vehicleId = call.argument<String>("vehicleId"),
+                            TripTarget.fromApp(call.argument<String>("vehicleId")),
                         )
                         result.success(null)
                     }
@@ -63,7 +60,7 @@ object ServiceBridge {
                     }
                     "takeTripRequest" -> {
                         dartReady = true
-                        result.success(pendingStart?.target)
+                        result.success(pendingStart?.toArguments())
                         pendingStart = null
                     }
                     else -> result.notImplemented()
@@ -80,15 +77,11 @@ object ServiceBridge {
         return address.uppercase() in addresses
     }
 
-    fun requestTripStart(headUnit: String?, vehicleId: String?) = main.post {
-        val target = buildMap {
-            headUnit?.let { put("headUnit", it) }
-            vehicleId?.let { put("vehicleId", it) }
-        }
+    fun requestTripStart(target: TripTarget) = main.post {
         if (dartReady) {
-            channel?.invokeMethod("tripStart", target)
+            channel?.invokeMethod("tripStart", target.toArguments())
         } else {
-            pendingStart = PendingStart(target)
+            pendingStart = target
         }
     }
 
