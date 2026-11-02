@@ -130,8 +130,13 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     final vehicle = _current.vehicleById(vehicleId);
     if (vehicle == null) return;
     await ref.read(settingsStoreProvider).deleteProfile(vehicleId);
+    // The model year only picks which of the profile's requests apply.
     await saveVehicle(
-      vehicle.copyWith(profileName: null, profileImportedAt: null),
+      vehicle.copyWith(
+        profileName: null,
+        profileImportedAt: null,
+        modelYear: null,
+      ),
     );
   }
 }

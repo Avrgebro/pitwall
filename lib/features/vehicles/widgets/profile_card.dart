@@ -56,15 +56,6 @@ class ProfileCard extends StatelessWidget {
               vehicle.profileName ?? 'profile.json',
               if (imported != null) 'imported ${Formatters.date(imported)}',
             ].join(', '),
-            trailing: PopupMenuButton<VoidCallback>(
-              icon: const Icon(Symbols.more_vert_rounded),
-              tooltip: 'Profile options',
-              onSelected: (action) => action(),
-              itemBuilder: (context) => [
-                PopupMenuItem(value: onImport, child: const Text('Replace')),
-                PopupMenuItem(value: onRemove, child: const Text('Remove')),
-              ],
-            ),
           ),
           const SizedBox(height: Insets.l),
           DropdownButtonFormField<int>(
@@ -88,6 +79,22 @@ class ProfileCard extends StatelessWidget {
               ),
               padding: EdgeInsets.only(top: Insets.m),
             ),
+          const SizedBox(height: Insets.l),
+          ButtonGroup(
+            buttons: [
+              GroupButton(
+                icon: Symbols.swap_horiz_rounded,
+                label: 'Replace profile',
+                onPressed: onImport,
+              ),
+              GroupButton(
+                icon: Symbols.delete_rounded,
+                tooltip: 'Remove profile',
+                tone: StatusTone.error,
+                onPressed: onRemove,
+              ),
+            ],
+          ),
         ],
       ),
     );

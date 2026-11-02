@@ -6,6 +6,7 @@ library;
 export '../core/format/formatters.dart';
 export 'components/app_row.dart';
 export 'components/checklist_row.dart';
+export 'components/button_group.dart';
 export 'components/card_header.dart';
 export 'components/content_card.dart';
 export 'components/detail_rows.dart';

@@ -183,7 +183,7 @@ void main() {
       );
     });
 
-    test('removing clears the file and the vehicle\'s profile', () async {
+    test('removing clears the file, the profile and its model year', () async {
       final (container, store) = await start(profileName: 'default.json');
       store.profiles['tucson'] = testProfileJson;
 
@@ -192,7 +192,10 @@ void main() {
           .removeProfile('tucson');
 
       expect(store.profiles, isEmpty);
-      expect(container.read(vehicleProvider('tucson'))!.profileName, isNull);
+      final vehicle = container.read(vehicleProvider('tucson'))!;
+      expect(vehicle.profileName, isNull);
+      // It only chose which of the profile's requests apply.
+      expect(vehicle.modelYear, isNull);
     });
   });
 }
