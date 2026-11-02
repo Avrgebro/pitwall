@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/routes.dart';
-import '../../core/bluetooth/classic_bluetooth.dart';
+import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';

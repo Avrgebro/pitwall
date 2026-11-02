@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:pitwall/core/bluetooth/classic_bluetooth.dart';
+import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/bluetooth/device_kind.dart';
 import 'package:pitwall/features/common/widgets/adapter_picker.dart';
 import 'package:pitwall/ui/ui.dart';

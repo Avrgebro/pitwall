@@ -18,11 +18,7 @@ class ValueTileData {
 /// A value with its label and unit. Values are the biggest type on screen;
 /// labels and units step back.
 class ValueTile extends StatelessWidget {
-  const ValueTile({
-    super.key,
-    required this.data,
-    this.wide = false,
-  });
+  const ValueTile({super.key, required this.data, this.wide = false});
 
   final ValueTileData data;
 

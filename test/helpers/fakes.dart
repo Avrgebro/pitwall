@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
-import 'package:pitwall/core/bluetooth/classic_bluetooth.dart';
 
 import 'dart:async';
 

@@ -3,29 +3,20 @@ import 'package:flutter/services.dart';
 import 'bluetooth_gateway.dart';
 import 'device_kind.dart';
 
-/// A device paired with the phone in Android's Bluetooth settings.
-class BondedDevice {
-  const BondedDevice({
-    required this.name,
-    required this.address,
-    this.kind = DeviceKind.uncategorized,
-  });
-
-  final String name;
-  final String address;
-  final DeviceKind kind;
-}
-
 /// Classic Bluetooth (serial) adapters, Android only. Backed by
-/// `ClassicBluetoothChannel.kt`.
+/// `ClassicBluetoothChannel.kt` and `BluetoothStateChannel.kt`.
 ///
 /// Errors surface as [PlatformException] with codes `unavailable`,
 /// `disabled`, `permission`, `connect_failed` or `write_failed`.
-abstract final class ClassicBluetooth {
+class ClassicBluetoothGateway implements BluetoothGateway {
+  const ClassicBluetoothGateway();
+
   static const _methods = MethodChannel('pitwall/classic_bluetooth');
   static const _input = EventChannel('pitwall/classic_bluetooth/input');
+  static const _state = EventChannel('pitwall/bluetooth_state');
 
-  static Future<List<BondedDevice>> bondedDevices() async {
+  @override
+  Future<List<BondedDevice>> bondedDevices() async {
     final devices = await _methods.invokeListMethod<Map>('bondedDevices');
     return [
       for (final device in devices ?? const <Map>[])
@@ -39,26 +30,29 @@ abstract final class ClassicBluetooth {
 
   /// Opens a serial connection to the adapter at [address]. Only one
   /// connection is open at a time; connecting again closes the previous one.
-  static Future<ClassicTransport> connect(String address) async {
+  @override
+  Future<ClosableTransport> connect(String address) async {
     await _methods.invokeMethod<void>('connect', {'address': address});
-    return ClassicTransport._();
+    return _ClassicTransport();
   }
+
+  @override
+  Stream<bool> get enabled =>
+      _state.receiveBroadcastStream().map((on) => on as bool);
 }
 
-class ClassicTransport implements ClosableTransport {
-  ClassicTransport._();
-
+class _ClassicTransport implements ClosableTransport {
   /// Ends with an error when the adapter disconnects.
   @override
-  late final Stream<List<int>> input = ClassicBluetooth._input
+  late final Stream<List<int>> input = ClassicBluetoothGateway._input
       .receiveBroadcastStream()
       .map((bytes) => bytes as Uint8List);
 
   @override
-  Future<void> write(List<int> bytes) => ClassicBluetooth._methods
+  Future<void> write(List<int> bytes) => ClassicBluetoothGateway._methods
       .invokeMethod<void>('write', Uint8List.fromList(bytes));
 
   @override
   Future<void> close() =>
-      ClassicBluetooth._methods.invokeMethod<void>('disconnect');
+      ClassicBluetoothGateway._methods.invokeMethod<void>('disconnect');
 }

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../core/bluetooth/classic_bluetooth.dart';
+import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/bluetooth/device_kind.dart';
 import '../../core/settings/settings.dart';
 import '../../core/vehicles/vehicle.dart';

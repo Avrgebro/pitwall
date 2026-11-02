@@ -1,7 +1,5 @@
-import 'package:flutter/services.dart';
-
 import '../obd/obd_transport.dart';
-import 'classic_bluetooth.dart';
+import 'device_kind.dart';
 
 /// Access to the phone's Bluetooth, behind an interface so screens and
 /// controllers can be tested without a phone.
@@ -16,27 +14,20 @@ abstract interface class BluetoothGateway {
   Stream<bool> get enabled;
 }
 
+/// A device paired with the phone in Android's Bluetooth settings.
+class BondedDevice {
+  const BondedDevice({
+    required this.name,
+    required this.address,
+    this.kind = DeviceKind.uncategorized,
+  });
+
+  final String name;
+  final String address;
+  final DeviceKind kind;
+}
+
 /// A transport the app can close when it's done.
 abstract interface class ClosableTransport implements ObdTransport {
   Future<void> close();
-}
-
-/// Classic Bluetooth (serial) adapters, Android only.
-class ClassicBluetoothGateway implements BluetoothGateway {
-  const ClassicBluetoothGateway();
-
-  @override
-  Future<List<BondedDevice>> bondedDevices() =>
-      ClassicBluetooth.bondedDevices();
-
-  @override
-  Future<ClosableTransport> connect(String address) =>
-      ClassicBluetooth.connect(address);
-
-  static const _state = EventChannel('pitwall/bluetooth_state');
-
-  /// Backed by `BluetoothStateChannel.kt`.
-  @override
-  Stream<bool> get enabled =>
-      _state.receiveBroadcastStream().map((on) => on as bool);
 }

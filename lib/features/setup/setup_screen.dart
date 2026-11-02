@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
-import '../../core/bluetooth/classic_bluetooth.dart';
+import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/platform/permission_gateway.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/permissions_state.dart';

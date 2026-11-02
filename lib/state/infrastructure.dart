@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/bluetooth/bluetooth_gateway.dart';
+import '../core/bluetooth/classic_bluetooth.dart';
 import '../core/logging/adapter_log.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/platform/permission_gateway.dart';
