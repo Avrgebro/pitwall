@@ -10,7 +10,7 @@ final settingsAttentionProvider = Provider<bool>((ref) {
   final error = ref.watch(
     deliveryStatusProvider.select((status) => status.lastError),
   );
-  return (error != null && !error.isTransient) ||
+  return (error != null && error.kind.needsUser) ||
       ref.watch(missingPermissionsProvider) > 0;
 });
 

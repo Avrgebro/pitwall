@@ -2,36 +2,55 @@ import 'package:flutter/foundation.dart';
 
 import 'webhook_auth.dart';
 
+/// What gets a failed delivery going again.
+enum DeliveryFix {
+  /// Nothing: retrying later helps, and the sender retries on its own.
+  retry,
+
+  /// Only a change in the webhook settings.
+  settings,
+
+  /// A change on the server, such as in Home Assistant, or in the settings
+  /// to match it; Retry helps once it's made.
+  server,
+}
+
 enum DeliveryErrorKind {
   /// No webhook URL is set.
-  noUrl(retryable: false),
+  noUrl(DeliveryFix.settings),
 
   /// Authentication is chosen but incomplete.
-  authIncomplete(retryable: false),
+  authIncomplete(DeliveryFix.settings),
 
   /// The URL can't be parsed.
-  invalidUrl(retryable: false),
+  invalidUrl(DeliveryFix.settings),
 
   /// HTTP 401 or 403: the server doesn't accept these credentials or URL.
-  refused(retryable: false),
+  refused(DeliveryFix.server),
 
   /// HTTP 404: the server doesn't know this webhook.
-  notFound(retryable: false),
+  notFound(DeliveryFix.server),
 
   /// Any other non-2xx answer.
-  serverError(retryable: true),
+  serverError(DeliveryFix.retry),
 
   /// The server didn't answer in time.
-  timeout(retryable: true),
+  timeout(DeliveryFix.retry),
 
   /// The server couldn't be reached: no signal, wrong host, server down.
-  unreachable(retryable: true);
+  unreachable(DeliveryFix.retry);
 
-  const DeliveryErrorKind({required this.retryable});
+  const DeliveryErrorKind(this.fix);
+
+  final DeliveryFix fix;
 
   /// Whether retrying later can help without the user changing anything.
-  /// The sender retries only these; the rest wait for the user.
-  final bool retryable;
+  /// The sender retries only these.
+  bool get retryable => fix == DeliveryFix.retry;
+
+  /// Whether the user has to change something, in Settings or on the
+  /// server.
+  bool get needsUser => !retryable;
 }
 
 /// Why a delivery failed. Descriptions for people are written by the UI;
@@ -47,9 +66,6 @@ class DeliveryError {
 
   /// For [DeliveryErrorKind.authIncomplete], what's wrong.
   final AuthProblem? authProblem;
-
-  /// Whether retrying later can help without the user changing anything.
-  bool get isTransient => kind.retryable;
 
   @override
   bool operator ==(Object other) =>

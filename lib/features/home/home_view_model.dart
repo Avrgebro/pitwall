@@ -302,7 +302,7 @@ class HomeViewModel {
     }
 
     // Retried on its own, so there's nothing to offer.
-    if (error.isTransient) {
+    if (error.kind.retryable) {
       final readings = queued == 1 ? '1 reading' : '$queued readings';
       return DeliveryCardModel(
         kind: DeliveryCardKind.queued,
@@ -320,11 +320,8 @@ class HomeViewModel {
     }
 
     // Not retried on its own. Retry helps once the server side is fixed;
-    // without a URL or complete credentials, only Settings can.
+    // what only Settings can fix, it can't.
     final text = DeliveryText.error(error);
-    final settingsOnly =
-        error.kind == DeliveryErrorKind.noUrl ||
-        error.kind == DeliveryErrorKind.authIncomplete;
     return DeliveryCardModel(
       kind: DeliveryCardKind.failing,
       title: text.title,
@@ -332,7 +329,7 @@ class HomeViewModel {
       stats: stats(lastSentLabel: 'Last success'),
       actions: {
         DeliveryAction.openSettings,
-        if (!settingsOnly) DeliveryAction.retry,
+        if (error.kind.fix == DeliveryFix.server) DeliveryAction.retry,
       },
     );
   }
@@ -365,7 +362,7 @@ class HomeViewModel {
         (true, _) => 'Updated $ago',
         (null, _) => 'Read $ago',
         (false, null) => 'Read $ago, sending',
-        (false, final error?) when error.isTransient =>
+        (false, final error?) when error.kind.retryable =>
           'Read $ago, not sent yet',
         (false, _) => 'Read $ago, not delivered',
       },

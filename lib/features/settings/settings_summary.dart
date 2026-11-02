@@ -14,7 +14,7 @@ abstract final class SettingsSummary {
   ) {
     if (!webhook.hasUrl) return (text: 'Not set yet', problem: true);
     final error = status.lastError;
-    if (error != null && !error.isTransient) {
+    if (error != null && error.kind.needsUser) {
       return (text: DeliveryText.error(error).title, problem: true);
     }
     final lastSuccess = status.lastSuccess;
