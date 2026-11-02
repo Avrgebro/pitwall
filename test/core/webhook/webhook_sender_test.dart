@@ -180,6 +180,31 @@ void main() {
     }
   });
 
+  test('failed attempts are counted once, and back off with each', () async {
+    failNext = 3;
+    final waits = <int>[];
+    final pitwall = WebhookSender(
+      storage: storage,
+      webhookTarget: () async => _target,
+      client: server(),
+      clock: () => DateTime.utc(2026, 10, 31, 19, 40),
+      backoff: (attempt) {
+        waits.add(attempt);
+        return const Duration(milliseconds: 5);
+      },
+    );
+    await pitwall.init();
+
+    await sendFuel(pitwall, 47.5);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    // Three failures, each backing off further, then a success.
+    expect(waits, [0, 1, 2]);
+    expect(pitwall.status.value.failedAttempts, 0);
+    expect(received, hasLength(1));
+    pitwall.dispose();
+  });
+
   test('credentials are sent as headers on every request', () async {
     final headers = <Map<String, String>>[];
     final pitwall = sender(

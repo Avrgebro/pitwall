@@ -1,20 +1,57 @@
 import 'dart:convert';
 
 import '../storage/app_files.dart';
+import 'queued_reading.dart';
 
-/// What the sender keeps across restarts: the payloads still to deliver,
-/// oldest first, the last sequence number used, and the newest payload that
-/// carried values (shown on Home).
+/// What the sender keeps across restarts: the readings still to deliver,
+/// oldest first, the last sequence number used, and the newest reading
+/// that carried values (shown on Home).
 class DeliveryState {
-  const DeliveryState({this.queue = const [], this.seq = 0, this.lastReading});
+  const DeliveryState({this.queue = const [], this.seq = 0, this.latest});
 
-  /// Encoded JSON bodies, ready to POST.
-  final List<String> queue;
+  final List<QueuedReading> queue;
   final int seq;
 
-  /// The newest payload with values. End-of-trip messages carry none, so
+  /// The newest reading with values. End-of-trip messages carry none, so
   /// they never replace it.
-  final String? lastReading;
+  final QueuedReading? latest;
+
+  Map<String, Object?> toJson() => {
+    'seq': seq,
+    'queue': [for (final reading in queue) reading.toJson()],
+    'latest': latest?.toJson(),
+  };
+
+  /// Also reads the earlier format, where each reading was kept as its
+  /// encoded payload and the latest was `lastReading`. Entries that don't
+  /// parse are left out.
+  factory DeliveryState.fromJson(Map<String, Object?> json) => DeliveryState(
+    queue: [
+      for (final entry in json['queue'] as List? ?? const []) ?_reading(entry),
+    ],
+    seq: switch (json['seq']) {
+      final int seq => seq,
+      _ => 0,
+    },
+    latest: _reading(json['latest'] ?? json['lastReading']),
+  );
+
+  static QueuedReading? _reading(Object? entry) => switch (entry) {
+    final Map<String, Object?> json => QueuedReading.fromJson(json),
+    final String payload => switch (_decode(payload)) {
+      final Map<String, Object?> json => QueuedReading.fromJson(json),
+      _ => null,
+    },
+    _ => null,
+  };
+
+  static Object? _decode(String source) {
+    try {
+      return jsonDecode(source);
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
 abstract interface class DeliveryStorage {
@@ -31,26 +68,13 @@ class FileDeliveryStorage implements DeliveryStorage {
   Future<DeliveryState> load() async {
     final file = await appFile(_fileName);
     if (!await file.exists()) return const DeliveryState();
-    try {
-      final json =
-          jsonDecode(await file.readAsString()) as Map<String, Object?>;
-      return DeliveryState(
-        queue: [...(json['queue'] as List? ?? const []).whereType<String>()],
-        seq: (json['seq'] as num? ?? 0).toInt(),
-        lastReading: json['lastReading'] as String?,
-      );
-    } on Object {
-      return const DeliveryState();
-    }
+    return switch (DeliveryState._decode(await file.readAsString())) {
+      final Map<String, Object?> json => DeliveryState.fromJson(json),
+      _ => const DeliveryState(),
+    };
   }
 
   @override
-  Future<void> save(DeliveryState state) async => writeAtomically(
-    await appFile(_fileName),
-    jsonEncode({
-      'seq': state.seq,
-      'queue': state.queue,
-      'lastReading': state.lastReading,
-    }),
-  );
+  Future<void> save(DeliveryState state) async =>
+      writeAtomically(await appFile(_fileName), jsonEncode(state.toJson()));
 }

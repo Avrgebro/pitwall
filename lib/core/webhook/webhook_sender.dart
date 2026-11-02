@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'delivery_status.dart';
 import 'delivery_storage.dart';
 import 'payload.dart';
+import 'queued_reading.dart';
 import 'webhook_target.dart';
 
 /// Sends readings to the webhook, one POST each, in order. Readings are
@@ -49,10 +50,10 @@ class WebhookSender {
 
   final status = ValueNotifier(const DeliveryStatus());
 
-  List<String> _queue = [];
+  /// Oldest first; sequence numbers only go up.
+  List<QueuedReading> _queue = [];
   int _seq = 0;
-  String? _lastReading;
-  int _failures = 0;
+  QueuedReading? _latest;
   bool _flushing = false;
   Timer? _retry;
 
@@ -61,8 +62,8 @@ class WebhookSender {
     final state = await _storage.load();
     _queue = [...state.queue];
     _seq = state.seq;
-    _lastReading = state.lastReading;
-    _update();
+    _latest = state.latest;
+    _queueChanged();
     unawaited(flush());
   }
 
@@ -73,24 +74,21 @@ class WebhookSender {
     required bool connected,
     bool? engineRunning,
   }) async {
-    _seq++;
-    final payload = jsonEncode(
-      buildPayload(
-        device: device,
-        seq: _seq,
-        timestamp: _clock(),
-        values: values,
-        connected: connected,
-        engineRunning: engineRunning,
-      ),
+    final reading = QueuedReading(
+      seq: ++_seq,
+      device: device,
+      timestamp: _clock(),
+      values: values,
+      connected: connected,
+      engineRunning: engineRunning,
     );
-    _queue.add(payload);
-    if (values.isNotEmpty) _lastReading = payload;
+    _queue.add(reading);
+    if (values.isNotEmpty) _latest = reading;
     if (_queue.length > maxQueued) {
       _queue.removeRange(0, _queue.length - maxQueued);
     }
     await _persist();
-    _update();
+    _queueChanged();
     await flush();
   }
 
@@ -105,18 +103,20 @@ class WebhookSender {
       while (_queue.isNotEmpty) {
         final target = await _webhookTarget();
         if (_unusable(target) case final error?) {
-          _fail(error);
+          _failed(error);
           return;
         }
-        final (:error, :elapsed) = await _post(target, _queue.first);
+        final (:error, :elapsed) = await _post(
+          target,
+          jsonEncode(_queue.first.toJson()),
+        );
         if (error != null) {
-          _fail(error);
+          _failed(error);
           return;
         }
         _queue.removeAt(0);
-        _failures = 0;
         await _persist();
-        _update(lastSuccess: _clock(), clearError: true);
+        _succeeded();
       }
     } finally {
       _flushing = false;
@@ -213,57 +213,69 @@ class WebhookSender {
     _ => DeliveryError(DeliveryErrorKind.serverError, statusCode: statusCode),
   };
 
-  void _fail(DeliveryError error) {
-    _update(lastFailure: _clock(), error: error, failed: true);
-    // Only the user can fix the rest; delivery resumes on the next send,
-    // when the webhook settings change, or on Retry.
-    if (!error.kind.retryable) return;
-    _retry = Timer(_backoff(_failures++), () => unawaited(flush()));
-  }
-
-  Future<void> _persist() => _storage.save(
-    DeliveryState(queue: List.of(_queue), seq: _seq, lastReading: _lastReading),
-  );
-
-  void _update({
-    DateTime? lastSuccess,
-    DateTime? lastFailure,
-    DeliveryError? error,
-    bool clearError = false,
-    bool failed = false,
-  }) {
+  void _succeeded() {
     final current = status.value;
-    status.value = DeliveryStatus(
-      queued: _queue.length,
-      failedAttempts: clearError
-          ? 0
-          : current.failedAttempts + (failed ? 1 : 0),
-      lastSuccess: lastSuccess ?? current.lastSuccess,
-      lastFailure: lastFailure ?? current.lastFailure,
-      lastError: clearError ? null : (error ?? current.lastError),
-      latest: _latest(),
+    _publish(
+      failedAttempts: 0,
+      lastSuccess: _clock(),
+      lastFailure: current.lastFailure,
+      lastError: null,
     );
   }
 
-  Reading? _latest() {
-    final source = _lastReading;
-    if (source == null) return null;
-    try {
-      final json = jsonDecode(source) as Map<String, Object?>;
-      return Reading(
-        device: json['device'] as String? ?? '',
-        timestamp: DateTime.parse(json['timestamp'] as String),
-        values: {
-          for (final MapEntry(:key, :value)
-              in (json['values'] as Map<String, Object?>? ?? const {}).entries)
-            if (value is num) key: value,
-        },
-        // Payloads are unique (each has its own seq), so still being in the
-        // queue means not delivered yet.
-        delivered: !_queue.contains(source),
-      );
-    } on Object {
-      return null;
-    }
+  void _failed(DeliveryError error) {
+    final current = status.value;
+    final attempts = current.failedAttempts + 1;
+    _publish(
+      failedAttempts: attempts,
+      lastSuccess: current.lastSuccess,
+      lastFailure: _clock(),
+      lastError: error,
+    );
+    // Only the user can fix the rest; delivery resumes on the next send,
+    // when the webhook settings change, or on Retry.
+    if (!error.kind.retryable) return;
+    _retry = Timer(_backoff(attempts - 1), () => unawaited(flush()));
   }
+
+  /// The queue or the latest reading changed; delivery itself didn't.
+  void _queueChanged() {
+    final current = status.value;
+    _publish(
+      failedAttempts: current.failedAttempts,
+      lastSuccess: current.lastSuccess,
+      lastFailure: current.lastFailure,
+      lastError: current.lastError,
+    );
+  }
+
+  void _publish({
+    required int failedAttempts,
+    required DateTime? lastSuccess,
+    required DateTime? lastFailure,
+    required DeliveryError? lastError,
+  }) {
+    final latest = _latest;
+    status.value = DeliveryStatus(
+      queued: _queue.length,
+      failedAttempts: failedAttempts,
+      lastSuccess: lastSuccess,
+      lastFailure: lastFailure,
+      lastError: lastError,
+      latest: latest == null
+          ? null
+          : Reading(
+              device: latest.device,
+              timestamp: latest.timestamp,
+              values: latest.values,
+              // The queue is in sequence order, so the reading is
+              // delivered once everything left came after it.
+              delivered: _queue.isEmpty || _queue.first.seq > latest.seq,
+            ),
+    );
+  }
+
+  Future<void> _persist() => _storage.save(
+    DeliveryState(queue: List.of(_queue), seq: _seq, latest: _latest),
+  );
 }
