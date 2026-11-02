@@ -95,6 +95,13 @@ class FakeTripServiceGateway implements TripServiceGateway {
 
   void send(TripTarget target) => _starts.add(target);
 
+  /// A start whose target couldn't be read.
+  void sendUnreadable() =>
+      _starts.addError(const FormatException('Not a trip target'));
+
+  /// Makes updating the notification fail on [text], like a channel error.
+  String? failNotification;
+
   @override
   Stream<TripTarget> get starts => _starts.stream;
 
@@ -122,7 +129,12 @@ class FakeTripServiceGateway implements TripServiceGateway {
   Future<void> stopService() async => calls.add('stopService');
 
   @override
-  Future<void> updateNotification(String text) async => notifications.add(text);
+  Future<void> updateNotification(String text) async {
+    if (text == failNotification) {
+      throw PlatformException(code: 'error', message: 'No notification');
+    }
+    notifications.add(text);
+  }
 }
 
 /// Keeps the last values in memory.

@@ -18,7 +18,8 @@ enum TripEnd {
   /// The user stopped it.
   stopped,
 
-  /// No vehicle the trip is for has an adapter set.
+  /// No vehicle the trip is for has an adapter set, or the trip's vehicle
+  /// was deleted.
   noVehicle,
 
   /// Bluetooth permission is missing, and there's no screen to ask on.
@@ -155,7 +156,10 @@ class TripController extends Notifier<TripState> {
   @override
   TripState build() {
     final gateway = ref.watch(tripServiceGatewayProvider);
-    final starts = gateway.starts.listen((target) => unawaited(_run(target)));
+    final starts = gateway.starts.listen(
+      (target) => unawaited(_run(target)),
+      onError: _refuse,
+    );
     ref.onDispose(starts.cancel);
     // Android needs to know which head units start a trip, even while the
     // app isn't running.
@@ -168,8 +172,12 @@ class TripController extends Notifier<TripState> {
     }, fireImmediately: true);
     // Android may have started the service before Dart was listening.
     Future.microtask(() async {
-      if (await gateway.takeTripRequest() case final target?) {
-        unawaited(_run(target));
+      try {
+        if (await gateway.takeTripRequest() case final target?) {
+          unawaited(_run(target));
+        }
+      } on FormatException catch (error, stack) {
+        _refuse(error, stack);
       }
     });
     return const TripIdle();
@@ -212,13 +220,8 @@ class TripController extends Notifier<TripState> {
       );
       end = await _readLoop(run, reached, settings.interval);
     } on Object catch (error, stack) {
-      // Nothing awaits a trip, so it's reported here: in the adapter log for
-      // the user, and as an error in the system log.
       end = TripEnd.failed;
-      ref.read(adapterLogProvider).note('Trip failed: $error', warning: true);
-      FlutterError.reportError(
-        FlutterErrorDetails(exception: error, stack: stack, library: 'trip'),
-      );
+      _report('Trip failed', error, stack);
     } finally {
       await _finish(run, end, vehicle: vehicle);
     }
@@ -260,12 +263,16 @@ class TripController extends Notifier<TripState> {
     _Reached reached,
     Duration interval,
   ) async {
-    final vehicle = reached.vehicle;
+    var vehicle = reached.vehicle;
     var silent = reached.session.carState == CarState.off;
     var lost = false;
     DateTime? quietSince;
     while (!run.stopRequested) {
       if (lost) {
+        // As it is now, with any new adapter.
+        final current = ref.read(vehicleProvider(vehicle.id));
+        if (current == null) return TripEnd.noVehicle;
+        vehicle = current;
         final (again, _) = await _connect(run, [vehicle]);
         if (again == null) {
           return run.stopRequested ? TripEnd.stopped : TripEnd.adapterLost;
@@ -288,6 +295,8 @@ class TripController extends Notifier<TripState> {
         // again after the interval.
         case ReadNotDone(problem: SessionProblem.busy):
           break;
+        case ReadNotDone(problem: SessionProblem.vehicleRemoved):
+          return TripEnd.noVehicle;
         case ReadNotDone():
           lost = true;
         case ReadDone(reading: CarSilent()):
@@ -320,20 +329,49 @@ class TripController extends Notifier<TripState> {
     }
   }
 
-  /// Closes the trip. The trip is over even if a step here fails.
+  /// Closes the trip. Each step runs even if one before it fails, so the
+  /// adapter is let go and the service stopped however the trip ended.
   Future<void> _finish(_TripRun run, TripEnd end, {Vehicle? vehicle}) async {
-    try {
-      state = TripEnding(vehicleId: vehicle?.id);
-      // Mark the end, but only after readings: a trip that never sent one,
-      // like a stereo waking with the car parked, has nothing to close.
-      if (vehicle != null) await _close(run, vehicle);
-      if (_sessionState is! SessionIdle) await _session.disconnect();
-      ref.read(adapterLogProvider).note('Trip ended: ${end.name}');
-      await _gateway.stopService();
-    } finally {
-      _current = null;
-      state = TripIdle(lastEnd: end);
+    state = TripEnding(vehicleId: vehicle?.id);
+    // Mark the end, but only after readings: a trip that never sent one,
+    // like a stereo waking with the car parked, has nothing to close.
+    if (vehicle != null) {
+      await _guarded('Closing the trip', () => _close(run, vehicle));
     }
+    if (_sessionState is! SessionIdle) {
+      await _guarded('Disconnecting', _session.disconnect);
+    }
+    ref.read(adapterLogProvider).note('Trip ended: ${end.name}');
+    await _guarded('Stopping the trip service', _gateway.stopService);
+    _current = null;
+    state = TripIdle(lastEnd: end);
+  }
+
+  /// Runs one step of ending a trip, reporting it if it fails.
+  Future<void> _guarded(String step, Future<void> Function() action) async {
+    try {
+      await action();
+    } on Object catch (error, stack) {
+      _report('$step failed', error, stack);
+    }
+  }
+
+  /// Android started the service for a trip whose target can't be read. No
+  /// trip will run on it, so it's stopped, unless a trip already is.
+  void _refuse(Object error, StackTrace stack) {
+    _report('Trip start not understood', error, stack);
+    if (_current == null) {
+      unawaited(_guarded('Stopping the trip service', _gateway.stopService));
+    }
+  }
+
+  /// Nothing awaits a trip, so its failures are reported here: in the
+  /// adapter log for the user, and as an error in the system log.
+  void _report(String what, Object error, StackTrace stack) {
+    ref.read(adapterLogProvider).note('$what: $error', warning: true);
+    FlutterError.reportError(
+      FlutterErrorDetails(exception: error, stack: stack, library: 'trip'),
+    );
   }
 
   Future<void> _notify(String text) => _gateway.updateNotification(text);

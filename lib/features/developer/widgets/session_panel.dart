@@ -202,7 +202,10 @@ class SessionPanel extends ConsumerWidget {
     SessionProblem.noAdapter => 'Choose the vehicle\'s adapter first.',
     SessionProblem.inUse => 'Another connection is open.',
     // Only ever the outcome of a step, never why the session is idle.
-    SessionProblem.notConnected || SessionProblem.busy || null => null,
+    SessionProblem.notConnected ||
+    SessionProblem.busy ||
+    SessionProblem.vehicleRemoved ||
+    null => null,
   };
 }
 

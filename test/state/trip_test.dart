@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/trips/trip_notification_text.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
@@ -449,5 +450,53 @@ void main() {
     expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
     c.read(tripProvider.notifier).stop();
     await ended(c);
+  });
+
+  test('deleting the trip\'s vehicle ends the trip', () async {
+    final bluetooth = FakeBluetoothGateway(adapter: (_) => _Adapter());
+    final c = container(bluetooth: bluetooth);
+    c.read(tripProvider);
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    await running(c);
+
+    await c.read(appSettingsProvider.notifier).deleteVehicle(_tucson.id);
+    final trip = await ended(c);
+
+    expect(trip.lastEnd, TripEnd.noVehicle);
+    expect(c.read(sessionProvider), isA<SessionIdle>());
+    // One connection: the trip didn't keep reconnecting to the deleted car.
+    expect(bluetooth.connected, hasLength(1));
+  });
+
+  test(
+    'a failing step while ending still lets go and stops the service',
+    () async {
+      final c = container(adapter: (_) => _Adapter());
+      c.read(tripProvider);
+      service.failNotification = TripNotificationText.ending;
+      service.send(const HeadUnitTarget(_tucsonStereo));
+      await running(c);
+
+      c.read(tripProvider.notifier).stop();
+      final trip = await ended(c);
+
+      expect(trip.lastEnd, TripEnd.stopped);
+      expect(c.read(sessionProvider), isA<SessionIdle>());
+      expect(service.calls, contains('stopService'));
+      expect(
+        c.read(adapterLogProvider).entries.value.map((e) => e.text),
+        contains(startsWith('Closing the trip failed')),
+      );
+    },
+  );
+
+  test('a start that can\'t be read stops the service', () async {
+    final c = container(adapter: (_) => _Adapter());
+    c.read(tripProvider);
+
+    service.sendUnreadable();
+    await until(() => service.calls.contains('stopService'), 'stopService');
+
+    expect(c.read(tripProvider), isA<TripIdle>());
   });
 }

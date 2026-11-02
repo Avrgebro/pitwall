@@ -10,10 +10,12 @@ import '../trips/trip_target.dart';
 /// Android only ever starts trips; the trip decides when it's over.
 abstract interface class TripServiceGateway {
   /// Trips Android started: a car's head unit connected, or the app asked.
+  /// A start whose target can't be read arrives as a [FormatException].
   Stream<TripTarget> get starts;
 
   /// The trip Android asked for before Dart was ready to hear it, if any.
-  /// Asking also tells Android that Dart is now listening.
+  /// Asking also tells Android that Dart is now listening. Throws
+  /// [FormatException] if its target can't be read.
   Future<TripTarget?> takeTripRequest();
 
   /// The head units whose connection starts a trip, one per vehicle at
@@ -35,7 +37,11 @@ class AndroidTripServiceGateway implements TripServiceGateway {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'tripStart':
-          _starts.add(_decode(call.arguments));
+          try {
+            _starts.add(TripTarget.fromArguments(call.arguments));
+          } on FormatException catch (error, stack) {
+            _starts.addError(error, stack);
+          }
       }
     });
   }
@@ -46,24 +52,10 @@ class AndroidTripServiceGateway implements TripServiceGateway {
   @override
   Stream<TripTarget> get starts => _starts.stream;
 
-  /// A target travels as `TripTarget.toArguments()` in `TripTarget.kt`:
-  /// one `headUnit` or one `vehicleId`, or nothing for any vehicle.
-  /// Anything else is a mistake in the bridge, and an error rather than a
-  /// trip for any vehicle.
-  static TripTarget _decode(Object? arguments) => switch (arguments) {
-    {'headUnit': final String address} when arguments.length == 1 =>
-      HeadUnitTarget(address),
-    {'vehicleId': final String id} when arguments.length == 1 => VehicleTarget(
-      id,
-    ),
-    Map(isEmpty: true) => const AnyVehicleTarget(),
-    _ => throw FormatException('Not a trip target', arguments),
-  };
-
   @override
   Future<TripTarget?> takeTripRequest() async {
     final request = await _channel.invokeMethod<Object?>('takeTripRequest');
-    return request == null ? null : _decode(request);
+    return request == null ? null : TripTarget.fromArguments(request);
   }
 
   @override
@@ -73,8 +65,13 @@ class AndroidTripServiceGateway implements TripServiceGateway {
       });
 
   @override
-  Future<void> startService({String? vehicleId}) =>
-      _channel.invokeMethod<void>('startService', {'vehicleId': ?vehicleId});
+  Future<void> startService({String? vehicleId}) => _channel.invokeMethod<void>(
+    'startService',
+    switch (vehicleId) {
+      final id? => VehicleTarget(id),
+      null => const AnyVehicleTarget(),
+    }.toArguments(),
+  );
 
   @override
   Future<void> stopService() => _channel.invokeMethod<void>('stopService');

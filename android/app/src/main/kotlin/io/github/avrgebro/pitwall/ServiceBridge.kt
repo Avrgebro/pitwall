@@ -12,7 +12,7 @@ import io.flutter.plugin.common.MethodChannel
  * Dart → Android: `configure`, `startService`, `stopService`,
  * `updateNotification`, `takeTripRequest`.
  * Android → Dart: `tripStart`, with the trip's [TripTarget]. The app's
- * `startService` names a `vehicleId`, or none for any vehicle.
+ * `startService` sends one too: a vehicle, or any.
  *
  * A trip can be requested before Dart has finished starting, so requests
  * wait until Dart asks for them with `takeTripRequest`.
@@ -44,11 +44,13 @@ object ServiceBridge {
                         result.success(null)
                     }
                     "startService" -> {
-                        TripService.start(
-                            context,
-                            TripTarget.fromApp(call.argument<String>("vehicleId")),
-                        )
-                        result.success(null)
+                        when (val target = TripTarget.fromArguments(call.arguments as? Map<*, *>)) {
+                            null -> result.error("bad_target", "Not a trip target", null)
+                            else -> {
+                                TripService.start(context, target)
+                                result.success(null)
+                            }
+                        }
                     }
                     "stopService" -> {
                         TripService.stop(context)

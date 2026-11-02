@@ -32,10 +32,16 @@ class TripService : Service() {
         // One trip at a time: a head unit connecting mid-trip, say after
         // the stereo was handed to someone else and back, changes nothing.
         if (!tripActive) {
+            val target = TripTarget.from(intent)
+            if (target == null) {
+                // Nothing to run a trip for, so nothing to keep running.
+                stopSelf()
+                return START_NOT_STICKY
+            }
             tripActive = true
             acquireWakeLock()
             EngineHolder.get(this)
-            ServiceBridge.requestTripStart(TripTarget.from(intent))
+            ServiceBridge.requestTripStart(target)
         }
         // Without a trip request there's nothing to resume after a restart.
         return START_NOT_STICKY

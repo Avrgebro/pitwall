@@ -40,6 +40,9 @@ enum SessionProblem {
 
   /// Another operation is running on the adapter.
   busy,
+
+  /// The connected vehicle was deleted, so there's nothing to read for.
+  vehicleRemoved,
 }
 
 /// How a connection attempt ended.
@@ -171,6 +174,15 @@ class SessionController extends Notifier<SessionState> {
         );
       }
     });
+    // A connection is to one vehicle; once it's deleted, the connection
+    // has nothing left to do.
+    ref.listen(appSettingsProvider, (_, settings) {
+      if ((state, settings.value)
+          case (SessionConnected(:final vehicleId), final settings?)
+          when settings.vehicleById(vehicleId) == null) {
+        unawaited(disconnect());
+      }
+    });
     return const SessionIdle();
   }
 
@@ -263,14 +275,16 @@ class SessionController extends Notifier<SessionState> {
   /// read holds the adapter; keeping and sending happen after, so a slow
   /// network doesn't hold it, and a failure there can't leave it busy.
   Future<ReadOutcome> readAndSend() async {
-    final vehicle = switch (state) {
-      SessionConnected(:final vehicleId) => ref.read(
-        vehicleProvider(vehicleId),
-      ),
-      _ => null,
-    };
-    if (vehicle == null) {
-      return const ReadNotDone(SessionProblem.notConnected);
+    final Vehicle vehicle;
+    switch (state) {
+      case SessionConnected(:final vehicleId):
+        final found = ref.read(vehicleProvider(vehicleId));
+        if (found == null) {
+          return const ReadNotDone(SessionProblem.vehicleRemoved);
+        }
+        vehicle = found;
+      case SessionIdle() || SessionConnecting():
+        return const ReadNotDone(SessionProblem.notConnected);
     }
     final log = ref.read(adapterLogProvider);
     final profile = await _profileFor(vehicle.id);

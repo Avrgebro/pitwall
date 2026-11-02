@@ -36,8 +36,8 @@ void main() {
     await gateway.startService();
 
     expect(calls.map((c) => c.arguments), [
-      {'vehicleId': 'mazda'},
-      <String, String>{},
+      {'kind': 'vehicle', 'id': 'mazda'},
+      {'kind': 'any'},
     ]);
   });
 
@@ -46,9 +46,9 @@ void main() {
     final targets = <TripTarget>[];
     gateway.starts.listen(targets.add);
 
-    await androidStarts({'headUnit': 'AA:BB'});
-    await androidStarts({'vehicleId': 'mazda'});
-    await androidStarts(<String, String>{});
+    await androidStarts({'kind': 'headUnit', 'address': 'AA:BB'});
+    await androidStarts({'kind': 'vehicle', 'id': 'mazda'});
+    await androidStarts({'kind': 'any'});
     await Future<void>.delayed(Duration.zero);
 
     expect(
@@ -61,7 +61,7 @@ void main() {
 
   test('a start Android held for Dart keeps its target', () async {
     final gateway = AndroidTripServiceGateway();
-    pending = {'vehicleId': 'mazda'};
+    pending = {'kind': 'vehicle', 'id': 'mazda'};
     expect(
       await gateway.takeTripRequest(),
       isA<VehicleTarget>().having((t) => t.id, 'id', 'mazda'),
@@ -70,13 +70,49 @@ void main() {
     expect(await gateway.takeTripRequest(), isNull);
   });
 
-  test('anything but one head unit, one vehicle or none is an error', () async {
+  test('anything but one head unit, one vehicle or any is an error', () async {
     final gateway = AndroidTripServiceGateway();
-    pending = {'headUnit': 'AA:BB', 'vehicleId': 'mazda'};
-    await expectLater(gateway.takeTripRequest(), throwsFormatException);
-    pending = {'vehicleId': 7};
-    await expectLater(gateway.takeTripRequest(), throwsFormatException);
-    pending = 'any';
-    await expectLater(gateway.takeTripRequest(), throwsFormatException);
+    for (final bad in <Object>[
+      {'kind': 'headUnit', 'address': 'AA:BB', 'id': 'mazda'},
+      {'kind': 'vehicle', 'id': 7},
+      {'kind': 'vehicle'},
+      {'vehicleId': 'mazda'},
+      <String, String>{},
+      'any',
+    ]) {
+      pending = bad;
+      await expectLater(
+        gateway.takeTripRequest(),
+        throwsFormatException,
+        reason: '$bad',
+      );
+    }
+  });
+
+  test(
+    'a start Android sends that can\'t be read arrives as an error',
+    () async {
+      final gateway = AndroidTripServiceGateway();
+      final errors = <Object>[];
+      gateway.starts.listen((_) {}, onError: errors.add);
+
+      await androidStarts({'kind': 'car'});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(errors.single, isFormatException);
+    },
+  );
+
+  test('a target reads back as itself', () {
+    for (final target in const [
+      HeadUnitTarget('AA:BB'),
+      VehicleTarget('mazda'),
+      AnyVehicleTarget(),
+    ]) {
+      expect(
+        TripTarget.fromArguments(target.toArguments()).toArguments(),
+        target.toArguments(),
+      );
+    }
   });
 }
