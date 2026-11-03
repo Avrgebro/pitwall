@@ -80,8 +80,7 @@ class WebhookTarget {
   }
 
   /// Plain http: readings, and any credentials, travel unencrypted.
-  bool get isInsecure =>
-      _hasUrl && _urlProblem == null && Uri.parse(url).scheme == 'http';
+  bool get isInsecure => urlUsable && Uri.parse(url).scheme == 'http';
 
   /// Why readings can't be sent here, or null if they can.
   WebhookProblem? get problem {

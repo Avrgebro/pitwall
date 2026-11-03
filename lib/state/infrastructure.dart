@@ -70,20 +70,17 @@ final webhookSenderProvider = Provider<WebhookSender>((ref) {
 void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
   final target = attempt.test ? 'webhook (test)' : 'webhook';
   final elapsed = '${attempt.elapsed.inMilliseconds} ms';
-  if (attempt.error case final error? when attempt.statusCode == null) {
-    final what = switch (error) {
-      UnusableWebhook() => 'webhook not usable',
-      TimedOut() => 'timeout',
-      Unreachable() => 'unreachable',
-      Rejected(:final statusCode) => '$statusCode',
-    };
-    log.delivery('POST $target ✕ $what, $elapsed', warning: true);
-  } else {
-    log.delivery(
-      'POST $target ← ${attempt.statusCode}, $elapsed',
-      warning: attempt.error != null,
-    );
-  }
+  final result = switch (attempt.error) {
+    null => '← ${attempt.statusCode}',
+    Rejected(:final statusCode) => '← $statusCode',
+    UnusableWebhook() => '✕ webhook not usable',
+    TimedOut() => '✕ timeout',
+    Unreachable() => '✕ unreachable',
+  };
+  log.delivery(
+    'POST $target $result, $elapsed',
+    warning: attempt.error != null,
+  );
 }
 
 final packageInfoProvider = FutureProvider<PackageInfo>(

@@ -155,6 +155,9 @@ class DeliveryAttempt {
   });
 
   final Duration elapsed;
+
+  /// The status the server accepted it with. A rejection's status is in
+  /// its [error].
   final int? statusCode;
   final DeliveryError? error;
   final bool test;

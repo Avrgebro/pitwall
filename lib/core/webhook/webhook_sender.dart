@@ -183,8 +183,8 @@ class WebhookSender {
             body: body,
           )
           .timeout(timeout);
-      statusCode = response.statusCode;
       error = _errorFor(response.statusCode);
+      if (error == null) statusCode = response.statusCode;
     } on TimeoutException {
       error = const TimedOut();
     } on Exception {

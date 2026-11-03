@@ -29,7 +29,7 @@ abstract final class DeliveryText {
               'The server doesn\'t know this webhook (HTTP 404). Check the '
               'URL in Settings.',
         ),
-        Rejected(:final statusCode) when error.fix == DeliveryFix.server => (
+        Rejected(statusCode: (401 || 403) && final statusCode) => (
           title: 'The webhook is refusing readings',
           message:
               'The server says this phone isn\'t allowed to send '
