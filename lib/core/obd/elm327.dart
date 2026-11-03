@@ -1,3 +1,5 @@
+import 'can_id.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -69,12 +71,10 @@ class Elm327 {
     r'LV RESET|ERR\d+|BUS INIT:.*ERROR)$',
   );
   static final _voltage = RegExp(r'(\d+(?:\.\d+)?)\s*V');
-  static final _canId = RegExp(r'^[0-9A-F]{3}$');
   static final _byteCount = RegExp(r'^[0-9A-F]{3}$');
   static final _frameLine = RegExp(r'^[0-9A-F]:');
 
   /// Functional address: every emissions-related module listens to it.
-  static const _broadcastHeader = '7DF';
 
   final ObdTransport _transport;
   late final StreamSubscription<List<int>> _subscription;
@@ -83,8 +83,8 @@ class Elm327 {
   String _pendingCommand = '';
   bool _closed = false;
   Future<void> _queue = Future.value();
-  String _header = _broadcastHeader;
-  String? _receiveFilter;
+  CanId _header = CanId.broadcast;
+  CanId? _receiveFilter;
   bool _manualFlowControl = false;
   bool _flowControlSupported = true;
 
@@ -96,7 +96,7 @@ class Elm327 {
   /// `ELM327 v1.5`.
   Future<String> initialize() async {
     final banner = await send('ATZ', timeout: resetTimeout);
-    _header = _broadcastHeader;
+    _header = CanId.broadcast;
     _receiveFilter = null;
     _manualFlowControl = false;
     for (final command in ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATSP0']) {
@@ -157,6 +157,14 @@ class Elm327 {
     return definition.decode(data);
   }
 
+  /// Asks for the supported standard values (PID 00), which every OBD-II
+  /// car answers, only to see whether the car answers at all. Throws
+  /// [ElmException] with [ElmError.unableToConnect] if it doesn't, as with
+  /// the ignition off.
+  Future<void> checkCarAnswers() async {
+    await requestPid(0x00);
+  }
+
   /// Battery voltage as measured by the adapter itself (`ATRV`). Works even
   /// on cars that don't report voltage as a PID.
   Future<double?> readBatteryVoltage() async {
@@ -175,20 +183,15 @@ class Elm327 {
   /// (`ATSH`) and, if [receive] is given, only accepts replies from that id
   /// (`ATCRA`). Pass null to go back to the default broadcast to all
   /// modules. Commands are only sent when something changes.
-  ///
-  /// Ids are 11-bit, written as three hex digits like `7E0`.
-  Future<void> setTarget(String? header, {String? receive}) async {
-    final target = header ?? _broadcastHeader;
-    for (final id in [target, ?receive]) {
-      if (!_canId.hasMatch(id)) throw ArgumentError.value(id, 'CAN id');
-    }
+  Future<void> setTarget(CanId? header, {CanId? receive}) async {
+    final target = header ?? CanId.broadcast;
     if (target != _header) {
-      await send('ATSH$target');
+      await send('ATSH${target.hex}');
       _header = target;
       await _setFlowControl(target);
     }
     if (receive != _receiveFilter) {
-      await send(receive == null ? 'ATCRA' : 'ATCRA$receive');
+      await send(receive == null ? 'ATCRA' : 'ATCRA${receive.hex}');
       _receiveFilter = receive;
     }
   }
@@ -201,14 +204,14 @@ class Elm327 {
   ///
   /// Adapters that don't know these commands keep working; only long
   /// replies from modules outside 7E0-7E7 stay cut off.
-  Future<void> _setFlowControl(String target) async {
+  Future<void> _setFlowControl(CanId target) async {
     if (!_flowControlSupported) return;
     try {
-      if (target == _broadcastHeader) {
+      if (target == CanId.broadcast) {
         if (_manualFlowControl) await send('ATFCSM0');
         _manualFlowControl = false;
       } else {
-        await send('ATFCSH$target');
+        await send('ATFCSH${target.hex}');
         if (!_manualFlowControl) {
           await send('ATFCSD300000');
           await send('ATFCSM1');

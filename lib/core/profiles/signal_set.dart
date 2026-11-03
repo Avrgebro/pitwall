@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../obd/can_id.dart';
+
 /// A vehicle profile in OBDb's signal-set format (v3), as found in
 /// `signalsets/v3/default.json` in each https://github.com/OBDb repository.
 ///
@@ -16,7 +18,6 @@ class SignalSet {
   /// manufacturer "read data by identifier" services.
   static const readServices = {0x01, 0x09, 0x21, 0x22};
 
-  static final _canId = RegExp(r'^[0-9A-F]{3}$');
   static final _hexBytes = RegExp(r'^(?:[0-9A-F]{2}){1,4}$');
 
   /// The file this was parsed from, kept so it can be saved as imported.
@@ -144,12 +145,13 @@ class SignalSet {
     if (!_hexBytes.hasMatch(idHex)) {
       throw const _Unsupported(SkipReason.unusualRequest);
     }
-    final header = entry['hdr']?.toString().toUpperCase();
-    final receive = entry['rax']?.toString().toUpperCase();
-    if (header == null || !_canId.hasMatch(header)) {
-      throw const _Unsupported(SkipReason.extendedAddress);
-    }
-    if (receive != null && !_canId.hasMatch(receive)) {
+    // Anything but an 11-bit id, such as a 29-bit one, is an address
+    // Pitwall can't send to yet.
+    final header = CanId.tryParse('${entry['hdr']}');
+    if (header == null) throw const _Unsupported(SkipReason.extendedAddress);
+    final rax = entry['rax'];
+    final receive = rax == null ? null : CanId.tryParse('$rax');
+    if (rax != null && receive == null) {
       throw const _Unsupported(SkipReason.extendedAddress);
     }
     if (entry['eax'] != null) {
@@ -207,10 +209,10 @@ final class ProfileCommand extends ProfileRequest {
   });
 
   /// CAN id the request is sent to, e.g. `7C6`.
-  final String header;
+  final CanId header;
 
   /// CAN id the reply comes from, e.g. `7CE`, if the profile names one.
-  final String? receive;
+  final CanId? receive;
 
   final int service;
   final List<int> id;

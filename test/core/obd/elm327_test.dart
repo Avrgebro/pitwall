@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/obd/can_id.dart';
 import 'package:pitwall/core/obd/elm327.dart';
 import 'package:pitwall/core/obd/pids.dart';
 
@@ -165,8 +166,8 @@ void main() {
     });
     final elm = Elm327(transport);
 
-    await elm.setTarget('7C6', receive: '7CE');
-    await elm.setTarget('7C6', receive: '7CE');
+    await elm.setTarget(_id('7C6'), receive: _id('7CE'));
+    await elm.setTarget(_id('7C6'), receive: _id('7CE'));
     await elm.setTarget(null);
 
     expect(transport.sent, [
@@ -191,8 +192,8 @@ void main() {
     });
     final elm = Elm327(transport);
 
-    await elm.setTarget('7C6', receive: '7CE');
-    await elm.setTarget('7E0', receive: '7CE');
+    await elm.setTarget(_id('7C6'), receive: _id('7CE'));
+    await elm.setTarget(_id('7E0'), receive: _id('7CE'));
 
     expect(transport.sent, ['ATSH7C6', 'ATFCSH7C6', 'ATCRA7CE', 'ATSH7E0']);
   });
@@ -204,10 +205,10 @@ void main() {
     expect(await elm.request(0x22, [0xB0, 0x02]), isEmpty);
   });
 
-  test('setTarget rejects anything but a CAN id', () async {
-    final elm = Elm327(FakeTransport({}));
-
-    expect(() => elm.setTarget('7E0 ATZ'), throwsArgumentError);
+  test('only an 11-bit id is a CAN id', () {
+    expect(CanId.tryParse('7e0'), '7E0');
+    expect(CanId.tryParse('7E0 ATZ'), isNull);
+    expect(CanId.tryParse('18DA10F1'), isNull);
   });
 
   test('request joins a multi-frame reply', () async {
@@ -240,3 +241,5 @@ void main() {
     ]);
   });
 }
+
+CanId _id(String hex) => CanId.tryParse(hex)!;

@@ -54,7 +54,7 @@ Future<CarReading> readCar(
     // Values the adapter measures itself come back with the car switched
     // off too; without any from the car, make sure it still answers.
     if (values.keys.every((key) => key == batteryVoltageKey)) {
-      await elm.requestPid(0x00);
+      await elm.checkCarAnswers();
     }
     // The engine's state needs the battery voltage, sent or not.
     final voltage = values[batteryVoltageKey] ?? await elm.readBatteryVoltage();
