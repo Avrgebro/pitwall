@@ -23,9 +23,18 @@ Vehicle? focusedVehicleFor({
   return settings.mostRecentVehicle;
 }
 
-/// The vehicle in a session or a trip right now, if any.
+/// The vehicle in a session or a trip right now, if any: one being
+/// connected to or connected, or the only one a trip is looking for.
 final _liveVehicleIdProvider = Provider<String?>(
-  (ref) => ref.watch(liveActivityProvider.select((live) => live.vehicleId)),
+  (ref) => ref.watch(
+    liveActivityProvider.select(
+      (live) => switch (live) {
+        VehicleActivity(:final vehicleId) => vehicleId,
+        LiveSearching(vehicleIds: final ids) when ids.length == 1 => ids.single,
+        LiveSearching() || NoActivity() => null,
+      },
+    ),
+  ),
 );
 
 /// Whether there's more than one vehicle to choose between.

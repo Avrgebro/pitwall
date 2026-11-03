@@ -70,4 +70,15 @@ void main() {
       isA<NoActivity>(),
     );
   });
+
+  test('a trip between attempts is looking, for the vehicles it\'s for', () {
+    final live = liveActivityFrom(
+      const SessionIdle(),
+      const TripConnecting(vehicleIds: {'tucson'}),
+    );
+
+    expect(live, isA<LiveSearching>());
+    expect(live.forVehicle('tucson'), isA<LiveSearching>());
+    expect(live.forVehicle('mazda'), isA<NoActivity>());
+  });
 }

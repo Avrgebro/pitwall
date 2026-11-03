@@ -44,9 +44,6 @@ enum TripEnd {
 sealed class TripState {
   const TripState();
 
-  /// The vehicle the trip is for, once its adapter answered.
-  String? get vehicleId => null;
-
   bool get isActive => this is! TripIdle;
 }
 
@@ -58,13 +55,15 @@ final class TripIdle extends TripState {
 }
 
 final class TripConnecting extends TripState {
-  const TripConnecting();
+  const TripConnecting({this.vehicleIds = const {}});
+
+  /// The vehicles whose adapters it's trying, once the settings say which.
+  final Set<String> vehicleIds;
 }
 
 final class TripRunning extends TripState {
   const TripRunning({required this.vehicleId, required this.since});
 
-  @override
   final String vehicleId;
 
   /// When the trip first reached the car. Reconnecting doesn't change it.
@@ -72,10 +71,7 @@ final class TripRunning extends TripState {
 }
 
 final class TripEnding extends TripState {
-  const TripEnding({this.vehicleId});
-
-  @override
-  final String? vehicleId;
+  const TripEnding();
 }
 
 /// How looking for an adapter ended.
@@ -227,6 +223,7 @@ class TripController extends Notifier<TripState> {
         end = TripEnd.noVehicle;
         return;
       }
+      state = TripConnecting(vehicleIds: {for (final v in candidates) v.id});
       switch (await _connect(run, candidates)) {
         case _NotFound(end: final notFound):
           end = notFound;
@@ -345,7 +342,7 @@ class TripController extends Notifier<TripState> {
   /// Closes the trip. Each step runs even if one before it fails, so the
   /// adapter is let go and the service stopped however the trip ended.
   Future<void> _finish(_TripRun run, TripEnd end, {Vehicle? vehicle}) async {
-    state = TripEnding(vehicleId: vehicle?.id);
+    state = const TripEnding();
     // Mark the end, but only after readings: a trip that never sent one,
     // like a stereo waking with the car parked, has nothing to close.
     if (vehicle != null) {

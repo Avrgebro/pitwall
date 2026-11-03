@@ -172,6 +172,13 @@ class HomeViewModel {
         null => 'Never',
       },
     );
+    final adapter = vehicle.adapterName ?? 'the adapter';
+    final connecting = switch (activity) {
+      LiveConnected() || NoActivity() => null,
+      LiveConnecting() => 'Connecting to $adapter…',
+      LiveReconnecting() => 'Reconnecting to $adapter…',
+      LiveSearching() => 'Looking for $adapter…',
+    };
     if (activity case LiveConnected(:final carState, :final since)) {
       return HeroModel(
         state: HeroState.running,
@@ -196,14 +203,11 @@ class HomeViewModel {
         ],
       );
     }
-    if (activity is LiveConnecting || activity is LiveReconnecting) {
-      final adapter = vehicle.adapterName ?? 'the adapter';
+    if (connecting != null) {
       return HeroModel(
         state: HeroState.connecting,
         title: vehicle.name,
-        subtitle: activity is LiveReconnecting
-            ? 'Reconnecting to $adapter…'
-            : 'Connecting to $adapter…',
+        subtitle: connecting,
         stats: [
           (kind: HeroStatKind.adapter, label: 'Adapter', value: 'Connecting'),
           (kind: HeroStatKind.car, label: 'Car', value: 'Checking'),

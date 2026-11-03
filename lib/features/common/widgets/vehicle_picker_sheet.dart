@@ -28,12 +28,17 @@ class _Choices extends ConsumerWidget {
     final focused = ref.watch(focusedVehicleProvider);
     final activity = ref.watch(liveActivityProvider);
     final now = ref.watch(nowProvider);
-    final live = vehicles.where((v) => v.id == activity.vehicleId).firstOrNull;
+    final live = switch (activity) {
+      VehicleActivity(:final vehicleId) =>
+        vehicles.where((v) => v.id == vehicleId).firstOrNull,
+      LiveSearching() || NoActivity() => null,
+    };
 
     String state(Vehicle vehicle) => switch (activity.forVehicle(vehicle.id)) {
       LiveConnected() => 'Connected',
       LiveConnecting() => 'Connecting',
       LiveReconnecting() => 'Reconnecting',
+      LiveSearching() => 'Looking for its adapter',
       NoActivity() => switch (vehicle.lastSeen) {
         final seen? => 'Last seen ${Formatters.ago(seen, now)}',
         null => 'Never connected',

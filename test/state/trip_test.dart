@@ -348,7 +348,7 @@ void main() {
     await running(c);
     service.send(const HeadUnitTarget(_mazdaStereo));
     await Future<void>.delayed(const Duration(milliseconds: 40));
-    expect(c.read(tripProvider).vehicleId, 'tucson');
+    expect((c.read(tripProvider) as TripRunning).vehicleId, 'tucson');
     c.read(tripProvider.notifier).stop();
     await ended(c);
   });

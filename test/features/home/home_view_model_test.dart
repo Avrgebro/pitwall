@@ -247,6 +247,13 @@ void main() {
     expect(model.hero.subtitle, 'Reconnecting to vLinker MC+…');
   });
 
+  test('a trip between connection attempts is still looking', () {
+    final model = build(activity: const LiveSearching({'tucson'}));
+
+    expect(model.hero.state, HeroState.connecting);
+    expect(model.hero.subtitle, 'Looking for vLinker MC+…');
+  });
+
   test('another car\'s activity doesn\'t show on this one', () {
     final model = build(
       activity: LiveConnected(
