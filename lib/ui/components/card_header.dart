@@ -36,10 +36,7 @@ class CardHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: text.titleMedium?.copyWith(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               if (subtitle != null)
                 Text(

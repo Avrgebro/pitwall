@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../theme/glass_colors.dart';
 import '../theme/tokens.dart';
 import 'small_parts.dart';
 
@@ -18,8 +19,7 @@ class DetailRows extends StatelessWidget {
       vertical: Insets.xs,
     ),
     decoration: BoxDecoration(
-      // A faint layer over the card, neutral or tinted.
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
+      color: context.glass.panel,
       borderRadius: Corners.largeRadius,
     ),
     child: Column(

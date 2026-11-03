@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
+import '../theme/text_styles.dart';
 import 'expandable_row.dart';
 import 'row_group.dart';
 import 'app_row.dart';
@@ -63,7 +64,9 @@ class ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppRow(
     title: title,
-    subtitle: caption == null ? null : RowCaption(caption!),
+    subtitle: caption == null
+        ? null
+        : Text(caption!, style: Theme.of(context).textTheme.mono),
     trailing: Checkbox(
       value: value,
       onChanged: (checked) => onChanged(checked ?? false),

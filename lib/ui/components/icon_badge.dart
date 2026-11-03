@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../theme/emphasis.dart';
 import '../theme/status_colors.dart';
 import '../theme/tokens.dart';
 
@@ -13,7 +12,7 @@ class IconBadge extends StatelessWidget {
     this.tone = StatusTone.active,
     this.size = Sizes.badge,
     this.shape = BoxShape.rectangle,
-    this.emphasis = Emphasis.tonal,
+    this.filled = false,
   });
 
   final IconData icon;
@@ -21,32 +20,28 @@ class IconBadge extends StatelessWidget {
   final double size;
   final BoxShape shape;
 
-  final Emphasis emphasis;
+  /// In the tone's strong colour, as on a tinted card; otherwise in its
+  /// soft container colour.
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tone(tone);
-    final scheme = Theme.of(context).colorScheme;
-    // As a StatusChip shows each emphasis.
-    final (fill, foreground) = switch (emphasis) {
-      Emphasis.filled => (colors.accent, colors.onAccent),
-      Emphasis.tonal => (colors.container, colors.onContainer),
-      Emphasis.outlined => (null, scheme.onSurface),
-    };
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: fill,
-        border: emphasis == Emphasis.outlined
-            ? Border.all(color: scheme.outline)
-            : null,
+        color: filled ? colors.accent : colors.container,
         shape: shape,
         borderRadius: shape == BoxShape.rectangle
             ? BorderRadius.circular(size * 0.3)
             : null,
       ),
-      child: Icon(icon, size: size * 0.5, color: foreground),
+      child: Icon(
+        icon,
+        size: size * 0.5,
+        color: filled ? colors.onAccent : colors.onContainer,
+      ),
     );
   }
 }

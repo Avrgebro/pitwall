@@ -14,6 +14,7 @@ class AppRow extends StatelessWidget {
     this.subtitle,
     this.subtitleTone,
     this.trailing,
+    this.opensPage = false,
     this.onTap,
     this.tone,
     this.enabled = true,
@@ -31,6 +32,10 @@ class AppRow extends StatelessWidget {
   /// Colours the subtitle, e.g. error for "Choose its adapter".
   final StatusTone? subtitleTone;
   final Widget? trailing;
+
+  /// Ends the row with the arrow of a row that opens a page, after
+  /// [trailing].
+  final bool opensPage;
   final VoidCallback? onTap;
 
   /// Colours the title and leading icon, e.g. error for "Delete vehicle".
@@ -95,6 +100,10 @@ class AppRow extends StatelessWidget {
             ),
           ),
           if (trailing != null) ...[const SizedBox(width: Insets.m), trailing],
+          if (opensPage) ...[
+            SizedBox(width: trailing == null ? Insets.m : Insets.s),
+            Icon(Icons.chevron_right, color: theme.colorScheme.primary),
+          ],
         ],
       ),
     );
@@ -103,25 +112,4 @@ class AppRow extends StatelessWidget {
         : InkWell(onTap: onTap, child: content);
     return enabled ? row : Opacity(opacity: 0.45, child: row);
   }
-}
-
-/// The trailing arrow of a row that opens a page.
-class RowChevron extends StatelessWidget {
-  const RowChevron({super.key});
-
-  @override
-  Widget build(BuildContext context) =>
-      Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.primary);
-}
-
-/// A technical detail under a row's title, in monospace, such as a payload
-/// key.
-class RowCaption extends StatelessWidget {
-  const RowCaption(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) =>
-      Text(text, style: Theme.of(context).textTheme.mono);
 }

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/glass_colors.dart';
 import '../theme/glass_filters.dart';
+import '../theme/status_colors.dart';
 
 /// A filled button made of tinted glass, for actions that float over
 /// scrolling content. Blurs what passes behind it, like the bars, so its
@@ -38,10 +39,14 @@ class GlassButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final glass = context.glass;
+    // Tinted as a card in the active tone is.
+    final active = context.tone(StatusTone.active);
     final style = FilledButton.styleFrom(
       shape: _shape,
-      backgroundColor: _tinted ? glass.tintFill : glass.barFill,
-      foregroundColor: _tinted ? glass.onTint : scheme.onSurface,
+      backgroundColor: _tinted
+          ? active.container.withValues(alpha: glass.tintOpacity)
+          : glass.barFill,
+      foregroundColor: _tinted ? active.onContainer : scheme.onSurface,
       disabledBackgroundColor: glass.barFill,
       disabledForegroundColor: scheme.onSurface.withValues(alpha: 0.38),
       side: BorderSide(color: glass.edge),

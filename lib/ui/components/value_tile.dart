@@ -76,12 +76,7 @@ class _Value extends StatelessWidget {
     final reading = Text.rich(
       TextSpan(
         children: [
-          TextSpan(
-            text: value,
-            style: theme.textTheme.value.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
+          TextSpan(text: value, style: theme.textTheme.value),
           if (data.unit case final unit? when unit.isNotEmpty)
             TextSpan(
               text: ' $unit',

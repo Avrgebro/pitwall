@@ -60,6 +60,12 @@ class GlassSurface extends StatelessWidget {
           onSurface: strong,
           onSurfaceVariant: strong.withValues(alpha: 0.75),
         ),
+        // The text styles took their colour from onSurface when the theme
+        // was made, so they're tinted too.
+        textTheme: theme.textTheme.apply(
+          bodyColor: strong,
+          displayColor: strong,
+        ),
       ),
       child: DefaultTextStyle.merge(
         style: TextStyle(color: strong),

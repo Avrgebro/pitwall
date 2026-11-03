@@ -61,14 +61,8 @@ class VehicleRow extends StatelessWidget {
       // differently at a glance.
       subtitle: Text(problem ?? status),
       subtitleTone: problem == null ? null : StatusTone.error,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ?chip,
-          if (chip != null) const SizedBox(width: Insets.s),
-          const RowChevron(),
-        ],
-      ),
+      trailing: chip,
+      opensPage: true,
       onTap: onTap,
     );
   }

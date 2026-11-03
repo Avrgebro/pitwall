@@ -51,8 +51,8 @@ class GroupTile extends StatelessWidget {
     leading: icon == null ? null : Icon(icon),
     subtitle: subtitle == null ? null : Text(subtitle!),
     subtitleTone: subtitleTone,
-    trailing:
-        trailing ?? (_opensPage && onTap != null ? const RowChevron() : null),
+    trailing: trailing,
+    opensPage: _opensPage && onTap != null && trailing == null,
     onTap: onTap,
   );
 }

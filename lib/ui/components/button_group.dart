@@ -38,9 +38,9 @@ class ButtonGroup extends StatelessWidget {
 
   static const _height = 48.0;
   static const _iconWidth = 64.0;
-  static const _gap = 3.0;
+  static const _gap = segmentGap;
   static const _outer = Radius.circular(_height / 2);
-  static const _inner = Radius.circular(Corners.small - 2);
+  static const _inner = Radius.circular(Corners.segment);
 
   @override
   Widget build(BuildContext context) {
@@ -105,8 +105,7 @@ class ButtonGroup extends StatelessWidget {
       ],
     );
     final segment = Material(
-      // A faint layer over the card, like its detail panels.
-      color: theme.colorScheme.surface.withValues(alpha: 0.4),
+      color: context.glass.panel,
       shape: shape,
       clipBehavior: Clip.antiAlias,
       child: InkWell(onTap: button.onPressed, child: content),

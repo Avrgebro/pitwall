@@ -22,10 +22,7 @@ class CodeBlock extends StatelessWidget {
         borderRadius: Corners.largeRadius,
       ),
       child: DefaultTextStyle.merge(
-        style: theme.textTheme.mono.copyWith(
-          color: theme.colorScheme.onSurface,
-          height: 1.6,
-        ),
+        style: theme.textTheme.mono.copyWith(height: 1.6),
         child: child,
       ),
     );

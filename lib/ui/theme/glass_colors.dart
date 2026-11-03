@@ -10,8 +10,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
     required this.fill,
     required this.barFill,
     required this.tintOpacity,
-    required this.tintFill,
-    required this.onTint,
+    required this.panel,
     required this.edge,
     required this.glow,
     required this.secondGlow,
@@ -26,8 +25,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
             fill: scheme.surfaceContainerLow.withValues(alpha: 0.5),
             barFill: scheme.surfaceContainer.withValues(alpha: 0.5),
             tintOpacity: tintOpacity,
-            tintFill: scheme.primaryContainer.withValues(alpha: tintOpacity),
-            onTint: scheme.onPrimaryContainer,
+            panel: scheme.surface.withValues(alpha: 0.4),
             edge: Colors.white.withValues(alpha: 0.1),
             glow: scheme.primary.withValues(alpha: 0.34),
             secondGlow: scheme.tertiary.withValues(alpha: 0.24),
@@ -36,8 +34,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
             fill: scheme.surfaceContainerLowest.withValues(alpha: 0.55),
             barFill: scheme.surfaceContainerLowest.withValues(alpha: 0.6),
             tintOpacity: tintOpacity,
-            tintFill: scheme.primaryContainer.withValues(alpha: tintOpacity),
-            onTint: scheme.onPrimaryContainer,
+            panel: scheme.surface.withValues(alpha: 0.4),
             edge: scheme.outlineVariant.withValues(alpha: 0.6),
             glow: scheme.primary.withValues(alpha: 0.26),
             secondGlow: scheme.tertiary.withValues(alpha: 0.2),
@@ -51,16 +48,15 @@ class GlassColors extends ThemeExtension<GlassColors> {
   /// navigation bar.
   final Color barFill;
 
-  /// How opaque a tint on glass is: [tintFill], and tinted cards.
+  /// How opaque a tone's container colour is on glass: tinted cards and
+  /// the main floating action. The container colour, close to the
+  /// background in brightness, keeps its text readable through the
+  /// translucency.
   final double tintOpacity;
 
-  /// Accent-tinted glass, for a main action floating over content. The
-  /// container colour, close to the background in brightness, keeps
-  /// [onTint] readable through the translucency.
-  final Color tintFill;
-
-  /// Labels and icons on [tintFill].
-  final Color onTint;
+  /// A faint layer over a card, neutral or tinted, for panels and segments
+  /// set into it.
+  final Color panel;
 
   /// A thin edge that catches the light, outlining the card.
   final Color edge;
@@ -76,8 +72,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
     Color? fill,
     Color? barFill,
     double? tintOpacity,
-    Color? tintFill,
-    Color? onTint,
+    Color? panel,
     Color? edge,
     Color? glow,
     Color? secondGlow,
@@ -85,8 +80,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
     fill: fill ?? this.fill,
     barFill: barFill ?? this.barFill,
     tintOpacity: tintOpacity ?? this.tintOpacity,
-    tintFill: tintFill ?? this.tintFill,
-    onTint: onTint ?? this.onTint,
+    panel: panel ?? this.panel,
     edge: edge ?? this.edge,
     glow: glow ?? this.glow,
     secondGlow: secondGlow ?? this.secondGlow,
@@ -99,8 +93,7 @@ class GlassColors extends ThemeExtension<GlassColors> {
       fill: Color.lerp(fill, other.fill, t)!,
       barFill: Color.lerp(barFill, other.barFill, t)!,
       tintOpacity: lerpDouble(tintOpacity, other.tintOpacity, t)!,
-      tintFill: Color.lerp(tintFill, other.tintFill, t)!,
-      onTint: Color.lerp(onTint, other.onTint, t)!,
+      panel: Color.lerp(panel, other.panel, t)!,
       edge: Color.lerp(edge, other.edge, t)!,
       glow: Color.lerp(glow, other.glow, t)!,
       secondGlow: Color.lerp(secondGlow, other.secondGlow, t)!,

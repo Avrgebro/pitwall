@@ -75,7 +75,7 @@ class AppPage extends StatelessWidget {
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
     final subtitle = this.subtitle;
 
-    return PageFrame.slivers(
+    return PageFrame(
       appBar: AppBar(
         toolbarHeight: _barHeight,
         automaticallyImplyLeading: false,

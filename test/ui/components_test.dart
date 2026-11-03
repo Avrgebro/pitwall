@@ -204,9 +204,14 @@ void main() {
         theme: AppTheme.light(),
         home: PageFrame(
           bottom: GlassButton(onPressed: () {}, child: const Text('Pinned')),
-          children: [
-            Center(
-              child: GlassButton(onPressed: () {}, child: const Text('Inline')),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Center(
+                child: GlassButton(
+                  onPressed: () {},
+                  child: const Text('Inline'),
+                ),
+              ),
             ),
           ],
         ),

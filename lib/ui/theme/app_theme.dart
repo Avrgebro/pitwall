@@ -49,14 +49,6 @@ abstract final class AppTheme {
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
-      listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(horizontal: Insets.l),
-        iconColor: scheme.onSurfaceVariant,
-        titleTextStyle: text.bodyLarge?.copyWith(color: scheme.onSurface),
-        subtitleTextStyle: text.bodyMedium?.copyWith(
-          color: scheme.onSurfaceVariant,
-        ),
-      ),
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: Corners.smallRadius),
       ),

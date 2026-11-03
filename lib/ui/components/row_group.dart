@@ -11,9 +11,9 @@ class RowGroup extends StatelessWidget {
 
   final List<Widget> children;
 
-  static const _gap = 3.0;
+  static const _gap = segmentGap;
   static const _outer = Radius.circular(Corners.extraLarge);
-  static const _inner = Radius.circular(Corners.small - 2);
+  static const _inner = Radius.circular(Corners.segment);
 
   @override
   Widget build(BuildContext context) => Column(

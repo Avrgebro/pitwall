@@ -56,29 +56,35 @@ class StepScaffold extends StatelessWidget {
         ),
         child: _buttons(),
       ),
-      children: [
-        if (title != null) Text(title!, style: theme.textTheme.headlineMedium),
-        if (message != null) ...[
-          const SizedBox(height: Insets.s),
-          Text(
-            message!,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-        if (title != null || message != null) const SizedBox(height: Insets.xl),
-        ...children,
-        if (footnote != null) ...[
-          const SizedBox(height: Insets.xl),
-          Text(
-            footnote!,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+      slivers: [
+        SliverList.list(
+          children: [
+            if (title != null)
+              Text(title!, style: theme.textTheme.headlineMedium),
+            if (message != null) ...[
+              const SizedBox(height: Insets.s),
+              Text(
+                message!,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            if (title != null || message != null)
+              const SizedBox(height: Insets.xl),
+            ...children,
+            if (footnote != null) ...[
+              const SizedBox(height: Insets.xl),
+              Text(
+                footnote!,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }

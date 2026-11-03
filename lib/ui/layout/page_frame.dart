@@ -9,19 +9,9 @@ import 'pinned_bottom.dart';
 /// the content, the scrolling content, and an optional [bottom] pinned
 /// over it. `AppPage` and setup's steps build on it.
 class PageFrame extends StatelessWidget {
-  /// A frame whose content is a list of [children].
-  PageFrame({
-    super.key,
-    required List<Widget> children,
-    this.appBar,
-    this.header,
-    this.bottom,
-    this.padding = defaultPadding,
-  }) : slivers = [SliverList.list(children: children)];
-
-  /// A frame whose content is slivers, for long lists that should only
-  /// build what's on screen.
-  const PageFrame.slivers({
+  /// Content is slivers: `SliverList.list` for ordinary content, and lazy
+  /// slivers for long lists that should only build what's on screen.
+  const PageFrame({
     super.key,
     required this.slivers,
     this.appBar,

@@ -35,7 +35,15 @@ abstract final class Corners {
   static const largeRadius = BorderRadius.all(Radius.circular(large));
   static const extraLargeRadius = BorderRadius.all(Radius.circular(extraLarge));
   static const heroRadius = BorderRadius.all(Radius.circular(hero));
+
+  /// Where segments of a group meet: rows in a group, buttons in a button
+  /// group.
+  static const double segment = small - 2;
 }
+
+/// The gap between segments of a group, which lets the surface show
+/// through as a hairline.
+const double segmentGap = 3;
 
 /// Fixed sizes shared by several components.
 abstract final class Sizes {
