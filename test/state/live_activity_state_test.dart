@@ -24,7 +24,12 @@ void main() {
       const TripIdle(),
     );
 
-    expect(live, isA<LiveConnected>().having((l) => l.since, 'since', now));
+    expect(
+      live,
+      isA<LiveConnected>()
+          .having((l) => l.since, 'since', now)
+          .having((l) => l.inTrip, 'in a trip', isFalse),
+    );
   });
 
   test('a reconnect mid-trip keeps the trip\'s start', () {
@@ -39,7 +44,9 @@ void main() {
 
     expect(
       live,
-      isA<LiveConnected>().having((l) => l.since, 'since', trip.since),
+      isA<LiveConnected>()
+          .having((l) => l.since, 'since', trip.since)
+          .having((l) => l.inTrip, 'in a trip', isTrue),
     );
   });
 

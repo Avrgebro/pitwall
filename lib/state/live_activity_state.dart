@@ -57,11 +57,15 @@ final class LiveConnected extends VehicleActivity {
     required String vehicleId,
     required this.since,
     required this.carState,
+    this.inTrip = false,
   }) : super(vehicleId);
 
   /// When the trip first reached the car, or, outside a trip, when the
   /// connection was made. A reconnect mid-trip doesn't change it.
   final DateTime since;
+
+  /// Part of a trip, rather than a connection made by hand.
+  final bool inTrip;
   final CarState carState;
 }
 
@@ -78,16 +82,21 @@ LiveActivity liveActivityFrom(SessionState session, TripState trip) => switch ((
     SessionConnected(:final vehicleId, :final connectedAt, :final carState),
     _,
   ) =>
-    LiveConnected(
-      vehicleId: vehicleId,
-      since: switch (trip) {
-        TripRunning(vehicleId: final tripVehicle, :final since)
-            when tripVehicle == vehicleId =>
-          since,
-        _ => connectedAt,
-      },
-      carState: carState,
-    ),
+    switch (trip) {
+      TripRunning(vehicleId: final tripVehicle, :final since)
+          when tripVehicle == vehicleId =>
+        LiveConnected(
+          vehicleId: vehicleId,
+          since: since,
+          carState: carState,
+          inTrip: true,
+        ),
+      _ => LiveConnected(
+        vehicleId: vehicleId,
+        since: connectedAt,
+        carState: carState,
+      ),
+    },
   (SessionConnecting(:final vehicleId), TripRunning(vehicleId: final trip))
       when trip == vehicleId =>
     LiveReconnecting(vehicleId),

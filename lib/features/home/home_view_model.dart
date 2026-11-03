@@ -162,14 +162,19 @@ class HomeViewModel {
       },
     );
     final adapter = vehicle.adapterName ?? 'the adapter';
-    final connecting = switch (activity) {
-      LiveConnected() || NoActivity() => null,
-      LiveConnecting() => 'Connecting to $adapter…',
-      LiveReconnecting() => 'Reconnecting to $adapter…',
-      LiveSearching() => 'Looking for $adapter…',
-    };
-    if (activity case LiveConnected(:final carState, :final since)) {
-      return HeroModel(
+    HeroModel connecting(String subtitle, {required String adapterState}) =>
+        HeroModel(
+          state: HeroState.connecting,
+          title: vehicle.name,
+          subtitle: subtitle,
+          stats: [
+            (kind: HeroStatKind.adapter, label: 'Adapter', value: adapterState),
+            (kind: HeroStatKind.car, label: 'Car', value: 'Checking'),
+            lastConnected,
+          ],
+        );
+    return switch (activity) {
+      LiveConnected(:final carState, :final since, :final inTrip) => HeroModel(
         state: HeroState.running,
         title: vehicle.name,
         subtitle: deliveryHealthy
@@ -186,44 +191,46 @@ class HomeViewModel {
           ),
           (
             kind: HeroStatKind.trip,
-            label: 'Trip',
+            // A connection made by hand, from Developer tools, isn't a trip.
+            label: inTrip ? 'Trip' : 'Connected',
             value: Formatters.duration(now.difference(since)),
           ),
         ],
-      );
-    }
-    if (connecting != null) {
-      return HeroModel(
-        state: HeroState.connecting,
+      ),
+      LiveConnecting() => connecting(
+        'Connecting to $adapter…',
+        adapterState: 'Connecting',
+      ),
+      LiveReconnecting() => connecting(
+        'Reconnecting to $adapter…',
+        adapterState: 'Connecting',
+      ),
+      // Between connection attempts.
+      LiveSearching() => connecting(
+        'Looking for $adapter…',
+        adapterState: 'Looking',
+      ),
+      NoActivity() => HeroModel(
+        state: HeroState.waiting,
         title: vehicle.name,
-        subtitle: connecting,
+        // Without a connection there's no telling whether the car is on, or
+        // whether the adapter is near; only what was last heard from it.
         stats: [
-          (kind: HeroStatKind.adapter, label: 'Adapter', value: 'Connecting'),
-          (kind: HeroStatKind.car, label: 'Car', value: 'Checking'),
-          lastConnected,
-        ],
-      );
-    }
-    return HeroModel(
-      state: HeroState.waiting,
-      title: vehicle.name,
-      // Without a connection there's no telling whether the car is on, or
-      // whether the adapter is near; only what was last heard from it.
-      stats: [
-        (
-          kind: HeroStatKind.adapterMissing,
-          label: 'Adapter',
-          value: 'Not connected',
-        ),
-        lastConnected,
-        if (lastReading != null)
           (
-            kind: HeroStatKind.lastReading,
-            label: 'Last reading',
-            value: Formatters.ago(lastReading, now),
+            kind: HeroStatKind.adapterMissing,
+            label: 'Adapter',
+            value: 'Not connected',
           ),
-      ],
-    );
+          lastConnected,
+          if (lastReading != null)
+            (
+              kind: HeroStatKind.lastReading,
+              label: 'Last reading',
+              value: Formatters.ago(lastReading, now),
+            ),
+        ],
+      ),
+    };
   }
 
   static String _carState(CarState state) => switch (state) {

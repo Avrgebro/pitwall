@@ -22,6 +22,7 @@ void main() {
     vehicleId: 'tucson',
     since: now.subtract(const Duration(minutes: 24)),
     carState: CarState.engineRunning,
+    inTrip: true,
   );
 
   /// This car's last values, all from reading 1, read [at].
@@ -265,6 +266,24 @@ void main() {
 
     expect(model.hero.state, HeroState.connecting);
     expect(model.hero.subtitle, 'Looking for vLinker MC+…');
+    expect(model.hero.stats.first.value, 'Looking');
+  });
+
+  test('a trip shows how long it has run; a manual connection doesn\'t', () {
+    String label(LiveConnected activity) =>
+        build(activity: activity).hero.stats.last.label;
+
+    expect(label(driving), 'Trip');
+    expect(
+      label(
+        LiveConnected(
+          vehicleId: 'tucson',
+          since: now,
+          carState: CarState.ignitionOn,
+        ),
+      ),
+      'Connected',
+    );
   });
 
   test('another car\'s activity doesn\'t show on this one', () {
