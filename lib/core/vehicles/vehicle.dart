@@ -161,7 +161,7 @@ class Vehicle {
   /// so older saved data keeps loading.
   factory Vehicle.fromJson(Map<String, Object?> json) => Vehicle(
     id: _string(json['id']) ?? _newId(),
-    name: switch (json['name'] ?? json['deviceName']) {
+    name: switch (json['name']) {
       final String name when name.isNotEmpty => name,
       _ => defaultName,
     },

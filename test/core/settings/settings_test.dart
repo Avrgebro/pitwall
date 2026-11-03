@@ -40,42 +40,11 @@ void main() {
   });
 
   group('trip start', () {
-    final older = Vehicle(
-      id: 'b2',
-      name: 'mazda',
-      lastSeen: DateTime(2026, 10, 1),
-    );
     final recent = Vehicle(
       id: 'a1',
       name: 'tucson',
       lastSeen: DateTime(2026, 11, 1),
     );
-
-    test('the app-wide head unit moves to the car seen most recently', () {
-      final settings = AppSettings.fromJson({
-        'vehicles': [older.toJson(), recent.toJson()],
-        'wakeTrigger': 'carBluetooth',
-        'headUnitAddress': 'AA:BB:CC:DD:EE:FF',
-        'headUnitName': 'TUCSON BT',
-      });
-
-      expect(settings.vehicleById('a1')!.headUnitName, 'TUCSON BT');
-      expect(settings.vehicleById('b2')!.headUnitAddress, isNull);
-      // Saved again, the app-wide fields are gone.
-      expect(settings.toJson().containsKey('headUnitAddress'), isFalse);
-    });
-
-    test('a vehicle\'s own head unit wins over the app-wide one', () {
-      final settings = AppSettings.fromJson({
-        'vehicles': [
-          older.copyWith(headUnitAddress: '11:22:33:44:55:66').toJson(),
-          recent.toJson(),
-        ],
-        'headUnitAddress': 'AA:BB:CC:DD:EE:FF',
-      });
-
-      expect(settings.vehicleById('a1')!.headUnitAddress, isNull);
-    });
 
     test('head units are found without regard to case', () {
       final settings = AppSettings(
@@ -168,22 +137,6 @@ void main() {
         ['mazda', 'tucson', 'kia'],
       );
     });
-  });
-
-  test('the earlier single-car format becomes one vehicle', () {
-    final settings = AppSettings.fromJson({
-      'adapterAddress': '00:11:22:33:44:55',
-      'adapterName': 'OBDII',
-      'deviceName': 'tucson',
-      'modelYear': 2023,
-      'selectedKeys': ['tucson_fli_vol'],
-    });
-
-    final vehicle = settings.vehicles.single;
-    expect(vehicle.name, 'tucson');
-    expect(vehicle.adapterAddress, '00:11:22:33:44:55');
-    expect(vehicle.selectedKeys, {'tucson_fli_vol'});
-    expect(vehicle.id, isNotEmpty);
   });
 
   test('missing or broken fields fall back to defaults', () {

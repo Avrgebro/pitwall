@@ -1,7 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/settings/settings_store.dart';
-import 'package:pitwall/core/webhook/webhook_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -13,23 +13,30 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
-  test('a webhook saved under the earlier two keys moves to one', () async {
-    FlutterSecureStorage.setMockInitialValues({
-      'webhook_url': 'https://example.com/api/webhook/abc',
-      'webhook_auth': '{"type":"bearer","token":"secret"}',
-    });
-    const secrets = FlutterSecureStorage();
-    final store = SettingsStore(secrets: secrets);
-
-    const expected = WebhookTarget(
-      'https://example.com/api/webhook/abc',
-      WebhookAuth(type: WebhookAuthType.bearer, token: 'secret'),
+  test('settings saved before versions load as they are', () async {
+    final preferences = SharedPreferencesAsync();
+    await preferences.setString(
+      'settings',
+      '{"vehicles": [{"id": "a1", "name": "tucson"}], "setupDone": true}',
     );
-    expect(await store.loadWebhook(), expected);
-    expect(await secrets.read(key: 'webhook_url'), isNull);
-    expect(await secrets.read(key: 'webhook_auth'), isNull);
-    // Read back from the new key alone.
-    expect(await SettingsStore(secrets: secrets).loadWebhook(), expected);
+
+    final settings = await SettingsStore(preferences: preferences).load();
+
+    expect(settings.vehicles.single.name, 'tucson');
+    expect(settings.setupDone, isTrue);
+  });
+
+  test('settings from a newer version start fresh', () async {
+    final preferences = SharedPreferencesAsync();
+    await preferences.setString(
+      'settings',
+      '{"version": 99, "setupDone": true}',
+    );
+
+    expect(
+      (await SettingsStore(preferences: preferences).load()).setupDone,
+      isFalse,
+    );
   });
 
   test('saving no webhook removes it', () async {

@@ -119,15 +119,10 @@ class AppSettings {
     'setupDone': setupDone,
   };
 
-  /// Tolerates missing or wrongly typed fields. Also reads earlier
-  /// formats: the single-car one, where the car's settings sat at the top
-  /// level, and the one with a single head unit for the whole app.
+  /// Tolerates missing or wrongly typed fields, falling back to defaults.
   factory AppSettings.fromJson(Map<String, Object?> json) {
-    if (isLegacy(json)) {
-      return AppSettings(vehicles: [Vehicle.fromJson(json)], setupDone: true);
-    }
     final seconds = json['intervalSeconds'];
-    final settings = AppSettings(
+    return AppSettings(
       vehicles: switch (json['vehicles']) {
         final List<Object?> list => [
           for (final item in list)
@@ -140,37 +135,8 @@ class AppSettings {
           : defaultInterval,
       setupDone: json['setupDone'] == true,
     );
-    return settings._withAppHeadUnit(
-      address: _string(json['headUnitAddress']),
-      name: _string(json['headUnitName']),
-    );
   }
-
-  /// Moves the app-wide head unit of the earlier format onto the vehicle
-  /// seen most recently, unless a vehicle already has a head unit.
-  AppSettings _withAppHeadUnit({String? address, String? name}) {
-    final vehicle = mostRecentVehicle;
-    if (address == null ||
-        vehicle == null ||
-        vehicles.any((v) => v.headUnitAddress != null)) {
-      return this;
-    }
-    return withVehicle(
-      vehicle.copyWith(
-        tripStart: TripStart.carBluetooth,
-        headUnitAddress: address,
-        headUnitName: name,
-      ),
-    );
-  }
-
-  /// Whether [json] is the earlier single-car format.
-  static bool isLegacy(Map<String, Object?> json) =>
-      !json.containsKey('vehicles') &&
-      (json.containsKey('adapterAddress') || json.containsKey('deviceName'));
 }
-
-String? _string(Object? value) => value is String ? value : null;
 
 /// Bluetooth addresses compare without case: Android reports them upper
 /// case, but stored ones may differ.

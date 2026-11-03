@@ -25,47 +25,71 @@ void main() {
     expect(back.queue.single.toJson(), reading.toJson());
   });
 
-  test('without what was delivered, it\'s everything before the queue', () {
-    expect(
-      DeliveryState.fromJson({
-        'seq': 7,
-        'queue': [reading.toJson()],
-      }).deliveredThrough,
-      6,
-    );
-    expect(DeliveryState.fromJson({'seq': 7}).deliveredThrough, 7);
-  });
-
   test('after a loss, numbering resumes above anything before', () {
     final state = DeliveryState.afterLoss(DateTime.utc(2026, 11, 2));
     expect(state.seq, greaterThan(1000000000));
     expect(state.deliveredThrough, state.seq);
   });
 
-  test('the earlier format, payloads as text, still loads', () {
-    final payload = jsonEncode(reading.toJson());
-    final back = DeliveryState.fromJson({
-      'seq': 7,
-      'queue': [payload, 'not json'],
-      'lastReading': payload,
-    });
+  test('a reading is stored at full precision, apart from its payload', () {
+    final precise = QueuedReading(
+      seq: 8,
+      device: 'hyundai-tucson',
+      timestamp: DateTime.utc(2026, 11, 2),
+      values: const {'battery_v': 14.123456},
+      connected: true,
+    );
 
-    expect(back.queue.single.seq, 7);
-    expect(back.queue.single.values, {
-      'odometer_km': 33999.7,
-      'battery_v': 14.1,
-    });
-    expect(back.queue.single.engineRunning, isTrue);
+    final back = DeliveryState.fromJson(
+      jsonDecode(jsonEncode(DeliveryState(queue: [precise]).toJson()))
+          as Map<String, Object?>,
+    );
+
+    expect(back.queue.single.values['battery_v'], 14.123456);
   });
 
   test('what goes out is the payload itself', () {
-    expect(reading.toJson(), {
+    expect(reading.toPayload(), {
       'device': 'hyundai-tucson',
       'seq': 7,
       'timestamp': '2026-11-02T00:30:00Z',
       'values': {'odometer_km': 33999.7, 'battery_v': 14.1},
       'engine': 'running',
       'connected': true,
+    });
+  });
+
+  group('the file', () {
+    final now = DateTime.utc(2026, 11, 2);
+
+    test('saved before versions, with payloads, is brought up to date', () {
+      final state = FileDeliveryStorage.decode({
+        'seq': 7,
+        'deliveredThrough': 6,
+        'queue': [reading.toPayload()],
+      }, now: now);
+
+      expect(state.seq, 7);
+      expect(state.deliveredThrough, 6);
+      expect(state.queue.single.values, {
+        'odometer_km': 33999.7,
+        'battery_v': 14.1,
+      });
+      expect(state.queue.single.engineRunning, isTrue);
+    });
+
+    test('missing, or from a newer version, is a lost state', () {
+      for (final json in <Object?>[
+        null,
+        'garbage',
+        {'version': 99},
+      ]) {
+        expect(
+          FileDeliveryStorage.decode(json, now: now).seq,
+          now.millisecondsSinceEpoch,
+          reason: '$json',
+        );
+      }
     });
   });
 

@@ -121,7 +121,10 @@ class WebhookSender {
       }
       // Kept, as a full queue can drop it from the front while it's posted.
       final sent = _queue.first;
-      final (:error, :elapsed) = await _post(target, jsonEncode(sent.toJson()));
+      final (:error, :elapsed) = await _post(
+        target,
+        jsonEncode(sent.toPayload()),
+      );
       // The reading stays queued; the next run delivers it.
       if (_disposed) return;
       if (error != null) {

@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 
 import '../storage/app_files.dart';
 import 'queued_reading.dart';
 
 /// What the sender keeps across restarts: the readings still to deliver,
-/// oldest first, and the last sequence number used.
+/// oldest first, the last sequence number used, and the newest delivered.
 class DeliveryState {
   const DeliveryState({
     this.queue = const [],
@@ -22,6 +21,9 @@ class DeliveryState {
         deliveredThrough: now.millisecondsSinceEpoch,
       );
 
+  /// The format [toJson] writes; see `FileDeliveryStorage.load`.
+  static const version = 2;
+
   final List<QueuedReading> queue;
   final int seq;
 
@@ -29,52 +31,34 @@ class DeliveryState {
   final int deliveredThrough;
 
   Map<String, Object?> toJson() => {
+    'version': version,
     'seq': seq,
     'deliveredThrough': deliveredThrough,
     'queue': [for (final reading in queue) reading.toJson()],
   };
 
-  /// Also reads the earlier format, where each reading was kept as its
-  /// encoded payload. Entries that don't parse are left out.
-  factory DeliveryState.fromJson(Map<String, Object?> json) {
-    final queue = [
-      for (final entry in switch (json['queue']) {
-        final List<Object?> queue => queue,
-        _ => const <Object?>[],
-      })
-        ?_reading(entry),
-    ];
-    final seq = switch (json['seq']) {
+  /// Reads the current format. Readings that don't parse are left out.
+  factory DeliveryState.fromJson(Map<String, Object?> json) =>
+      _read(json, QueuedReading.fromJson);
+
+  static DeliveryState _read(
+    Map<String, Object?> json,
+    QueuedReading? Function(Map<String, Object?> json) reading,
+  ) => DeliveryState(
+    queue: [
+      if (json['queue'] case final List<Object?> queue)
+        for (final entry in queue)
+          if (entry is Map<String, Object?>) ?reading(entry),
+    ],
+    seq: switch (json['seq']) {
       final int seq => seq,
       _ => 0,
-    };
-    return DeliveryState(
-      queue: queue,
-      seq: seq,
-      deliveredThrough: switch (json['deliveredThrough']) {
-        final int through => through,
-        // Not kept by earlier versions: everything before the queue.
-        _ => queue.isEmpty ? seq : queue.first.seq - 1,
-      },
-    );
-  }
-
-  static QueuedReading? _reading(Object? entry) => switch (entry) {
-    final Map<String, Object?> json => QueuedReading.fromJson(json),
-    final String payload => switch (_decode(payload)) {
-      final Map<String, Object?> json => QueuedReading.fromJson(json),
-      _ => null,
     },
-    _ => null,
-  };
-
-  static Object? _decode(String source) {
-    try {
-      return jsonDecode(source);
-    } on FormatException {
-      return null;
-    }
-  }
+    deliveredThrough: switch (json['deliveredThrough']) {
+      final int through => through,
+      _ => 0,
+    },
+  );
 }
 
 abstract interface class DeliveryStorage {
@@ -89,22 +73,53 @@ class FileDeliveryStorage implements DeliveryStorage {
 
   /// A file that's gone, can't be read or doesn't parse is a lost state:
   /// numbering resumes above anything before, which a first start needs no
-  /// less.
+  /// less. Earlier formats are brought up to date here, and only here.
   @override
-  Future<DeliveryState> load() async {
-    try {
-      final file = await appFile(_fileName);
-      if (DeliveryState._decode(await file.readAsString())
-          case final Map<String, Object?> json) {
-        return DeliveryState.fromJson(json);
-      }
-    } on FileSystemException {
-      // Lost, as below.
-    }
-    return DeliveryState.afterLoss(DateTime.now());
-  }
+  Future<DeliveryState> load() async =>
+      decode(await readJsonFile(_fileName), now: DateTime.now());
+
+  /// What the file's JSON, or its absence, means; see [load].
+  static DeliveryState decode(Object? json, {required DateTime now}) =>
+      switch (json) {
+        final Map<String, Object?> json => switch (json['version']) {
+          DeliveryState.version => DeliveryState.fromJson(json),
+          null => DeliveryState._read(json, _readingFromPayload),
+          _ => DeliveryState.afterLoss(now),
+        },
+        _ => DeliveryState.afterLoss(now),
+      };
 
   @override
   Future<void> save(DeliveryState state) async =>
       writeAtomically(await appFile(_fileName), jsonEncode(state.toJson()));
+
+  /// Version 1 kept each reading as its webhook payload.
+  static QueuedReading? _readingFromPayload(Map<String, Object?> json) {
+    if (json case {
+      'seq': final int seq,
+      'device': final String device,
+      'timestamp': final String timestamp,
+      'connected': final bool connected,
+    }) {
+      final time = DateTime.tryParse(timestamp);
+      if (time == null) return null;
+      return QueuedReading(
+        seq: seq,
+        device: device,
+        timestamp: time,
+        values: {
+          if (json['values'] case final Map<String, Object?> values)
+            for (final MapEntry(:key, :value) in values.entries)
+              if (value is num) key: value.toDouble(),
+        },
+        connected: connected,
+        engineRunning: switch (json['engine']) {
+          'running' => true,
+          'off' => false,
+          _ => null,
+        },
+      );
+    }
+    return null;
+  }
 }

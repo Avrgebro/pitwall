@@ -2,15 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../profiles/profile_ref.dart';
 import '../profiles/signal_set.dart';
 import '../profiles/stored_profile.dart';
 import '../storage/app_files.dart';
 import '../vehicles/vehicle.dart';
-import '../webhook/webhook_auth.dart';
 import '../webhook/webhook_target.dart';
 import 'settings.dart';
 
@@ -28,13 +25,9 @@ class SettingsStore {
   static const _settingsKey = 'settings';
   static const _webhookKey = 'webhook';
 
-  // Earlier versions kept the URL and credentials under two keys.
-  static const _oldWebhookUrlKey = 'webhook_url';
-  static const _oldWebhookAuthKey = 'webhook_auth';
-
-  // Single-car format, before vehicles: one profile file and its name.
-  static const _legacyProfileFile = 'vehicle_profile.json';
-  static const _legacyProfileNameKey = 'profile_name';
+  /// The format [save] writes. Earlier formats are brought up to date in
+  /// [load], and only there; none needs it yet.
+  static const _version = 1;
 
   final SharedPreferencesAsync _preferences;
   final FlutterSecureStorage _secrets;
@@ -42,25 +35,25 @@ class SettingsStore {
   Future<AppSettings> load() async {
     final saved = await _preferences.getString(_settingsKey);
     if (saved == null) return const AppSettings();
-    final Map<String, Object?> json;
-    try {
-      json = jsonDecode(saved) as Map<String, Object?>;
-    } on Object {
+    return switch (_decode(saved)) {
+      // Before versions, settings were saved in this same shape.
+      final Map<String, Object?> json
+          when (json['version'] ?? _version) == _version =>
+        AppSettings.fromJson(json),
       // Unreadable settings shouldn't lock the user out; start fresh.
-      return const AppSettings();
-    }
-    final settings = AppSettings.fromJson(json);
-    if (AppSettings.isLegacy(json)) return _migrate(settings);
-    return settings;
+      _ => const AppSettings(),
+    };
   }
 
-  Future<void> save(AppSettings settings) =>
-      _preferences.setString(_settingsKey, jsonEncode(settings.toJson()));
+  Future<void> save(AppSettings settings) => _preferences.setString(
+    _settingsKey,
+    jsonEncode({'version': _version, ...settings.toJson()}),
+  );
 
   /// The webhook URL and credentials; [WebhookTarget.none] if not set.
   Future<WebhookTarget> loadWebhook() async {
     final saved = await _secrets.read(key: _webhookKey);
-    if (saved == null) return _migrateWebhook();
+    if (saved == null) return WebhookTarget.none;
     return switch (_decode(saved)) {
       final Map<String, Object?> json => WebhookTarget.fromJson(json),
       _ => WebhookTarget.none,
@@ -70,21 +63,6 @@ class SettingsStore {
   Future<void> saveWebhook(WebhookTarget target) => target == WebhookTarget.none
       ? _secrets.delete(key: _webhookKey)
       : _secrets.write(key: _webhookKey, value: jsonEncode(target.toJson()));
-
-  /// Moves a URL and credentials saved under the earlier two keys into one.
-  Future<WebhookTarget> _migrateWebhook() async {
-    final url = await _secrets.read(key: _oldWebhookUrlKey);
-    final auth = await _secrets.read(key: _oldWebhookAuthKey);
-    if (url == null && auth == null) return WebhookTarget.none;
-    final target = WebhookTarget(url ?? '', switch (_decode(auth)) {
-      final Map<String, Object?> json => WebhookAuth.fromJson(json),
-      _ => WebhookAuth.none,
-    });
-    await saveWebhook(target);
-    await _secrets.delete(key: _oldWebhookUrlKey);
-    await _secrets.delete(key: _oldWebhookAuthKey);
-    return target;
-  }
 
   /// [source] as JSON, or null if there's none or it doesn't parse.
   static Object? _decode(String? source) {
@@ -124,38 +102,6 @@ class SettingsStore {
     if (await file.exists()) await file.delete();
   }
 
-  /// Moves the single-car profile file to the migrated vehicle and saves
-  /// the settings in the new format.
-  Future<AppSettings> _migrate(AppSettings settings) async {
-    var vehicle = settings.vehicles.single;
-    final legacy = File('${await _directory()}/$_legacyProfileFile');
-    if (await legacy.exists()) {
-      final name = await _preferences.getString(_legacyProfileNameKey);
-      try {
-        await saveProfile(
-          vehicle.id,
-          SignalSet.parse(await legacy.readAsString()),
-        );
-        vehicle = vehicle.copyWith(
-          profile: ProfileRef(
-            name ?? _legacyProfileFile,
-            importedAt: DateTime.now(),
-          ),
-        );
-      } on FormatException {
-        // A profile that no longer parses isn't carried over.
-      }
-      await legacy.delete();
-      await _preferences.remove(_legacyProfileNameKey);
-    }
-    final migrated = settings.withVehicle(vehicle);
-    await save(migrated);
-    return migrated;
-  }
-
-  Future<File> _profileFile(String vehicleId) async =>
-      File('${await _directory()}/profiles/$vehicleId.json');
-
-  Future<String> _directory() async =>
-      (await getApplicationSupportDirectory()).path;
+  Future<File> _profileFile(String vehicleId) =>
+      appFile('profiles/$vehicleId.json');
 }

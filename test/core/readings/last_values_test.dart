@@ -48,7 +48,8 @@ void main() {
   test('broken entries are left out', () {
     final values = LastValues.fromJson({
       'tucson': {
-        'battery_v': {'value': 12.4, 'at': later.toIso8601String()},
+        'battery_v': {'value': 12.4, 'at': later.toIso8601String(), 'seq': 1},
+        'coolant_temp_c': {'value': 90, 'at': later.toIso8601String()},
         'rpm': {'value': 'fast', 'at': later.toIso8601String()},
         'speed_kmh': {'value': 50, 'at': 'yesterday'},
       },
@@ -69,16 +70,6 @@ void main() {
 
     final back = LastValues.fromJson(values.toJson()).of('tucson');
     expect(back['battery_v']!.seq, 42);
-  });
-
-  test('values kept before readings were numbered read as delivered', () {
-    final back = LastValues.fromJson({
-      'tucson': {
-        'rpm': {'value': 800, 'at': '2026-11-01T10:00:00.000'},
-      },
-    });
-
-    expect(back.of('tucson')['rpm']!.seq, 0);
   });
 
   test('sent values are the chosen ones, with the newest', () {

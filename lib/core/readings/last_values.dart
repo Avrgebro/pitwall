@@ -91,9 +91,7 @@ class LastValues {
       },
   };
 
-  /// Entries that don't parse are left out. Values kept before readings
-  /// were numbered went out long ago, so they read as delivered, numbered
-  /// 0; the next save keeps them that way.
+  /// Entries that don't parse are left out.
   factory LastValues.fromJson(Map<String, Object?> json) => LastValues({
     for (final MapEntry(key: vehicleId, value: values) in json.entries)
       if (values is Map)
@@ -101,17 +99,14 @@ class LastValues {
           for (final MapEntry(:key, :value) in values.entries)
             if ((key, value) case (
               final String key,
-              {'value': final num v, 'at': final String at},
+              {
+                'value': final num v,
+                'at': final String at,
+                'seq': final int seq,
+              },
             ))
               if (DateTime.tryParse(at) case final readAt?)
-                key: LastValue(
-                  v,
-                  readAt,
-                  seq: switch (values[key]) {
-                    {'seq': final int seq} => seq,
-                    _ => 0,
-                  },
-                ),
+                key: LastValue(v, readAt, seq: seq),
         },
   });
 }
@@ -125,21 +120,24 @@ abstract interface class LastValuesStorage {
 class FileLastValuesStorage implements LastValuesStorage {
   static const _fileName = 'last_values.json';
 
+  /// The format [save] writes.
+  static const _version = 1;
+
+  /// A file that's missing or doesn't parse holds no values. Earlier
+  /// formats are brought up to date here, and only here.
   @override
-  Future<LastValues> load() async {
-    final file = await appFile(_fileName);
-    if (!await file.exists()) return const LastValues();
-    try {
-      return switch (jsonDecode(await file.readAsString())) {
-        final Map<String, Object?> json => LastValues.fromJson(json),
-        _ => const LastValues(),
-      };
-    } on FormatException {
-      return const LastValues();
-    }
-  }
+  Future<LastValues> load() async => switch (await readJsonFile(_fileName)) {
+    {'version': _version, 'vehicles': final Map<String, Object?> vehicles} =>
+      LastValues.fromJson(vehicles),
+    // Before versions, the file was the vehicles alone.
+    final Map<String, Object?> json when !json.containsKey('version') =>
+      LastValues.fromJson(json),
+    _ => const LastValues(),
+  };
 
   @override
-  Future<void> save(LastValues values) async =>
-      writeAtomically(await appFile(_fileName), jsonEncode(values.toJson()));
+  Future<void> save(LastValues values) async => writeAtomically(
+    await appFile(_fileName),
+    jsonEncode({'version': _version, 'vehicles': values.toJson()}),
+  );
 }
