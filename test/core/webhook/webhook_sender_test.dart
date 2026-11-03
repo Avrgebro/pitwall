@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -318,4 +319,38 @@ void main() {
     expect(received.single['connected'], isFalse);
     pitwall.dispose();
   });
+
+  test(
+    'a reading dropped while another is posted isn\'t marked delivered',
+    () async {
+      // The first post answers when told to; the ones after it never do.
+      final posted = Completer<http.Response>();
+      var requests = 0;
+      final pitwall = sender(
+        client: MockClient(
+          (request) => requests++ == 0
+              ? posted.future
+              : Completer<http.Response>().future,
+        ),
+      );
+      await pitwall.init();
+      for (var i = 0; i < WebhookSender.maxQueued; i++) {
+        await pitwall.queue(
+          device: 'tucson',
+          values: const {},
+          connected: true,
+        );
+      }
+
+      // Reading 1 is being posted; one more pushes it out of the full queue.
+      await pitwall.queue(device: 'tucson', values: const {}, connected: true);
+      posted.complete(http.Response('', 200));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Only reading 1 went out: reading 2, never posted, is still queued.
+      expect(pitwall.status.value.deliveredThrough, 1);
+      expect(pitwall.status.value.queued, WebhookSender.maxQueued);
+      pitwall.dispose();
+    },
+  );
 }
