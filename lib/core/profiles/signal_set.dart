@@ -26,9 +26,6 @@ class SignalSet {
   /// ones it skips, with why.
   final List<ProfileRequest> requests;
 
-  Iterable<ProfileCommand> get commands => requests.whereType<ProfileCommand>();
-  Iterable<SkippedRequest> get skipped => requests.whereType<SkippedRequest>();
-
   /// Parses a signal-set file. Throws [FormatException] if it isn't one.
   factory SignalSet.parse(String source) {
     final Object? json;
@@ -43,7 +40,9 @@ class SignalSet {
     final requests = <ProfileRequest>[];
     for (final entry in json['commands'] as List) {
       if (entry is! Map) continue;
-      // Kept for skipped requests too, to say what they would have read.
+      // Kept for skipped requests too, to say what they would have read. A
+      // filter that doesn't parse is no filter: the request applies to
+      // every year. That's safe, as only read services are ever sent.
       final filter = YearFilter._parse(entry['filter']);
       final signals = [
         for (final signal in _list(entry['signals']))
@@ -73,15 +72,32 @@ class SignalSet {
   Iterable<ProfileCommand> commandsFor(int modelYear) =>
       requestsFor(modelYear).whereType<ProfileCommand>();
 
+  /// The requests Pitwall sends to a car of [modelYear], each with the
+  /// values read through it. A value several requests carry is read
+  /// through the first, so its name, unit and reading all come from one
+  /// place.
+  List<({ProfileCommand command, List<ProfileSignal> signals})> readsFor(
+    int modelYear,
+  ) {
+    final claimed = <String>{};
+    return [
+      for (final command in commandsFor(modelYear))
+        (
+          command: command,
+          signals: [
+            for (final signal in command.signals)
+              if (claimed.add(signal.key)) signal,
+          ],
+        ),
+    ];
+  }
+
   /// What this profile offers a car of [modelYear]; see [ProfileSummary].
   ProfileSummary summaryFor(int modelYear) {
-    final readable = <String, ProfileSignal>{};
-    for (final command in commandsFor(modelYear)) {
-      for (final signal in command.signals) {
-        // A signal several requests read is read through the first.
-        readable.putIfAbsent(signal.key, () => signal);
-      }
-    }
+    final readable = {
+      for (final (:signals, command: _) in readsFor(modelYear))
+        for (final signal in signals) signal.key: signal,
+    };
     final missing = <SkipReason, Map<String, ProfileSignal>>{};
     var neverSent = 0;
     for (final request in requestsFor(modelYear)) {
@@ -224,8 +240,8 @@ final class SkippedRequest extends ProfileRequest {
   const SkippedRequest(
     this.description,
     this.reason, {
-    super.filter,
-    super.signals = const [],
+    required super.filter,
+    required super.signals,
   });
 
   /// The request, like `7E0: 22 0100`.

@@ -67,4 +67,30 @@ void main() {
 
     expect(values, isEmpty);
   });
+
+  test('a key two requests carry is read through the first only', () async {
+    final profile = SignalSet.parse(r'''
+      {"commands": [
+        {"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0001"},
+         "signals": [{"id": "SHARED", "fmt": {"len": 8}}]},
+        {"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0002"},
+         "signals": [{"id": "SHARED", "fmt": {"len": 8}},
+                     {"id": "OWN", "fmt": {"bix": 8, "len": 8}}]}
+      ]}
+    ''');
+    final transport = FakeTransport({
+      ...replies,
+      // The first request's reply holds no data for it.
+      '220001': '620001',
+      '220002': '6200020907',
+    });
+
+    final values = await readProfile(Elm327(transport), profile, 2023);
+
+    // Only ever from the first request, whose name and unit the profile's
+    // summary shows: the second request's value, in its own terms, isn't
+    // taken instead.
+    expect(values, isNot(contains('shared')));
+    expect(values['own'], 7);
+  });
 }

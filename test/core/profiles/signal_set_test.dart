@@ -8,17 +8,20 @@ void main() {
     final signalSet = SignalSet.parse(testProfileJson);
 
     test('keeps read requests and skips everything else', () {
-      expect(signalSet.commands.map((c) => c.id), [
+      expect(signalSet.requests.whereType<ProfileCommand>().map((c) => c.id), [
         [0x12, 0x34],
         [0x00, 0x42],
       ]);
-      expect(signalSet.skipped.map((s) => s.reason), [
-        SkipReason.notReadOnly,
-        SkipReason.notReadOnly,
-        SkipReason.notReadOnly,
-        SkipReason.extendedAddress,
-        SkipReason.specialFlowControl,
-      ]);
+      expect(
+        signalSet.requests.whereType<SkippedRequest>().map((s) => s.reason),
+        [
+          SkipReason.notReadOnly,
+          SkipReason.notReadOnly,
+          SkipReason.notReadOnly,
+          SkipReason.extendedAddress,
+          SkipReason.specialFlowControl,
+        ],
+      );
     });
 
     test('year filters pick the matching commands', () {
@@ -27,12 +30,18 @@ void main() {
     });
 
     test('signals keep their id, in lower case, and their unit', () {
-      final signals = signalSet.commands.first.signals;
+      final signals = signalSet.requests
+          .whereType<ProfileCommand>()
+          .first
+          .signals;
 
       // Even with OBDb's suggestedMetric tags, nothing is renamed.
       expect(signals.map((s) => s.key), ['test_fuel_vol', 'test_odo_mi']);
       expect(signals.map((s) => s.unit), ['liters', 'miles']);
-      expect(signalSet.commands.last.signals.single.key, 'test_old_only');
+      expect(
+        signalSet.requests.whereType<ProfileCommand>().last.signals.single.key,
+        'test_old_only',
+      );
     });
 
     test('rejects files that are not signal sets', () {
@@ -56,11 +65,11 @@ void main() {
       ''');
 
       // The write is still skipped as one, though its fields are malformed.
-      expect(profile.skipped.map((s) => s.reason), [
-        SkipReason.notReadOnly,
-        SkipReason.noUsableSignals,
-      ]);
-      final command = profile.commands.single;
+      expect(
+        profile.requests.whereType<SkippedRequest>().map((s) => s.reason),
+        [SkipReason.notReadOnly, SkipReason.noUsableSignals],
+      );
+      final command = profile.requests.whereType<ProfileCommand>().single;
       // A year that isn't a number is no year.
       expect(command.filter?.from, isNull);
       final signal = command.signals.single;
@@ -132,8 +141,8 @@ void main() {
     });
 
     test('values stay in the profile\'s units', () {
-      final odometer = SignalSet.parse(testProfileJson)
-          .commands
+      final odometer = SignalSet.parse(testProfileJson).requests
+          .whereType<ProfileCommand>()
           .first
           .signals
           .last;
@@ -213,7 +222,8 @@ void main() {
     });
 
     test('a category comes from the top of the path', () {
-      final range = SignalSet.parse(flowControlOnly).skipped
+      final range = SignalSet.parse(flowControlOnly).requests
+          .whereType<SkippedRequest>()
           .firstWhere((c) => c.signals.single.id == 'OLD_TRIP');
 
       expect(range.signals.single.category, 'Trips');
@@ -225,7 +235,15 @@ void main() {
   "signals": [{"id": "X", "path": 7, "fmt": {"len": 8, "unit": "scalar"}}]}]}
 """);
 
-      expect(profile.commands.single.signals.single.category, 'Other');
+      expect(
+        profile.requests
+            .whereType<ProfileCommand>()
+            .single
+            .signals
+            .single
+            .category,
+        'Other',
+      );
     });
   });
 }
