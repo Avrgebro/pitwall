@@ -164,9 +164,11 @@ class Elm327 {
     return match == null ? null : double.parse(match.group(1)!);
   }
 
+  /// Stops listening to the adapter. A command still waiting for its reply
+  /// fails at once as disconnected, rather than waiting for its timeout.
   Future<void> dispose() async {
     await _subscription.cancel();
-    _pending = null;
+    _onClosed();
   }
 
   /// Addresses following requests to the module with CAN id [header]
