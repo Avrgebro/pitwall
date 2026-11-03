@@ -68,4 +68,11 @@ void main() {
       'connected': true,
     });
   });
+
+  test('a queue that isn\'t a list loads as empty', () {
+    final back = DeliveryState.fromJson({'seq': 7, 'queue': 'broken'});
+
+    expect(back.queue, isEmpty);
+    expect(back.seq, 7);
+  });
 }

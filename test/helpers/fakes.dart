@@ -95,6 +95,9 @@ class FakeTripServiceGateway implements TripServiceGateway {
 
   void send(TripTarget target) => _starts.add(target);
 
+  /// Makes taking the held request fail, like a channel error.
+  Object? takeError;
+
   /// A start whose target couldn't be read.
   void sendUnreadable() =>
       _starts.addError(const FormatException('Not a trip target'));
@@ -107,6 +110,7 @@ class FakeTripServiceGateway implements TripServiceGateway {
 
   @override
   Future<TripTarget?> takeTripRequest() async {
+    if (takeError case final error?) throw error;
     final pending = pendingRequest;
     pendingRequest = null;
     return pending;

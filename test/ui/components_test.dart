@@ -307,4 +307,28 @@ void main() {
     final text = tester.widget<Text>(find.text('Couldn\'t read the licences.'));
     expect(text.style?.color, context.tone(StatusTone.error).accent);
   });
+
+  testWidgets('a failed save of typed text is reported', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: SaveWhenDone(
+            onDone: () async => throw StateError('disk full'),
+            child: const TextField(),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(tester.takeException(), isA<StateError>());
+
+    // Leaving the screen saves too, and that failure is reported as well.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    expect(tester.takeException(), isA<StateError>());
+  });
 }

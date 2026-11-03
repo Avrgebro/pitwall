@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import '../storage/app_files.dart';
 import 'queued_reading.dart';
@@ -37,7 +38,11 @@ class DeliveryState {
   /// encoded payload. Entries that don't parse are left out.
   factory DeliveryState.fromJson(Map<String, Object?> json) {
     final queue = [
-      for (final entry in json['queue'] as List? ?? const []) ?_reading(entry),
+      for (final entry in switch (json['queue']) {
+        final List<Object?> queue => queue,
+        _ => const <Object?>[],
+      })
+        ?_reading(entry),
     ];
     final seq = switch (json['seq']) {
       final int seq => seq,
@@ -82,14 +87,21 @@ abstract interface class DeliveryStorage {
 class FileDeliveryStorage implements DeliveryStorage {
   static const _fileName = 'delivery.json';
 
+  /// A file that's gone, can't be read or doesn't parse is a lost state:
+  /// numbering resumes above anything before, which a first start needs no
+  /// less.
   @override
   Future<DeliveryState> load() async {
-    final file = await appFile(_fileName);
-    if (!await file.exists()) return const DeliveryState();
-    return switch (DeliveryState._decode(await file.readAsString())) {
-      final Map<String, Object?> json => DeliveryState.fromJson(json),
-      _ => DeliveryState.afterLoss(DateTime.now()),
-    };
+    try {
+      final file = await appFile(_fileName);
+      if (DeliveryState._decode(await file.readAsString())
+          case final Map<String, Object?> json) {
+        return DeliveryState.fromJson(json);
+      }
+    } on FileSystemException {
+      // Lost, as below.
+    }
+    return DeliveryState.afterLoss(DateTime.now());
   }
 
   @override

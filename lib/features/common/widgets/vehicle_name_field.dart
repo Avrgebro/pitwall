@@ -19,7 +19,7 @@ class VehicleNameField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
 
   /// Called with the name when typing is done; see [SaveWhenDone].
-  final ValueChanged<String>? onDone;
+  final Future<void> Function(String name)? onDone;
 
   /// An extra sentence after the id, like "You can change it later."
   final String? note;
@@ -31,6 +31,10 @@ class VehicleNameField extends StatefulWidget {
 
 class _VehicleNameFieldState extends State<VehicleNameField> {
   late final _controller = TextEditingController(text: widget.initialName);
+
+  /// What's typed, kept apart from the controller: the last save can come
+  /// after the controller is disposed.
+  late String _typed = widget.initialName;
 
   @override
   void dispose() {
@@ -53,7 +57,7 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
       textInputAction: TextInputAction.done,
       decoration: const InputDecoration(labelText: 'Vehicle name'),
       onChanged: (text) {
-        setState(() {});
+        setState(() => _typed = text);
         widget.onChanged?.call(text);
       },
     );
@@ -62,7 +66,7 @@ class _VehicleNameFieldState extends State<VehicleNameField> {
       children: [
         switch (widget.onDone) {
           final onDone? => SaveWhenDone(
-            onDone: () => onDone(_controller.text),
+            onDone: () => onDone(_typed),
             child: field,
           ),
           null => field,

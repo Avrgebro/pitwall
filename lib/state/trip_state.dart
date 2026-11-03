@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/platform/trip_service_gateway.dart';
@@ -193,6 +194,8 @@ class TripController extends Notifier<TripState> {
         }
       } on FormatException catch (error, stack) {
         _refuse(error, stack);
+      } on PlatformException catch (error, stack) {
+        _refuse(error, stack);
       }
     });
     return const TripIdle();
@@ -294,6 +297,8 @@ class TripController extends Notifier<TripState> {
             return end;
           case _Found(:final session):
             lost = false;
+            // A car that answers again starts a new quiet window.
+            if (session.carState != CarState.off) quietSince = null;
             silent = session.carState == CarState.off;
         }
       }
@@ -320,6 +325,7 @@ class TripController extends Notifier<TripState> {
           silent = true;
         case StepDone(value: VehicleReading(reading: CarAwake())):
           silent = false;
+          quietSince = null;
         case StepDone(value: VehicleReading(reading: CarAnswered())):
           silent = false;
           quietSince = null;
@@ -366,8 +372,9 @@ class TripController extends Notifier<TripState> {
     }
   }
 
-  /// Android started the service for a trip whose target can't be read. No
-  /// trip will run on it, so it's stopped, unless a trip already is.
+  /// Android started the service for a trip whose target can't be read,
+  /// or can't be fetched. No trip will run on it, so it's stopped, unless
+  /// a trip already is.
   void _refuse(Object error, StackTrace stack) {
     _report('Trip start not understood', error, stack);
     if (_current == null) {
