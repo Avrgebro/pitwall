@@ -44,7 +44,7 @@ object ServiceBridge {
                         result.success(null)
                     }
                     "startService" -> {
-                        when (val target = TripTarget.fromArguments(call.arguments as? Map<*, *>)) {
+                        when (val target = TripTarget.fromApp(call.arguments as? Map<*, *>)) {
                             null -> result.error("bad_target", "Not a trip target", null)
                             else -> {
                                 TripService.start(context, target)

@@ -22,9 +22,9 @@ abstract interface class TripServiceGateway {
   /// most. Android keeps them, so it can start a trip with the app closed.
   Future<void> configure({required Set<String> headUnitAddresses});
 
-  /// Starts the service from the app, for [vehicleId] or any vehicle. It
-  /// comes back through [starts], as a head unit's start does.
-  Future<void> startService({String? vehicleId});
+  /// Starts the service from the app for [target]. It comes back through
+  /// [starts], as a head unit's start does.
+  Future<void> startService(AppTripTarget target);
 
   /// Stops the service once the trip is over.
   Future<void> stopService();
@@ -65,13 +65,8 @@ class AndroidTripServiceGateway implements TripServiceGateway {
       });
 
   @override
-  Future<void> startService({String? vehicleId}) => _channel.invokeMethod<void>(
-    'startService',
-    switch (vehicleId) {
-      final id? => VehicleTarget(id),
-      null => const AnyVehicleTarget(),
-    }.toArguments(),
-  );
+  Future<void> startService(AppTripTarget target) =>
+      _channel.invokeMethod<void>('startService', target.toArguments());
 
   @override
   Future<void> stopService() => _channel.invokeMethod<void>('stopService');

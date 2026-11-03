@@ -32,8 +32,8 @@ void main() {
   test('the app\'s request travels to Android', () async {
     final gateway = AndroidTripServiceGateway();
 
-    await gateway.startService(vehicleId: 'mazda');
-    await gateway.startService();
+    await gateway.startService(const VehicleTarget('mazda'));
+    await gateway.startService(const AnyVehicleTarget());
 
     expect(calls.map((c) => c.arguments), [
       {'kind': 'vehicle', 'id': 'mazda'},

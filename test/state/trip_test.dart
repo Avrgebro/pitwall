@@ -375,7 +375,7 @@ void main() {
     );
     c.read(tripProvider);
 
-    await c.read(tripProvider.notifier).startManually();
+    await c.read(tripProvider.notifier).startManually(const AnyVehicleTarget());
     expect((await running(c)).vehicleId, 'mazda');
     // The most recently seen car is tried first.
     expect(bluetooth.connected.first, _tucson.adapterAddress);
@@ -495,7 +495,9 @@ void main() {
     );
     c.read(tripProvider);
 
-    await c.read(tripProvider.notifier).startManually(vehicleId: 'mazda');
+    await c
+        .read(tripProvider.notifier)
+        .startManually(const VehicleTarget('mazda'));
 
     expect((await running(c)).vehicleId, 'mazda');
     expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});

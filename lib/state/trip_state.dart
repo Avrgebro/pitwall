@@ -201,11 +201,10 @@ class TripController extends Notifier<TripState> {
     return const TripIdle();
   }
 
-  /// Starts a trip from the app, through the service, as if [vehicleId]'s
-  /// head unit had connected. Without a vehicle, it tries every vehicle's
-  /// adapter.
-  Future<void> startManually({String? vehicleId}) =>
-      _gateway.startService(vehicleId: vehicleId);
+  /// Starts a trip from the app, through the service, as if the vehicle's
+  /// head unit had connected; for any vehicle, it tries every adapter.
+  Future<void> startManually(AppTripTarget target) =>
+      _gateway.startService(target);
 
   /// Ends the trip after the current step; the last reading is still sent.
   void stop() => _current?.stop();

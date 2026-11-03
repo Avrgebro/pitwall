@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/session/car_state.dart';
+import '../../../core/trips/trip_target.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../core/platform/permission_gateway.dart';
 import '../../../state/infrastructure.dart';
@@ -150,8 +151,9 @@ class SessionPanel extends ConsumerWidget {
                 ),
                 OutlinedButton.icon(
                   onPressed: canConnect
-                      ? () =>
-                            tripController.startManually(vehicleId: vehicle.id)
+                      ? () => tripController.startManually(
+                          VehicleTarget(vehicle.id),
+                        )
                       : null,
                   icon: const Icon(Symbols.play_circle_rounded),
                   label: const Text('Simulate auto-start'),

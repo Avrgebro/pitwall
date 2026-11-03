@@ -32,14 +32,20 @@ final class HeadUnitTarget extends TripTarget {
   final String address;
 }
 
+/// What the app can ask for: one vehicle, or any. Only a head unit names
+/// itself.
+sealed class AppTripTarget extends TripTarget {
+  const AppTripTarget();
+}
+
 /// The app asked for a trip for one vehicle.
-final class VehicleTarget extends TripTarget {
+final class VehicleTarget extends AppTripTarget {
   const VehicleTarget(this.id);
 
   final String id;
 }
 
 /// The app asked for a trip for whichever vehicle's adapter answers.
-final class AnyVehicleTarget extends TripTarget {
+final class AnyVehicleTarget extends AppTripTarget {
   const AnyVehicleTarget();
 }

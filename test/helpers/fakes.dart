@@ -122,11 +122,9 @@ class FakeTripServiceGateway implements TripServiceGateway {
 
   /// Like Android: the start comes back as the target it names.
   @override
-  Future<void> startService({String? vehicleId}) async {
+  Future<void> startService(AppTripTarget target) async {
     calls.add('startService');
-    send(
-      vehicleId == null ? const AnyVehicleTarget() : VehicleTarget(vehicleId),
-    );
+    send(target);
   }
 
   @override
