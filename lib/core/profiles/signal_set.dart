@@ -155,9 +155,9 @@ class SignalSet {
     if (entry['eax'] != null) {
       throw const _Unsupported(SkipReason.extendedAddress);
     }
-    if (entry['fcm1'] == true) {
-      throw const _Unsupported(SkipReason.specialFlowControl);
-    }
+    // OBDb's `fcm1` asks for flow-control mode 1 aimed at the module, so a
+    // long reply comes back whole. `Elm327.setTarget` sets that up for
+    // every module a request is sent to, so it needs nothing more here.
     if (signals.isEmpty) throw const _Unsupported(SkipReason.noUsableSignals);
     return ProfileCommand(
       header: header,
@@ -226,9 +226,6 @@ enum SkipReason {
 
   /// 29-bit or extended CAN addressing, not supported yet.
   extendedAddress,
-
-  /// Needs flow-control settings Pitwall doesn't support yet.
-  specialFlowControl,
 
   /// None of its signals could be read.
   noUsableSignals,

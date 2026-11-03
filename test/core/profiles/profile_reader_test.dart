@@ -21,6 +21,7 @@ void main() {
     'ATFCSH7E0': 'OK',
     'ATCRA7E8': 'OK',
     '220042': '6200422A',
+    '220100': '62010007',
     'ATSH7DF': 'OK',
     'ATFCSM0': 'OK',
     'ATCRA': 'OK',
@@ -37,6 +38,8 @@ void main() {
       expect(values['test_fuel_vol'], 52);
       expect(values['test_odo_mi'], 13042);
       expect(values, isNot(contains('test_old_only')));
+      // The fcm1 request, with the same flow control as any module.
+      expect(values['test_fcm1'], 7);
       expect(transport.sent, [
         'ATSH7A0',
         'ATFCSH7A0',
@@ -44,6 +47,10 @@ void main() {
         'ATFCSM1',
         'ATCRA7A8',
         '221234',
+        'ATSH7E0',
+        'ATFCSH7E0',
+        'ATCRA7E8',
+        '220100',
         'ATSH7DF',
         'ATFCSM0',
         'ATCRA',
@@ -65,7 +72,8 @@ void main() {
 
     final values = await readProfile(Elm327(transport), signalSet, 2023);
 
-    expect(values, isEmpty);
+    expect(values, isNot(contains('test_fuel_vol')));
+    expect(values, isNot(contains('test_odo_mi')));
   });
 
   test('a key two requests carry is read through the first only', () async {

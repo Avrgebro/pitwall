@@ -34,7 +34,12 @@ void main() {
           if (option.fromProfile) option.key,
       ];
 
-      expect(profileKeys, ['test_fuel_vol', 'test_odo_mi', 'test_old_only']);
+      expect(profileKeys, [
+        'test_fuel_vol',
+        'test_odo_mi',
+        'test_old_only',
+        'test_fcm1',
+      ]);
       // A tagged odometer doesn't take over the standard one.
       expect(options.where((o) => o.key == 'odometer_km'), hasLength(1));
       final sent = VehicleValues.of(

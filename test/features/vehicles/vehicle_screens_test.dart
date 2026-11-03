@@ -69,7 +69,7 @@ void main() {
     ) async {
       await pump(tester, const VehicleProfileScreen(vehicleId: 'tucson'));
 
-      expect(find.text('2 values your car can report'), findsOneWidget);
+      expect(find.text('3 values your car can report'), findsOneWidget);
       expect(find.text('Fuel'), findsOneWidget);
       expect(find.text('Trips'), findsOneWidget);
       await tester.scrollUntilVisible(

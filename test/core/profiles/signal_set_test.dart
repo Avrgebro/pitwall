@@ -11,6 +11,8 @@ void main() {
       expect(signalSet.requests.whereType<ProfileCommand>().map((c) => c.id), [
         [0x12, 0x34],
         [0x00, 0x42],
+        // OBDb's fcm1 is read like any other request.
+        [0x01, 0x00],
       ]);
       expect(
         signalSet.requests.whereType<SkippedRequest>().map((s) => s.reason),
@@ -19,14 +21,17 @@ void main() {
           SkipReason.notReadOnly,
           SkipReason.notReadOnly,
           SkipReason.extendedAddress,
-          SkipReason.specialFlowControl,
         ],
       );
     });
 
     test('year filters pick the matching commands', () {
-      expect(signalSet.commandsFor(2023).map((c) => c.header), ['7A0']);
-      expect(signalSet.commandsFor(2018).map((c) => c.header), ['7A0', '7E0']);
+      expect(signalSet.commandsFor(2023).map((c) => c.header), ['7A0', '7E0']);
+      expect(signalSet.commandsFor(2018).map((c) => c.header), [
+        '7A0',
+        '7E0',
+        '7E0',
+      ]);
     });
 
     test('signals keep their id, in lower case, and their unit', () {
@@ -39,7 +44,12 @@ void main() {
       expect(signals.map((s) => s.key), ['test_fuel_vol', 'test_odo_mi']);
       expect(signals.map((s) => s.unit), ['liters', 'miles']);
       expect(
-        signalSet.requests.whereType<ProfileCommand>().last.signals.single.key,
+        signalSet.requests
+            .whereType<ProfileCommand>()
+            .elementAt(1)
+            .signals
+            .single
+            .key,
         'test_old_only',
       );
     });
@@ -161,13 +171,14 @@ void main() {
       expect(summary.readable.map((s) => s.key), [
         'test_fuel_vol',
         'test_odo_mi',
+        'test_fcm1',
       ]);
       expect(
         {
           for (final group in summary.readableByCategory)
             group.category: group.signals.length,
         },
-        {'Fuel': 1, 'Trips': 1},
+        {'Fuel': 1, 'Trips': 1, 'Other': 1},
       );
     });
 
@@ -181,31 +192,30 @@ void main() {
       expect(summary.neverSentRequests, 3);
       expect(notYet, {
         SkipReason.extendedAddress: ['TEST_29BIT'],
-        SkipReason.specialFlowControl: ['TEST_FCM1'],
       });
     });
 
-    const flowControlOnly = """
+    const extendedOnly = """
 {"commands": [
   {"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0001"},
    "signals": [{"id": "BOTH", "path": "Engine", "name": "Both",
                 "fmt": {"len": 8, "unit": "scalar"}}]},
-  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0002"}, "fcm1": true,
+  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0002"}, "eax": "10",
    "filter": {"to": 2019},
    "signals": [{"id": "OLD_TRIP", "path": "Trips.Range", "name": "Range",
                 "fmt": {"len": 8, "unit": "kilometers"}}]},
-  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0003"}, "fcm1": true,
+  {"hdr": "7A0", "rax": "7A8", "cmd": {"22": "0003"}, "eax": "10",
    "signals": [{"id": "BOTH", "path": "Engine", "name": "Both",
                 "fmt": {"len": 8, "unit": "scalar"}}]}
 ]}
 """;
 
     test('skipped requests count only for the years they apply to', () {
-      final profile = SignalSet.parse(flowControlOnly);
+      final profile = SignalSet.parse(extendedOnly);
       List<String> unreadable(int year) => [
         for (final (:reason, :signals)
             in profile.summaryFor(year).notYetReadable)
-          if (reason == SkipReason.specialFlowControl)
+          if (reason == SkipReason.extendedAddress)
             for (final signal in signals) signal.id,
       ];
 
@@ -214,7 +224,7 @@ void main() {
     });
 
     test('a value readable through another request isn\'t missing', () {
-      final summary = SignalSet.parse(flowControlOnly).summaryFor(2023);
+      final summary = SignalSet.parse(extendedOnly).summaryFor(2023);
 
       expect(summary.readable.single.id, 'BOTH');
       // Nothing left for the reason, so the reason isn't listed.
@@ -222,7 +232,7 @@ void main() {
     });
 
     test('a category comes from the top of the path', () {
-      final range = SignalSet.parse(flowControlOnly).requests
+      final range = SignalSet.parse(extendedOnly).requests
           .whereType<SkippedRequest>()
           .firstWhere((c) => c.signals.single.id == 'OLD_TRIP');
 
