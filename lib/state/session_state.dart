@@ -77,8 +77,17 @@ final class StepFailed<T> extends StepOutcome<T> {
 /// How a connection attempt ended: done with the live session.
 typedef ConnectResult = StepOutcome<SessionConnected>;
 
+/// What asking a vehicle's car found, with the vehicle it was asked for.
+@immutable
+final class VehicleReading {
+  const VehicleReading(this.vehicle, this.reading);
+
+  final Vehicle vehicle;
+  final CarReading reading;
+}
+
 /// How asking the car something ended: done with what it said.
-typedef ReadOutcome = StepOutcome<CarReading>;
+typedef ReadOutcome = StepOutcome<VehicleReading>;
 
 /// A connection to a vehicle's adapter: none, being made, or live. Each
 /// stage carries only what's known in it.
@@ -239,7 +248,7 @@ class SessionController extends Notifier<SessionState> {
         vehicleId: vehicle.id,
         connectedAt: DateTime.now(),
         adapterVersion: version,
-        supportedPids: car.supportedPids ?? const {},
+        supportedPids: car.supportedPids,
         carState: car.carState,
       );
       state = live;
@@ -252,56 +261,76 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Asks the car again whether it answers, e.g. after the ignition was off.
-  Future<ReadOutcome> checkCar() => _exclusive((session, elm) async {
-    final car = await _askCar(elm);
-    _update(
-      (live) => live.copyWith(
-        carState: car.carState,
-        supportedPids: car.supportedPids,
-      ),
-    );
-    return switch (car.carState) {
-      CarState.off => const CarSilent(),
-      final carState => CarAwake(carState),
-    };
-  });
+  Future<ReadOutcome> checkCar() => _withVehicle(
+    (vehicle) => _exclusive((session, elm) async {
+      final car = await _askCar(elm);
+      _update(
+        (live) => live.copyWith(
+          carState: car.carState,
+          supportedPids: car.supportedPids,
+        ),
+      );
+      return VehicleReading(vehicle, switch (car.carState) {
+        CarState.off => const CarSilent(),
+        final carState => CarAwake(carState),
+      });
+    }),
+  );
 
-  /// Reads the vehicle's chosen values.
-  Future<ReadOutcome> read() async {
-    final Vehicle vehicle;
-    switch (state) {
-      case SessionConnected(:final vehicleId):
-        final found = ref.read(vehicleProvider(vehicleId));
-        if (found == null) return const StepRefused(Refusal.vehicleRemoved);
-        vehicle = found;
-      case SessionIdle() || SessionConnecting():
-        return const StepRefused(Refusal.notConnected);
-    }
+  /// Reads the vehicle's chosen values. The vehicle, the values it sends
+  /// and its profile are worked out once, before the adapter is taken.
+  Future<ReadOutcome> read() => _withVehicle((vehicle) async {
     final log = ref.read(adapterLogProvider);
     final profile = await _profileFor(vehicle.id);
+    // With the profile loaded, its values are among the ones on offer.
+    final sent = ref.read(vehicleValuesProvider(vehicle.id))?.sent;
+    if (sent == null) return const StepRefused(Refusal.vehicleRemoved);
     final outcome = await _exclusive(
-      (session, elm) => readCar(
-        elm,
-        vehicle: vehicle,
-        profile: profile,
-        supportedPids: session.supportedPids,
+      (session, elm) async => VehicleReading(
+        vehicle,
+        await readCar(
+          elm,
+          keys: sent,
+          profile: profile,
+          modelYear: vehicle.modelYear,
+          supportedPids: session.supportedPids,
+        ),
       ),
     );
     switch (outcome) {
-      case StepDone(value: CarSilent()):
+      case StepDone(value: VehicleReading(reading: CarSilent())):
         // The ignition went off; the adapter is still there.
         log.note('Car stopped answering', warning: true);
         _update((live) => live.copyWith(carState: CarState.off));
-      case StepDone(value: CarAwake(:final carState)):
+      case StepDone(value: VehicleReading(reading: CarAwake(:final carState))):
         log.note('Nothing to send: the car reported none of the values');
         _update((live) => live.copyWith(carState: carState));
-      case StepDone(value: CarAnswered(:final values, :final carState)):
+      case StepDone(
+        value: VehicleReading(
+          reading: CarAnswered(:final values, :final carState),
+        ),
+      ):
         values.forEach(log.value);
         _update((live) => live.copyWith(carState: carState));
       case StepRefused() || StepFailed():
         break;
     }
     return outcome;
+  });
+
+  /// Runs [ask] for the vehicle the session is connected to, or says why
+  /// there's none to ask for.
+  Future<ReadOutcome> _withVehicle(
+    Future<ReadOutcome> Function(Vehicle vehicle) ask,
+  ) async {
+    final vehicleId = switch (state) {
+      SessionConnected(:final vehicleId) => vehicleId,
+      SessionIdle() || SessionConnecting() => null,
+    };
+    if (vehicleId == null) return const StepRefused(Refusal.notConnected);
+    final vehicle = ref.read(vehicleProvider(vehicleId));
+    if (vehicle == null) return const StepRefused(Refusal.vehicleRemoved);
+    return ask(vehicle);
   }
 
   /// The vehicle's profile, if it loaded. One that can't be read reads
@@ -350,8 +379,8 @@ class SessionController extends Notifier<SessionState> {
   }
 
   /// Asks the car which standard values it supports, which also shows
-  /// whether it answers. Off, it keeps no supported values.
-  Future<({CarState carState, Set<int>? supportedPids})> _askCar(
+  /// whether it answers. Off, it supports none.
+  Future<({CarState carState, Set<int> supportedPids})> _askCar(
     Elm327 elm,
   ) async {
     final log = ref.read(adapterLogProvider);
@@ -362,7 +391,7 @@ class SessionController extends Notifier<SessionState> {
     } on ElmException catch (e) {
       if (e.error != ElmError.unableToConnect) rethrow;
       log.note('Car didn\'t answer: ignition off?', warning: true);
-      return (carState: CarState.off, supportedPids: null);
+      return (carState: CarState.off, supportedPids: const <int>{});
     }
   }
 

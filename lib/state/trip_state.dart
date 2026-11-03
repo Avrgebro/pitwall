@@ -316,11 +316,11 @@ class TripController extends Notifier<TripState> {
           return TripEnd.noVehicle;
         case StepRefused() || StepFailed():
           lost = true;
-        case StepDone(value: CarSilent()):
+        case StepDone(value: VehicleReading(reading: CarSilent())):
           silent = true;
-        case StepDone(value: CarAwake()):
+        case StepDone(value: VehicleReading(reading: CarAwake())):
           silent = false;
-        case StepDone(value: CarAnswered()):
+        case StepDone(value: VehicleReading(reading: CarAnswered())):
           silent = false;
           quietSince = null;
           run.sentReadings = true;

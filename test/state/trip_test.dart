@@ -9,7 +9,6 @@ import 'package:http/testing.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
-import 'package:pitwall/core/session/car_reading.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_notification_text.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
@@ -229,7 +228,7 @@ void main() {
     expect(c.read(sessionProvider), isA<SessionConnected>());
     expect((c.read(sessionProvider) as SessionConnected).busy, isFalse);
     lastValues.failing = false;
-    expect(await readings.readAndKeep(), isA<StepDone<CarReading>>());
+    expect(await readings.readAndKeep(), isA<StepDone<VehicleReading>>());
     await session.disconnect();
   });
 
@@ -456,7 +455,7 @@ void main() {
 
     final outcome = await c.read(readingKeeperProvider).readAndKeep();
 
-    expect(outcome, isA<StepDone<CarReading>>());
+    expect(outcome, isA<StepDone<VehicleReading>>());
     await until(() => received.isNotEmpty, 'the reading to be posted');
     expect(lastValues.saved.of(_tucson.id), isNotEmpty);
     server.complete(http.Response('', 200));

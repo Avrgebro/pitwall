@@ -6,7 +6,6 @@ import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 import 'last_values_state.dart';
 import 'session_state.dart';
-import 'settings_state.dart';
 
 final readingKeeperProvider = Provider<ReadingKeeper>(ReadingKeeper.new);
 
@@ -23,13 +22,10 @@ class ReadingKeeper {
   /// failing disk can't hold it.
   Future<ReadOutcome> readAndKeep() async {
     final outcome = await _ref.read(sessionProvider.notifier).read();
-    if ((outcome, _ref.read(sessionProvider)) case (
-      StepDone(value: final CarAnswered reading),
-      SessionConnected(:final vehicleId),
+    if (outcome case StepDone(
+      value: VehicleReading(:final vehicle, reading: final CarAnswered reading),
     )) {
-      if (_ref.read(vehicleProvider(vehicleId)) case final vehicle?) {
-        await _keep(vehicle, reading);
-      }
+      await _keep(vehicle, reading);
     }
     return outcome;
   }

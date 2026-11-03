@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
-import 'package:pitwall/core/session/car_reading.dart';
+import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/infrastructure.dart';
@@ -94,7 +94,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await session.disconnect();
 
-    expect(await reading, isA<StepFailed<CarReading>>());
+    expect(await reading, isA<StepFailed<VehicleReading>>());
     expect(c.read(sessionProvider), isA<SessionIdle>());
     expect((c.read(sessionProvider) as SessionIdle).problem, isNull);
     expect(
@@ -118,6 +118,43 @@ void main() {
     final live = c.read(sessionProvider);
     expect(live, isA<SessionConnected>());
     expect((live as SessionConnected).busy, isFalse);
-    expect(await session.read(), isA<StepDone<CarReading>>());
+    expect(await session.read(), isA<StepDone<VehicleReading>>());
+  });
+
+  test('once the car is off, it supports no values', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+    // It answers with some values supported, and no further ranges.
+    adapters.single.replies['0100'] = '4100BE3EB810';
+    await session.checkCar();
+    expect(
+      (c.read(sessionProvider) as SessionConnected).supportedPids,
+      isNotEmpty,
+    );
+    adapters.single.replies['0100'] = 'SEARCHING...\rUNABLE TO CONNECT';
+
+    await session.checkCar();
+
+    final live = c.read(sessionProvider) as SessionConnected;
+    expect(live.carState, CarState.off);
+    expect(live.supportedPids, isEmpty);
+  });
+
+  test('a reading says which vehicle it was for', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+
+    final outcome = await session.read();
+
+    expect(
+      outcome,
+      isA<StepDone<VehicleReading>>().having(
+        (o) => o.value.vehicle.id,
+        'vehicle',
+        'tucson',
+      ),
+    );
   });
 }
