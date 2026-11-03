@@ -20,6 +20,10 @@ abstract final class Insets {
 
   /// Padding inside cards and grouped lists.
   static const card = EdgeInsets.all(l);
+
+  /// The gap between segments of a group, which lets the surface show
+  /// through as a hairline.
+  static const double segment = 3;
 }
 
 /// Corner radii.
@@ -41,10 +45,6 @@ abstract final class Corners {
   static const double segment = small - 2;
 }
 
-/// The gap between segments of a group, which lets the surface show
-/// through as a hairline.
-const double segmentGap = 3;
-
 /// Fixed sizes shared by several components.
 abstract final class Sizes {
   static const double iconSmall = 18;
@@ -58,3 +58,6 @@ abstract final class Sizes {
   /// toolbar height.
   static const double floatingControl = 64;
 }
+
+/// How faint a disabled control is: Material's 38%.
+const double disabledOpacity = 0.38;

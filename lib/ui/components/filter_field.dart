@@ -32,8 +32,6 @@ class FilterField extends StatelessWidget {
   final ValueChanged<TextQuery> onChanged;
   final bool autoFocus;
 
-  static const _radius = BorderRadius.all(Radius.circular(28));
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -43,7 +41,7 @@ class FilterField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GlassSurface(
-          borderRadius: _radius,
+          borderRadius: Corners.heroRadius,
           child: SearchBar(
             hintText: hintText,
             leading: const Icon(Symbols.search_rounded),

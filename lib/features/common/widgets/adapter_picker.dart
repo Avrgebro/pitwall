@@ -156,7 +156,9 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (devices.length > AdapterPicker.filterAbove) ...[
+        // Kept while a filter is set, so what filters the list stays in
+        // view and can be cleared.
+        if (devices.length > AdapterPicker.filterAbove || !_query.isEmpty) ...[
           FilterField(
             hintText: 'Filter by name or address',
             noun: 'devices',

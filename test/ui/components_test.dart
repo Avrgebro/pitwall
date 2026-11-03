@@ -331,4 +331,51 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isA<StateError>());
   });
+
+  testWidgets('plain text and icons on tinted glass take the tint', (
+    tester,
+  ) async {
+    final theme = AppTheme.light();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: const Scaffold(
+          body: GlassSurface(
+            tone: StatusTone.error,
+            child: Column(
+              children: [
+                Text('Plain'),
+                Icon(Icons.error_outline),
+                _BodyMedium(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tint = theme.extension<StatusColors>()!.error.onContainer;
+    Color? colorOf(String text) => tester
+        .widget<RichText>(
+          find.descendant(of: find.text(text), matching: find.byType(RichText)),
+        )
+        .text
+        .style
+        ?.color;
+    expect(colorOf('Plain'), tint);
+    expect(colorOf('Body'), tint);
+    expect(
+      IconTheme.of(tester.element(find.byIcon(Icons.error_outline))).color,
+      tint,
+    );
+  });
+}
+
+/// Text in the theme's body style, with no colour of its own.
+class _BodyMedium extends StatelessWidget {
+  const _BodyMedium();
+
+  @override
+  Widget build(BuildContext context) =>
+      Text('Body', style: Theme.of(context).textTheme.bodyMedium);
 }

@@ -38,7 +38,6 @@ class ButtonGroup extends StatelessWidget {
 
   static const _height = 48.0;
   static const _iconWidth = 64.0;
-  static const _gap = segmentGap;
   static const _outer = Radius.circular(_height / 2);
   static const _inner = Radius.circular(Corners.segment);
 
@@ -51,7 +50,7 @@ class ButtonGroup extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i <= last; i++) ...[
-            if (i > 0) const SizedBox(width: _gap),
+            if (i > 0) const SizedBox(width: Insets.segment),
             if (buttons[i].label == null)
               SizedBox(
                 width: _iconWidth,
@@ -76,7 +75,7 @@ class ButtonGroup extends StatelessWidget {
     final enabled = button.onPressed != null;
     final color =
         (tone == null ? theme.colorScheme.onSurface : context.tone(tone).accent)
-            .withValues(alpha: enabled ? 1 : 0.38);
+            .withValues(alpha: enabled ? 1 : disabledOpacity);
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.horizontal(
         left: first ? _outer : _inner,

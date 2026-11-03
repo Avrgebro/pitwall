@@ -11,7 +11,6 @@ class RowGroup extends StatelessWidget {
 
   final List<Widget> children;
 
-  static const _gap = segmentGap;
   static const _outer = Radius.circular(Corners.extraLarge);
   static const _inner = Radius.circular(Corners.segment);
 
@@ -31,7 +30,7 @@ class RowGroup extends StatelessWidget {
       bottom: index == count - 1 ? _outer : _inner,
     );
     return Padding(
-      padding: EdgeInsets.only(top: index == 0 ? 0 : _gap),
+      padding: EdgeInsets.only(top: index == 0 ? 0 : Insets.segment),
       child: GlassSurface(
         borderRadius: borderRadius,
         child: RowSegment(borderRadius: borderRadius, child: child),

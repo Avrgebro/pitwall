@@ -2,6 +2,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'status_colors.dart';
+
 /// Colours for the frosted look: the soft glows behind pages and the
 /// translucent fill and light edge of cards on top of them.
 @immutable
@@ -57,6 +59,9 @@ class GlassColors extends ThemeExtension<GlassColors> {
   /// A faint layer over a card, neutral or tinted, for panels and segments
   /// set into it.
   final Color panel;
+
+  /// Glass tinted in a tone: its container colour at [tintOpacity].
+  Color tint(ToneColors tone) => tone.container.withValues(alpha: tintOpacity);
 
   /// A thin edge that catches the light, outlining the card.
   final Color edge;

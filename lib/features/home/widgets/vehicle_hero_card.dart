@@ -35,7 +35,6 @@ class _HeroContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final foreground = theme.colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.all(Insets.lPlus),
       child: Column(
@@ -43,13 +42,10 @@ class _HeroContent extends StatelessWidget {
         children: [
           _chip(),
           const SizedBox(height: Insets.l),
-          _title(theme.textTheme.displaySmall?.copyWith(color: foreground)),
+          _title(theme.textTheme.displaySmall),
           if (model.subtitle case final subtitle?) ...[
             const SizedBox(height: Insets.xs),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyLarge?.copyWith(color: foreground),
-            ),
+            Text(subtitle, style: theme.textTheme.bodyLarge),
           ],
           const SizedBox(height: Insets.l),
           DetailRows(

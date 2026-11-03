@@ -31,26 +31,29 @@ class GlassSurface extends StatelessWidget {
     final glass = context.glass;
     final tone = this.tone;
     final colors = tone == null ? null : context.tone(tone);
+    final surface = Material(
+      color: colors == null ? glass.fill : glass.tint(colors),
+      shape: RoundedRectangleBorder(
+        borderRadius: borderRadius,
+        side: BorderSide(color: glass.edge),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter.grouped(
         // Shared by all cards: grouped blurs must use the same filter.
         filter: GlassFilters.card,
-        child: Material(
-          color:
-              colors?.container.withValues(alpha: glass.tintOpacity) ??
-              glass.fill,
-          shape: RoundedRectangleBorder(
-            borderRadius: borderRadius,
-            side: BorderSide(color: glass.edge),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: colors == null ? child : _tinted(context, colors, child),
-        ),
+        // The Material inside the tint, so the text and icon colours it
+        // sets come from it too.
+        child: colors == null ? surface : _tinted(context, colors, surface),
       ),
     );
   }
 
+  /// The one source of the tint: the colours, text styles and icons of the
+  /// theme inside, which whatever sits on the glass reads.
   static Widget _tinted(BuildContext context, ToneColors colors, Widget child) {
     final theme = Theme.of(context);
     final strong = colors.onContainer;
@@ -66,14 +69,9 @@ class GlassSurface extends StatelessWidget {
           bodyColor: strong,
           displayColor: strong,
         ),
+        iconTheme: theme.iconTheme.copyWith(color: strong),
       ),
-      child: DefaultTextStyle.merge(
-        style: TextStyle(color: strong),
-        child: IconTheme.merge(
-          data: IconThemeData(color: strong),
-          child: child,
-        ),
-      ),
+      child: child,
     );
   }
 }

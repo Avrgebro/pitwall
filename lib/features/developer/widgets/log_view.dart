@@ -16,10 +16,7 @@ class LogView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final mono = theme.textTheme.mono.copyWith(
-      color: scheme.onSurface,
-      height: 1.6,
-    );
+    final mono = theme.textTheme.mono.copyWith(height: 1.6);
     final muted = scheme.onSurfaceVariant;
     final command = scheme.primary;
     final warning = context.tone(StatusTone.warning).accent;
