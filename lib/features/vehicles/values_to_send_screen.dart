@@ -49,8 +49,8 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       values.options,
       category: category,
       query: _query,
+      profileOpen: _showProfile,
     );
-    final profileOpen = view.profileForcedOpen || _showProfile;
     final profileToggle = DisclosureGroup(
       open: _showProfile,
       icon: Symbols.manage_search_rounded,
@@ -125,11 +125,11 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                   'Profile signals',
                   trailing: _profileLabel(vehicle),
                 ),
-                if (!view.profileForcedOpen) profileToggle,
+                if (view.profileList.showsToggle) profileToggle,
               ],
             ],
           ),
-          if (view.profile.isNotEmpty && profileOpen)
+          if (view.profile.isNotEmpty && view.profileList.showsList)
             SliverRowGroup(
               itemCount: view.profile.length,
               itemBuilder: (context, index) => row(view.profile[index]),

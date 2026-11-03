@@ -114,10 +114,13 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     // Kept open while filtering, when nothing suits, or when the chosen
     // device is among them, so the choice is never hidden. Otherwise the
     // user opens and closes them.
-    final othersForcedOpen =
-        !_query.isEmpty ||
-        suited.isEmpty ||
-        others.any((d) => d.address == widget.selectedAddress);
+    final othersList = Disclosure(
+      forced:
+          !_query.isEmpty ||
+          suited.isEmpty ||
+          others.any((d) => d.address == widget.selectedAddress),
+      open: _showOthers,
+    );
     final othersToggle = DisclosureGroup(
       open: _showOthers,
       icon: Symbols.devices_other_rounded,
@@ -166,10 +169,9 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
         if (suited.isNotEmpty) group(suited),
         if (others.isNotEmpty && suited.isNotEmpty) ...[
           const SectionHeader('Other devices'),
-          if (!othersForcedOpen) othersToggle,
+          if (othersList.showsToggle) othersToggle,
         ],
-        if (others.isNotEmpty && (othersForcedOpen || _showOthers))
-          group(others),
+        if (others.isNotEmpty && othersList.showsList) group(others),
       ],
     );
   }

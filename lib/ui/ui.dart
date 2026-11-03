@@ -8,6 +8,7 @@ export 'components/button_group.dart';
 export 'components/card_header.dart';
 export 'components/content_card.dart';
 export 'components/detail_rows.dart';
+export 'components/disclosure.dart';
 export 'components/disclosure_group.dart';
 export 'components/expandable_row.dart';
 export 'components/floating_nav_bar.dart';

@@ -23,14 +23,16 @@ void main() {
     final view = ValuesView.of(_all);
     expect(view.standard, [_speed]);
     expect(view.profile, [_fuel, _tyre]);
-    expect(view.profileForcedOpen, isFalse);
+    expect(view.profileList.showsToggle, isTrue);
+    expect(view.profileList.showsList, isFalse);
   });
 
   test('a search narrows both lists and opens the profile ones', () {
     final view = ValuesView.of(_all, query: TextQuery('FUEL'));
     expect(view.standard, isEmpty);
     expect(view.profile, [_fuel]);
-    expect(view.profileForcedOpen, isTrue);
+    expect(view.profileList.showsToggle, isFalse);
+    expect(view.profileList.showsList, isTrue);
   });
 
   test('a search matches payload keys too', () {
@@ -41,7 +43,8 @@ void main() {
     final view = ValuesView.of(_all, category: 'Tires');
     expect(view.options, [_tyre]);
     expect(view.standard, isEmpty);
-    expect(view.profileForcedOpen, isTrue);
+    expect(view.profileList.showsToggle, isFalse);
+    expect(view.profileList.showsList, isTrue);
     expect(view.sentCount({'tucson_tp_fl', 'speed_kmh'}), 1);
   });
 }

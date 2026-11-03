@@ -1,14 +1,17 @@
 import '../../core/format/text_query.dart';
 import '../../core/readings/readings.dart';
+import '../../ui/components/disclosure.dart';
 
 /// What the values page lists: the values in reach, split by where they
 /// come from, narrowed by the search.
 class ValuesView {
-  /// [category] keeps only the profile values OBDb files under it.
+  /// [category] keeps only the profile values OBDb files under it, and
+  /// [profileOpen] is whether the user opened the profile values.
   factory ValuesView.of(
     List<ValueOption> all, {
     String? category,
     TextQuery query = TextQuery.none,
+    bool profileOpen = false,
   }) {
     final options = category == null
         ? all
@@ -32,7 +35,10 @@ class ValuesView {
       ],
       // Matches are what was searched for, and a category is what was
       // asked for, so neither waits to be opened.
-      profileForcedOpen: !query.isEmpty || category != null,
+      profileList: Disclosure(
+        forced: !query.isEmpty || category != null,
+        open: profileOpen,
+      ),
     );
   }
 
@@ -40,7 +46,7 @@ class ValuesView {
     required this.options,
     required this.standard,
     required this.profile,
-    required this.profileForcedOpen,
+    required this.profileList,
   });
 
   /// Every value in reach, before the search.
@@ -52,8 +58,8 @@ class ValuesView {
   /// The profile values to list.
   final List<ValueOption> profile;
 
-  /// Whether the profile values list with no row to fold them away.
-  final bool profileForcedOpen;
+  /// Whether the profile values list, and whether a row folds them.
+  final Disclosure profileList;
 
   int sentCount(Set<String> sent) =>
       options.where((o) => sent.contains(o.key)).length;
