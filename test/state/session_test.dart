@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/infrastructure.dart';
 import 'package:pitwall/state/session_state.dart';
@@ -32,8 +33,11 @@ class _Adapter extends FakeTransport implements ClosableTransport {
 const _tucson = Vehicle(
   id: 'tucson',
   name: 'Tucson',
-  adapterAddress: '00:1D:A5:68:98:8B',
-  adapterName: 'vLinker MC+',
+  adapter: VehicleAdapter(
+    address: '00:1D:A5:68:98:8B',
+    name: 'vLinker MC+',
+    type: AdapterType.classic,
+  ),
 );
 
 void main() {

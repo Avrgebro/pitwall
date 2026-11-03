@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/readings/readings.dart';
 import 'package:pitwall/core/session/car_state.dart';
@@ -14,7 +15,11 @@ void main() {
   final vehicle = Vehicle(
     id: 'tucson',
     name: 'Tucson',
-    adapterName: 'vLinker MC+',
+    adapter: const VehicleAdapter(
+      address: '00:1D:A5:68:98:8B',
+      name: 'vLinker MC+',
+      type: AdapterType.classic,
+    ),
     lastSeen: DateTime(2026, 10, 31, 8, 24),
   );
   const settings = AppSettings();

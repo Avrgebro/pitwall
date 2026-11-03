@@ -17,8 +17,11 @@ import '../helpers/fakes.dart';
 const _tucson = Vehicle(
   id: 'tucson',
   name: 'Tucson',
-  adapterAddress: '00:1D:A5:68:98:8B',
-  adapterName: 'vLinker MC+',
+  adapter: VehicleAdapter(
+    address: '00:1D:A5:68:98:8B',
+    name: 'vLinker MC+',
+    type: AdapterType.classic,
+  ),
 );
 
 Future<void> _pumpApp(
@@ -159,8 +162,7 @@ void main() {
           Vehicle(
             id: 'tucson',
             name: 'Tucson',
-            headUnitAddress: 'AA',
-            headUnitName: 'T',
+            headUnit: HeadUnit(address: 'AA', name: 'T'),
           ),
         ],
         setupDone: true,
@@ -178,7 +180,11 @@ void main() {
     await _pumpApp(
       tester,
       settings: AppSettings(
-        vehicles: [_tucson.copyWith(headUnitAddress: 'AA', headUnitName: 'T')],
+        vehicles: [
+          _tucson.copyWith(
+            headUnit: HeadUnit(address: 'AA', name: 'T'),
+          ),
+        ],
         setupDone: true,
       ),
     );
@@ -405,7 +411,15 @@ void main() {
         settings: AppSettings(
           vehicles: [
             _tucson.copyWith(lastSeen: DateTime(2026, 11, 1)),
-            const Vehicle(id: 'mazda', name: 'Mazda', adapterAddress: 'BB'),
+            const Vehicle(
+              id: 'mazda',
+              name: 'Mazda',
+              adapter: VehicleAdapter(
+                address: 'BB',
+                name: 'BB',
+                type: AdapterType.classic,
+              ),
+            ),
           ],
           setupDone: true,
         ),
@@ -504,8 +518,11 @@ void main() {
           const Vehicle(
             id: 'mazda',
             name: 'Mazda',
-            adapterAddress: 'BB',
-            adapterName: 'Mazda OBD',
+            adapter: VehicleAdapter(
+              address: 'BB',
+              name: 'Mazda OBD',
+              type: AdapterType.classic,
+            ),
           ),
         ],
         setupDone: true,
@@ -543,8 +560,11 @@ void main() {
           const Vehicle(
             id: 'mazda',
             name: 'Mazda',
-            adapterAddress: 'BB',
-            adapterName: 'Mazda OBD',
+            adapter: VehicleAdapter(
+              address: 'BB',
+              name: 'Mazda OBD',
+              type: AdapterType.classic,
+            ),
           ),
         ],
         setupDone: true,
@@ -609,8 +629,8 @@ void main() {
       settings: AppSettings(
         vehicles: [
           _tucson.copyWith(
-            headUnitAddress: 'AA',
-            headUnitName: 'T',
+            headUnit: HeadUnit(address: 'AA', name: 'T'),
+
             lastSeen: testNow.subtract(const Duration(hours: 2)),
           ),
         ],
@@ -630,7 +650,12 @@ void main() {
       tester,
       settings: AppSettings(
         // The vehicle says it has a profile, but there's no file for it.
-        vehicles: [_tucson.copyWith(profile: const ProfileRef('default.json'))],
+        vehicles: [
+          _tucson.withProfile(
+            const ProfileRef('default.json'),
+            modelYear: null,
+          ),
+        ],
         setupDone: true,
       ),
     );

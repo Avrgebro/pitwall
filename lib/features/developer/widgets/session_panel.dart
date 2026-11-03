@@ -65,7 +65,7 @@ class SessionPanel extends ConsumerWidget {
           tone: StatusTone.active,
           icon: Symbols.bluetooth_searching_rounded,
         ),
-        'Talking to ${vehicle?.adapterName ?? 'the adapter'}…',
+        'Talking to ${vehicle?.adapter?.name ?? 'the adapter'}…',
       ),
       SessionIdle(:final problem) => (
         const StatusChip(
@@ -79,7 +79,7 @@ class SessionPanel extends ConsumerWidget {
           _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
           final vehicle =>
             problem?.label ??
-                'Connect to ${vehicle.adapterName} to read by hand.',
+                'Connect to ${vehicle.adapter?.name} to read by hand.',
         },
       ),
     };
@@ -216,7 +216,7 @@ class _VehicleLine extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(vehicle.name, style: theme.textTheme.titleMedium),
-              if (vehicle.adapterName case final adapter?)
+              if (vehicle.adapter?.name case final adapter?)
                 Text(
                   adapter,
                   style: theme.textTheme.bodySmall?.copyWith(

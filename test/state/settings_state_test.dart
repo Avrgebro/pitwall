@@ -26,8 +26,10 @@ void main() {
             Vehicle(
               id: 'tucson',
               name: 'Tucson',
-              headUnitAddress: 'AA:BB:CC:DD:EE:FF',
-              headUnitName: 'TUCSON BT',
+              headUnit: HeadUnit(
+                address: 'AA:BB:CC:DD:EE:FF',
+                name: 'TUCSON BT',
+              ),
             ),
             Vehicle(id: 'mazda', name: 'Mazda'),
           ],
@@ -58,7 +60,8 @@ void main() {
           .read(appSettingsProvider)
           .value!
           .vehicleById('mazda')!
-          .headUnitAddress,
+          .headUnit
+          ?.address,
       isNull,
     );
   });
@@ -89,9 +92,9 @@ void main() {
       final saved = container.read(appSettingsProvider).value!.vehicles.single;
       expect(saved.id, added.id);
       expect(saved.name, 'Tucson');
-      expect(saved.adapterAddress, vlinker.address);
-      expect(saved.adapterName, vlinker.name);
-      expect(saved.adapterType, AdapterType.classic);
+      expect(saved.adapter?.address, vlinker.address);
+      expect(saved.adapter?.name, vlinker.name);
+      expect(saved.adapter?.type, AdapterType.classic);
     });
 
     test('the adapter keeps how it connects', () async {
@@ -109,7 +112,13 @@ void main() {
           );
 
       expect(
-        container.read(appSettingsProvider).value!.vehicles.single.adapterType,
+        container
+            .read(appSettingsProvider)
+            .value!
+            .vehicles
+            .single
+            .adapter
+            ?.type,
         AdapterType.ble,
       );
     });
@@ -121,9 +130,13 @@ void main() {
             Vehicle(
               id: 'tucson',
               name: 'Tucson',
-              adapterAddress: 'AA',
-              adapterName: 'Old',
-              headUnitAddress: 'BB',
+              adapter: VehicleAdapter(
+                address: 'AA',
+                name: 'Old',
+                type: AdapterType.classic,
+              ),
+
+              headUnit: HeadUnit(address: 'BB', name: 'BB'),
             ),
           ],
         ),
@@ -134,10 +147,10 @@ void main() {
           .setAdapter('tucson', vlinker);
 
       final saved = container.read(appSettingsProvider).value!.vehicles.single;
-      expect(saved.adapterAddress, vlinker.address);
-      expect(saved.adapterName, vlinker.name);
+      expect(saved.adapter?.address, vlinker.address);
+      expect(saved.adapter?.name, vlinker.name);
       expect(saved.name, 'Tucson');
-      expect(saved.headUnitAddress, 'BB');
+      expect(saved.headUnit?.address, 'BB');
     });
   });
 

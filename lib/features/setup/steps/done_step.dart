@@ -63,7 +63,7 @@ class DoneStep extends ConsumerWidget {
               SummaryRow(
                 icon: Symbols.bluetooth_rounded,
                 label: 'Adapter',
-                value: vehicle?.adapterName ?? 'Not chosen yet',
+                value: vehicle?.adapter?.name ?? 'Not chosen yet',
               ),
               SummaryRow(
                 icon: Symbols.webhook_rounded,

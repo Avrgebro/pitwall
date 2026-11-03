@@ -90,9 +90,11 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// The one place a device becomes a vehicle's adapter.
   static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
       vehicle.copyWith(
-        adapterAddress: adapter.address,
-        adapterName: adapter.name,
-        adapterType: adapter.type,
+        adapter: VehicleAdapter(
+          address: adapter.address,
+          name: adapter.name,
+          type: adapter.type,
+        ),
       );
 
   /// Removes the vehicle and its profile file; its last values follow.
@@ -137,8 +139,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
       vehicleId,
       (v) => v.copyWith(
         tripStart: TripStart.carBluetooth,
-        headUnitAddress: address,
-        headUnitName: name,
+        headUnit: HeadUnit(address: address, name: name),
       ),
     );
   }
@@ -163,11 +164,11 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// Makes [keys] the values the vehicle sends; see
   /// [VehicleValues.withSent].
   Future<void> setSentValues(String vehicleId, Set<String> keys) =>
-      _modifyVehicle(vehicleId, (v) => v.copyWith(selectedKeys: keys));
+      _modifyVehicle(vehicleId, (v) => v.withSelectedKeys(keys));
 
   /// Goes back to sending the standard values.
   Future<void> resetValues(String vehicleId) =>
-      _modifyVehicle(vehicleId, (v) => v.copyWith(selectedKeys: null));
+      _modifyVehicle(vehicleId, (v) => v.withSelectedKeys(null));
 
   /// Puts back [profile] after it was removed, with the model year it
   /// had. Does nothing once the vehicle has another profile, so Undo can't
@@ -209,7 +210,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     }
     await _modifyVehicle(
       vehicleId,
-      (v) => v.copyWith(profile: profile?.ref, modelYear: modelYear),
+      (v) => v.withProfile(profile?.ref, modelYear: modelYear),
     );
     if (profile == null) await store.deleteProfile(vehicleId);
   }

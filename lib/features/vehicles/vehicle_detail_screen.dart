@@ -100,11 +100,10 @@ class VehicleDetailScreen extends ConsumerWidget {
     );
   }
 
-  static String _adapterSummary(Vehicle vehicle) =>
-      switch (vehicle.adapterName) {
-        null => 'Not chosen yet',
-        final name => '$name (${vehicle.adapterType.label})',
-      };
+  static String _adapterSummary(Vehicle vehicle) => switch (vehicle.adapter) {
+    null => 'Not chosen yet',
+    final adapter => '${adapter.name} (${adapter.type.label})',
+  };
 
   static ({String text, bool problem}) _profileSummary(VehicleValues values) =>
       switch ((values.stored, values.profile)) {

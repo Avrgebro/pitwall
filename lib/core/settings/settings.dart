@@ -33,7 +33,7 @@ class AppSettings {
 
   /// The vehicle whose adapter has [address], if any.
   Vehicle? vehicleForAdapter(String address) =>
-      vehicles.where((v) => v.adapterAddress == address).firstOrNull;
+      vehicles.where((v) => v.adapter?.address == address).firstOrNull;
 
   /// The vehicle whose trips start when the head unit at [address]
   /// connects, if any.
@@ -44,7 +44,7 @@ class AppSettings {
   /// The vehicle the head unit at [address] belongs to, whatever starts its
   /// trips. A head unit belongs to one vehicle at most.
   Vehicle? headUnitOwner(String address) => vehicles
-      .where((v) => _sameAddress(v.headUnitAddress, address))
+      .where((v) => _sameAddress(v.headUnit?.address, address))
       .firstOrNull;
 
   /// The vehicle other than [vehicleId] the head unit at [address] belongs
@@ -82,7 +82,7 @@ class AppSettings {
     VehicleTarget(:final id) => [?vehicleById(id)],
     // The car seen most recently is the likeliest to be this one.
     AnyVehicleTarget() => [...vehicles]..sort(_mostRecentFirst),
-  }.where((v) => v.adapterAddress != null).toList();
+  }.where((v) => v.adapter != null).toList();
 
   static int _mostRecentFirst(Vehicle a, Vehicle b) {
     final seenA = a.lastSeen, seenB = b.lastSeen;

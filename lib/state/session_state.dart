@@ -212,7 +212,7 @@ class SessionController extends Notifier<SessionState> {
       case SessionIdle():
         break;
     }
-    final address = vehicle.adapterAddress;
+    final address = vehicle.adapter?.address;
     if (address == null) return const StepRefused(Refusal.noAdapter);
     final connecting = SessionConnecting(vehicle.id);
     state = connecting;

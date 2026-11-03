@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../bluetooth/adapter_type.dart';
 import '../profiles/profile_ref.dart';
 import 'device_id.dart';
@@ -29,18 +31,58 @@ enum VehicleNeed {
   bool get isTripStart => this != adapter;
 }
 
+/// The vehicle's OBD adapter: its Bluetooth address, the name the phone
+/// knows it by, and how the phone talks to it.
+@immutable
+class VehicleAdapter {
+  const VehicleAdapter({
+    required this.address,
+    required this.name,
+    required this.type,
+  });
+
+  final String address;
+  final String name;
+  final AdapterType type;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VehicleAdapter &&
+      other.address == address &&
+      other.name == name &&
+      other.type == type;
+
+  @override
+  int get hashCode => Object.hash(address, name, type);
+}
+
+/// The car's own Bluetooth (its head unit), whose connection can start
+/// the vehicle's trips.
+@immutable
+class HeadUnit {
+  const HeadUnit({required this.address, required this.name});
+
+  final String address;
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is HeadUnit && other.address == address && other.name == name;
+
+  @override
+  int get hashCode => Object.hash(address, name);
+}
+
 /// One car: its adapter, the name sent in payloads, what starts its trips,
 /// its optional OBDb profile and the values to send.
+@immutable
 class Vehicle {
   const Vehicle({
     required this.id,
     this.name = defaultName,
-    this.adapterAddress,
-    this.adapterName,
-    this.adapterType = AdapterType.classic,
+    this.adapter,
     this.tripStart = TripStart.carBluetooth,
-    this.headUnitAddress,
-    this.headUnitName,
+    this.headUnit,
     this.modelYear,
     this.selectedKeys,
     this.profile,
@@ -51,7 +93,8 @@ class Vehicle {
   factory Vehicle.create({String name = defaultName}) =>
       Vehicle(id: _newId(), name: name);
 
-  static const defaultName = 'my-car';
+  /// A name with nothing to make an id from gives the same `device`.
+  static const defaultName = fallbackDeviceId;
 
   /// Stable id, used to name the vehicle's profile file.
   final String id;
@@ -63,30 +106,24 @@ class Vehicle {
   /// cars apart. Derived from [name]; renaming the vehicle changes it.
   String get deviceId => deviceIdFor(name);
 
-  /// Bluetooth address of the vehicle's OBD adapter.
-  final String? adapterAddress;
-  final String? adapterName;
-  final AdapterType adapterType;
+  final VehicleAdapter? adapter;
 
   final TripStart tripStart;
 
-  /// The car's Bluetooth head unit, for [TripStart.carBluetooth].
-  final String? headUnitAddress;
-  final String? headUnitName;
+  /// The car's Bluetooth, for [TripStart.carBluetooth].
+  final HeadUnit? headUnit;
 
   /// The head unit whose connection starts this vehicle's trips, if its
   /// trips start that way and one is chosen.
   String? get startingHeadUnit =>
-      tripStart == TripStart.carBluetooth ? headUnitAddress : null;
+      tripStart == TripStart.carBluetooth ? headUnit?.address : null;
 
   /// What the vehicle lacks before it works on its own; empty when
   /// nothing does. The adapter comes first.
   List<VehicleNeed> get needs => [
-    if (adapterAddress == null) VehicleNeed.adapter,
+    if (adapter == null) VehicleNeed.adapter,
     ...switch (tripStart) {
-      TripStart.carBluetooth when headUnitAddress == null => [
-        VehicleNeed.headUnit,
-      ],
+      TripStart.carBluetooth when headUnit == null => [VehicleNeed.headUnit],
       TripStart.carBluetooth => const <VehicleNeed>[],
       TripStart.drivingDetection => [VehicleNeed.supportedTripStart],
     },
@@ -104,52 +141,65 @@ class Vehicle {
   /// When the vehicle's adapter last connected.
   final DateTime? lastSeen;
 
+  /// A copy with the given fields changed. What can be cleared has its own
+  /// method: [withProfile] and [withSelectedKeys].
   Vehicle copyWith({
     String? name,
-    Object? adapterAddress = _keep,
-    Object? adapterName = _keep,
-    AdapterType? adapterType,
+    VehicleAdapter? adapter,
     TripStart? tripStart,
-    Object? headUnitAddress = _keep,
-    Object? headUnitName = _keep,
-    Object? modelYear = _keep,
-    Object? selectedKeys = _keep,
-    Object? profile = _keep,
+    HeadUnit? headUnit,
+    int? modelYear,
     DateTime? lastSeen,
   }) => Vehicle(
     id: id,
     name: name ?? this.name,
-    adapterAddress: adapterAddress == _keep
-        ? this.adapterAddress
-        : adapterAddress as String?,
-    adapterName: adapterName == _keep
-        ? this.adapterName
-        : adapterName as String?,
-    adapterType: adapterType ?? this.adapterType,
+    adapter: adapter ?? this.adapter,
     tripStart: tripStart ?? this.tripStart,
-    headUnitAddress: headUnitAddress == _keep
-        ? this.headUnitAddress
-        : headUnitAddress as String?,
-    headUnitName: headUnitName == _keep
-        ? this.headUnitName
-        : headUnitName as String?,
-    modelYear: modelYear == _keep ? this.modelYear : modelYear as int?,
-    selectedKeys: selectedKeys == _keep
-        ? this.selectedKeys
-        : selectedKeys as Set<String>?,
-    profile: profile == _keep ? this.profile : profile as ProfileRef?,
+    headUnit: headUnit ?? this.headUnit,
+    modelYear: modelYear ?? this.modelYear,
+    selectedKeys: selectedKeys,
+    profile: profile,
     lastSeen: lastSeen ?? this.lastSeen,
   );
 
+  /// With [profile], or none, read for [modelYear], which only matters
+  /// with a profile.
+  Vehicle withProfile(ProfileRef? profile, {required int? modelYear}) =>
+      Vehicle(
+        id: id,
+        name: name,
+        adapter: adapter,
+        tripStart: tripStart,
+        headUnit: headUnit,
+        modelYear: modelYear,
+        selectedKeys: selectedKeys,
+        profile: profile,
+        lastSeen: lastSeen,
+      );
+
+  /// Sending [keys], or the default set with none.
+  Vehicle withSelectedKeys(Set<String>? keys) => Vehicle(
+    id: id,
+    name: name,
+    adapter: adapter,
+    tripStart: tripStart,
+    headUnit: headUnit,
+    modelYear: modelYear,
+    selectedKeys: keys,
+    profile: profile,
+    lastSeen: lastSeen,
+  );
+
+  /// The same keys as earlier versions, so saved vehicles keep loading.
   Map<String, Object?> toJson() => {
     'id': id,
     'name': name,
-    'adapterAddress': adapterAddress,
-    'adapterName': adapterName,
-    'adapterType': adapterType.name,
+    'adapterAddress': adapter?.address,
+    'adapterName': adapter?.name,
+    'adapterType': adapter?.type.name,
     'tripStart': tripStart.name,
-    'headUnitAddress': headUnitAddress,
-    'headUnitName': headUnitName,
+    'headUnitAddress': headUnit?.address,
+    'headUnitName': headUnit?.name,
     'modelYear': modelYear,
     'selectedKeys': selectedKeys?.toList()?..sort(),
     'profileName': profile?.name,
@@ -157,24 +207,34 @@ class Vehicle {
     'lastSeen': lastSeen?.toUtc().toIso8601String(),
   };
 
-  /// Tolerates missing or wrongly typed fields, falling back to defaults,
-  /// so older saved data keeps loading.
+  /// Tolerates missing or wrongly typed fields, falling back to defaults.
+  /// A device without a name goes by its address.
   factory Vehicle.fromJson(Map<String, Object?> json) => Vehicle(
     id: _string(json['id']) ?? _newId(),
     name: switch (json['name']) {
       final String name when name.isNotEmpty => name,
       _ => defaultName,
     },
-    adapterAddress: _string(json['adapterAddress']),
-    adapterName: _string(json['adapterName']),
-    adapterType:
-        AdapterType.values.asNameMap()[json['adapterType']] ??
-        AdapterType.classic,
+    adapter: switch (_string(json['adapterAddress'])) {
+      final address? => VehicleAdapter(
+        address: address,
+        name: _string(json['adapterName']) ?? address,
+        type:
+            AdapterType.values.asNameMap()[json['adapterType']] ??
+            AdapterType.classic,
+      ),
+      null => null,
+    },
     tripStart:
         TripStart.values.asNameMap()[json['tripStart']] ??
         TripStart.carBluetooth,
-    headUnitAddress: _string(json['headUnitAddress']),
-    headUnitName: _string(json['headUnitName']),
+    headUnit: switch (_string(json['headUnitAddress'])) {
+      final address? => HeadUnit(
+        address: address,
+        name: _string(json['headUnitName']) ?? address,
+      ),
+      null => null,
+    },
     modelYear: switch (json['modelYear']) {
       final num year => year.toInt(),
       _ => null,
@@ -201,8 +261,6 @@ class Vehicle {
     ).join();
   }
 }
-
-const _keep = Object();
 
 String? _string(Object? value) => value is String ? value : null;
 

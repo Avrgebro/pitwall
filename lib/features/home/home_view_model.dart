@@ -161,7 +161,7 @@ class HomeViewModel {
         null => 'Never',
       },
     );
-    final adapter = vehicle.adapterName ?? 'the adapter';
+    final adapter = vehicle.adapter?.name ?? 'the adapter';
     HeroModel connecting(String subtitle, {required String adapterState}) =>
         HeroModel(
           state: HeroState.connecting,

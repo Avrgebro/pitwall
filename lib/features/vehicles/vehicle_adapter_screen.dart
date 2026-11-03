@@ -22,7 +22,7 @@ class VehicleAdapterScreen extends ConsumerWidget {
         title: 'Adapter',
         children: [
           AdapterPicker(
-            selectedAddress: vehicle.adapterAddress,
+            selectedAddress: vehicle.adapter?.address,
             onSelected: (device) => ref
                 .read(appSettingsProvider.notifier)
                 .setAdapter(vehicle.id, device),

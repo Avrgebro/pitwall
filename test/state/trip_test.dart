@@ -13,6 +13,7 @@ import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_notification_text.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
@@ -52,19 +53,25 @@ const _mazdaStereo = '11:22:33:44:55:66';
 const _tucson = Vehicle(
   id: 'tucson',
   name: 'Hyundai Tucson',
-  adapterAddress: '00:1D:A5:68:98:8B',
-  adapterName: 'vLinker MC+',
-  headUnitAddress: _tucsonStereo,
-  headUnitName: 'TUCSON BT',
+  adapter: VehicleAdapter(
+    address: '00:1D:A5:68:98:8B',
+    name: 'vLinker MC+',
+    type: AdapterType.classic,
+  ),
+
+  headUnit: HeadUnit(address: _tucsonStereo, name: 'TUCSON BT'),
 );
 
 const _mazda = Vehicle(
   id: 'mazda',
   name: 'Mazda',
-  adapterAddress: '00:00:00:00:00:02',
-  adapterName: 'OBDII',
-  headUnitAddress: _mazdaStereo,
-  headUnitName: 'MAZDA',
+  adapter: VehicleAdapter(
+    address: '00:00:00:00:00:02',
+    name: 'OBDII',
+    type: AdapterType.classic,
+  ),
+
+  headUnit: HeadUnit(address: _mazdaStereo, name: 'MAZDA'),
 );
 
 const _fast = TripTiming(
@@ -199,7 +206,9 @@ void main() {
     final c = container(
       adapter: (_) => _Adapter(),
       // The vehicle says it has a profile, but there's no file for it.
-      vehicles: [_tucson.copyWith(profile: const ProfileRef('default.json'))],
+      vehicles: [
+        _tucson.withProfile(const ProfileRef('default.json'), modelYear: null),
+      ],
     );
     c.read(tripProvider);
 
@@ -332,7 +341,7 @@ void main() {
 
     service.send(const HeadUnitTarget(_mazdaStereo));
     expect((await running(c)).vehicleId, 'mazda');
-    expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
+    expect(bluetooth.connected.toSet(), {_mazda.adapter?.address});
     c.read(tripProvider.notifier).stop();
     await ended(c);
   });
@@ -364,7 +373,7 @@ void main() {
   test('a trip started from the app tries every vehicle', () async {
     final bluetooth = FakeBluetoothGateway(
       adapter: (address) =>
-          address == _mazda.adapterAddress ? _Adapter() : null,
+          address == _mazda.adapter?.address ? _Adapter() : null,
     );
     final c = container(
       vehicles: [
@@ -378,7 +387,7 @@ void main() {
     await c.read(tripProvider.notifier).startManually(const AnyVehicleTarget());
     expect((await running(c)).vehicleId, 'mazda');
     // The most recently seen car is tried first.
-    expect(bluetooth.connected.first, _tucson.adapterAddress);
+    expect(bluetooth.connected.first, _tucson.adapter?.address);
     c.read(tripProvider.notifier).stop();
     await ended(c);
   });
@@ -500,7 +509,7 @@ void main() {
         .startManually(const VehicleTarget('mazda'));
 
     expect((await running(c)).vehicleId, 'mazda');
-    expect(bluetooth.connected.toSet(), {_mazda.adapterAddress});
+    expect(bluetooth.connected.toSet(), {_mazda.adapter?.address});
     c.read(tripProvider.notifier).stop();
     await ended(c);
   });

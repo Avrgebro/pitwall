@@ -25,7 +25,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
 
   Widget _page(BuildContext context, WidgetRef ref, Vehicle vehicle) {
     final notifier = ref.read(appSettingsProvider.notifier);
-    final headUnit = vehicle.headUnitName;
+    final headUnit = vehicle.headUnit?.name;
 
     return AppPage(
       title: 'Trip start',
@@ -62,7 +62,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
                 title: headUnit ?? 'Not chosen yet',
                 subtitle: headUnit == null
                     ? 'Choose the car\'s stereo or hands-free system'
-                    : vehicle.headUnitAddress,
+                    : vehicle.headUnit?.address,
                 trailing: TextButton(
                   onPressed: () => chooseHeadUnit(context, ref, vehicle),
                   child: Text(headUnit == null ? 'Choose' : 'Change'),
@@ -97,7 +97,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
       builder: (context) => AdapterPicker(
         title: 'Paired devices',
         role: DeviceRole.headUnit,
-        selectedAddress: vehicle.headUnitAddress,
+        selectedAddress: vehicle.headUnit?.address,
         // Asked as the list shows, not from when the sheet opened.
         ownerOf: (address) => ref
             .read(appSettingsProvider)
