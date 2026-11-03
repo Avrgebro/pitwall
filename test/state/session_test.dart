@@ -161,4 +161,17 @@ void main() {
       ),
     );
   });
+
+  test('raw commands are split and sent as typed, in capitals', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+    adapters.single.replies['ATI'] = 'ELM327 v2.1';
+    adapters.single.replies['0100'] = '410000000000';
+
+    final outcome = await session.sendRaw(' ati, 0100 ');
+
+    expect(outcome, isA<StepDone<void>>());
+    expect(adapters.single.sent, containsAllInOrder(['ATI', '0100']));
+  });
 }

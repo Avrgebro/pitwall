@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../format/formatters.dart';
+import '../obd/elm327.dart';
+
 enum LogEntryKind {
   /// A command sent to the adapter and its reply.
   exchange,
@@ -35,6 +38,27 @@ class LogEntry {
 
   /// Something worth noticing, like `NO DATA` or a failed delivery.
   final bool warning;
+
+  /// The line, after its time: [lead] and, for exchanges, [trail]. Shown
+  /// and copied alike.
+  String get lead => switch (kind) {
+    LogEntryKind.exchange => '→ $text',
+    LogEntryKind.value => '= $text',
+    LogEntryKind.note => '- $text',
+    LogEntryKind.delivery => text,
+  };
+
+  /// The reply of an exchange, on one line: raw replies break lines
+  /// between modules.
+  String? get trail => switch (reply) {
+    final reply? =>
+      '← ${reply.replaceAll(RegExp(r'[\r\n]+'), ' ').replaceAll('>', '').trim()}',
+    null => null,
+  };
+
+  /// The whole line as plain text, for copying.
+  String toLine() =>
+      [Formatters.clockWithSeconds(time), lead, ?trail].join(' ');
 }
 
 /// Recent adapter and delivery activity, for the developer tools. Kept in
@@ -47,13 +71,15 @@ class AdapterLog {
   final DateTime Function() _clock;
   final entries = ValueNotifier<List<LogEntry>>(const []);
 
-  void exchange(String command, String reply) => _add(
+  /// One exchange with the adapter; a warning when the reply meant
+  /// [error], as the adapter code decided.
+  void exchange(String command, String reply, ElmError? error) => _add(
     LogEntry(
       time: _clock(),
       kind: LogEntryKind.exchange,
       text: command,
       reply: reply,
-      warning: reply.contains('NO DATA') || reply.contains('ERROR'),
+      warning: error != null,
     ),
   );
 
@@ -80,6 +106,9 @@ class AdapterLog {
   );
 
   void clear() => entries.value = const [];
+
+  /// Every entry as plain text, for copying.
+  String asText() => entries.value.map((entry) => entry.toLine()).join('\n');
 
   void dispose() => entries.dispose();
 

@@ -7,6 +7,7 @@ import '../../../core/trips/trip_target.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../core/platform/permission_gateway.dart';
 import '../../../state/infrastructure.dart';
+import '../../../state/manual_controls.dart';
 import '../../../state/permissions_state.dart';
 import '../../../state/reading_keeper.dart';
 import '../../../state/session_state.dart';
@@ -31,6 +32,7 @@ class SessionPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     final trip = ref.watch(tripProvider);
+    final controls = ref.watch(manualControlsProvider);
     final tripController = ref.read(tripProvider.notifier);
     final controller = ref.read(sessionProvider.notifier);
     final readings = ref.read(readingKeeperProvider);
@@ -113,18 +115,17 @@ class SessionPanel extends ConsumerWidget {
           Wrap(
             spacing: Insets.s,
             runSpacing: Insets.s,
-            children: switch (session) {
-              // The trip drives the session; manual controls would fight it.
-              _ when trip.isActive => [
+            children: switch (controls) {
+              TripControls(:final canStop) => [
                 OutlinedButton.icon(
-                  onPressed: trip is TripEnding ? null : tripController.stop,
+                  onPressed: canStop ? tripController.stop : null,
                   icon: const Icon(Symbols.stop_circle_rounded),
                   label: const Text('Stop trip'),
                 ),
               ],
-              SessionConnected(:final busy) => [
+              SessionControls(:final canRead) => [
                 FilledButton.icon(
-                  onPressed: busy ? null : readings.readAndKeep,
+                  onPressed: canRead ? readings.readAndKeep : null,
                   icon: const Icon(Symbols.send_rounded),
                   label: const Text('Read and send'),
                 ),
@@ -133,8 +134,8 @@ class SessionPanel extends ConsumerWidget {
                   child: const Text('Disconnect'),
                 ),
               ],
-              SessionConnecting() => const [],
-              SessionIdle() => [
+              WaitingControls() => const [],
+              IdleControls() => [
                 FilledButton.icon(
                   onPressed: canConnect
                       ? () async {
@@ -161,7 +162,7 @@ class SessionPanel extends ConsumerWidget {
               ],
             },
           ),
-          if (session is SessionIdle && !trip.isActive && canConnect) ...[
+          if (controls is IdleControls && canConnect) ...[
             const SizedBox(height: Insets.m),
             Text(
               'Connect opens a manual session. Simulate auto-start runs the '

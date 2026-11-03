@@ -120,7 +120,8 @@ void main() {
       final logged = <String>[];
       final elm = Elm327(
         transport,
-        log: (command, raw) => logged.add('$command|$raw'),
+        log: (command, raw, error) =>
+            logged.add('$command|$raw|${error?.name}'),
       );
       final isDisconnected = throwsA(
         isA<ElmException>().having(
@@ -136,21 +137,25 @@ void main() {
 
       await expectLater(pending, isDisconnected);
       expect(elm.isClosed, isTrue);
-      expect(logged, ['0100|(disconnected)']);
+      expect(logged, ['0100|(disconnected)|disconnected']);
       await expectLater(elm.send('ATRV'), isDisconnected);
     },
   );
 
-  test('log receives each command and raw reply', () async {
+  test('log receives each command, raw reply and what it means', () async {
     final logged = <String>[];
     final elm = Elm327(
-      FakeTransport({'010D': 'SEARCHING...\r410D34'}),
-      log: (command, raw) => logged.add('$command|$raw'),
+      FakeTransport({'010D': 'SEARCHING...\r410D34', '010C': 'NO DATA'}),
+      log: (command, raw, error) => logged.add('$command|$raw|${error?.name}'),
     );
 
     await elm.requestPid(0x0D);
+    await elm.requestPid(0x0C);
 
-    expect(logged, ['010D|SEARCHING...\r410D34\r\r']);
+    expect(logged, [
+      '010D|SEARCHING...\r410D34\r\r|null',
+      '010C|NO DATA\r\r|noData',
+    ]);
   });
 
   test('setTarget only sends what changed', () async {

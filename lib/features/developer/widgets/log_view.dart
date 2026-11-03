@@ -35,36 +35,23 @@ class LogView extends StatelessWidget {
         text: '${Formatters.clockWithSeconds(entry.time)}  ',
         style: TextStyle(color: muted),
       );
-      final body = switch (entry.kind) {
-        LogEntryKind.exchange => [
+      final leadColor = switch (entry.kind) {
+        LogEntryKind.exchange => command,
+        LogEntryKind.value => muted,
+        LogEntryKind.note => entry.warning ? warning : muted,
+        LogEntryKind.delivery => entry.warning ? warning : command,
+      };
+      final body = [
+        TextSpan(
+          text: entry.lead,
+          style: TextStyle(color: leadColor),
+        ),
+        if (entry.trail case final trail?)
           TextSpan(
-            text: '→ ${entry.text}',
-            style: TextStyle(color: command),
-          ),
-          TextSpan(
-            text: '  ← ${_compact(entry.reply ?? '')}',
+            text: '  $trail',
             style: entry.warning ? TextStyle(color: warning) : null,
           ),
-        ],
-        LogEntryKind.value => [
-          TextSpan(
-            text: '= ${entry.text}',
-            style: TextStyle(color: muted),
-          ),
-        ],
-        LogEntryKind.note => [
-          TextSpan(
-            text: '- ${entry.text}',
-            style: TextStyle(color: entry.warning ? warning : muted),
-          ),
-        ],
-        LogEntryKind.delivery => [
-          TextSpan(
-            text: entry.text,
-            style: TextStyle(color: entry.warning ? warning : command),
-          ),
-        ],
-      };
+      ];
       return TextSpan(
         children: [
           time,
@@ -81,22 +68,4 @@ class LogView extends StatelessWidget {
       ),
     );
   }
-
-  /// Raw replies have line breaks between ECUs; one line reads better.
-  static String _compact(String reply) =>
-      reply.replaceAll(RegExp(r'[\r\n]+'), ' ').replaceAll('>', '').trim();
 }
-
-/// Plain text of the log, for copying.
-String logAsText(List<LogEntry> entries) => entries
-    .map((entry) {
-      final time = Formatters.clockWithSeconds(entry.time);
-      return switch (entry.kind) {
-        LogEntryKind.exchange =>
-          '$time → ${entry.text} ← ${LogView._compact(entry.reply ?? '')}',
-        LogEntryKind.value => '$time = ${entry.text}',
-        LogEntryKind.note => '$time - ${entry.text}',
-        LogEntryKind.delivery => '$time ${entry.text}',
-      };
-    })
-    .join('\n');

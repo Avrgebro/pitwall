@@ -342,13 +342,18 @@ class SessionController extends Notifier<SessionState> {
         NoProfile() || UnreadableProfile() => null,
       };
 
-  /// Sends raw commands to the adapter; replies show up in the log. AT
-  /// commands can change settings the app relies on, so the adapter is
-  /// reset afterwards.
+  /// Sends the raw commands typed in [input], separated by commas or
+  /// spaces; replies show up in the log. AT commands can change settings
+  /// the app relies on, so the adapter is reset afterwards.
   ///
   /// Says in the log, where their replies would have been, when they
-  /// couldn't go out.
-  Future<StepOutcome<void>> sendRaw(List<String> commands) async {
+  /// couldn't go out. Nothing typed is nothing to send, and done.
+  Future<StepOutcome<void>> sendRaw(String input) async {
+    final commands = [
+      for (final command in input.split(RegExp(r'[,\s]+')))
+        if (command.isNotEmpty) command.toUpperCase(),
+    ];
+    if (commands.isEmpty) return const StepDone(null);
     final outcome = await _exclusive((session, elm) async {
       for (final command in commands) {
         try {

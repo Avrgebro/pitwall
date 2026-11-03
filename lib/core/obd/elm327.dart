@@ -56,7 +56,9 @@ class Elm327 {
     );
   }
 
-  final void Function(String command, String rawReply)? log;
+  /// Told every exchange: the command, the raw reply, and the error the
+  /// reply means, if any.
+  final void Function(String command, String rawReply, ElmError? error)? log;
 
   static const defaultTimeout = Duration(seconds: 3);
   static const resetTimeout = Duration(seconds: 5);
@@ -269,11 +271,17 @@ class Elm327 {
       raw = await completer.future.timeout(timeout);
     } on TimeoutException {
       _pending = null;
-      log?.call(command, '(timeout)');
+      log?.call(command, '(timeout)', ElmError.timeout);
       throw ElmException(ElmError.timeout, command);
     }
-    log?.call(command, raw);
-    return _clean(raw, command);
+    try {
+      final response = _clean(raw, command);
+      log?.call(command, raw, null);
+      return response;
+    } on ElmException catch (e) {
+      log?.call(command, raw, e.error);
+      rethrow;
+    }
   }
 
   void _onClosed() {
@@ -281,7 +289,7 @@ class Elm327 {
     final pending = _pending;
     _pending = null;
     if (pending == null) return;
-    log?.call(_pendingCommand, '(disconnected)');
+    log?.call(_pendingCommand, '(disconnected)', ElmError.disconnected);
     pending.completeError(ElmException(ElmError.disconnected, _pendingCommand));
   }
 

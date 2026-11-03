@@ -32,13 +32,9 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
   /// Clears the commands once they went out; ones that didn't stay, to
   /// send again.
   Future<void> _send() async {
-    final commands = _command.text
-        .split(RegExp(r'[,\s]+'))
-        .where((c) => c.isNotEmpty)
-        .map((c) => c.toUpperCase())
-        .toList();
-    if (commands.isEmpty) return;
-    final outcome = await ref.read(sessionProvider.notifier).sendRaw(commands);
+    final outcome = await ref
+        .read(sessionProvider.notifier)
+        .sendRaw(_command.text);
     if (outcome is StepDone && mounted) _command.clear();
   }
 
@@ -80,7 +76,7 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
                       ? null
                       : () async {
                           await Clipboard.setData(
-                            ClipboardData(text: logAsText(entries)),
+                            ClipboardData(text: log.asText()),
                           );
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
