@@ -23,7 +23,6 @@ void main() {
     final view = ValuesView.of(_all);
     expect(view.standard, [_speed]);
     expect(view.profile, [_fuel, _tyre]);
-    expect(view.nothingMatches, isFalse);
     expect(view.profileForcedOpen, isFalse);
   });
 
@@ -36,11 +35,6 @@ void main() {
 
   test('a search matches payload keys too', () {
     expect(ValuesView.of(_all, query: TextQuery('tp_fl')).profile, [_tyre]);
-  });
-
-  test('says when nothing matches, but only while searching', () {
-    expect(ValuesView.of(_all, query: TextQuery('xyz')).nothingMatches, isTrue);
-    expect(ValuesView.of(const []).nothingMatches, isFalse);
   });
 
   test('a category keeps only its profile values, opened', () {

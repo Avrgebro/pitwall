@@ -28,11 +28,11 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
 
   /// Whether the search bar is open, and what's typed in it.
   bool _searching = false;
-  String _query = '';
+  TextQuery _query = TextQuery.none;
 
   void _closeSearch() => setState(() {
     _searching = false;
-    _query = '';
+    _query = TextQuery.none;
   });
 
   @override
@@ -45,15 +45,14 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   Widget _page(BuildContext context, Vehicle vehicle, VehicleValues values) {
     final category = widget.category;
     final title = category ?? 'Values to send';
-    final query = TextQuery(_query);
     final view = ValuesView.of(
       values.options,
       category: category,
-      query: query,
+      query: _query,
     );
-    final profile = DisclosureGroup(
+    final profileOpen = view.profileForcedOpen || _showProfile;
+    final profileToggle = DisclosureGroup(
       open: _showProfile,
-      forcedOpen: view.profileForcedOpen,
       icon: Symbols.manage_search_rounded,
       showLabel: 'Show ${view.profile.length} signals',
       hideLabel: 'Hide ${view.profile.length} signals',
@@ -98,10 +97,10 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                 FilterField(
                   autoFocus: true,
                   hintText: 'Search values',
-                  noMatchText: view.nothingMatches
-                      ? 'No values match "${query.text}".'
-                      : null,
-                  onChanged: (text) => setState(() => _query = text),
+                  noun: 'values',
+                  query: _query,
+                  matches: view.standard.length + view.profile.length,
+                  onChanged: (query) => setState(() => _query = query),
                 )
               else
                 _IntroPanel(
@@ -121,11 +120,11 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                   'Profile signals',
                   trailing: _profileLabel(vehicle),
                 ),
-                profile,
+                if (!view.profileForcedOpen) profileToggle,
               ],
             ],
           ),
-          if (view.profile.isNotEmpty && profile.listShown)
+          if (view.profile.isNotEmpty && profileOpen)
             SliverRowGroup(
               itemCount: view.profile.length,
               itemBuilder: (context, index) => row(view.profile[index]),

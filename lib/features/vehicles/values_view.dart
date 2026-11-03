@@ -30,7 +30,6 @@ class ValuesView {
         for (final o in shown)
           if (o.fromProfile) o,
       ],
-      searched: !query.isEmpty,
       // Matches are what was searched for, and a category is what was
       // asked for, so neither waits to be opened.
       profileForcedOpen: !query.isEmpty || category != null,
@@ -41,7 +40,6 @@ class ValuesView {
     required this.options,
     required this.standard,
     required this.profile,
-    required this.searched,
     required this.profileForcedOpen,
   });
 
@@ -54,13 +52,8 @@ class ValuesView {
   /// The profile values to list.
   final List<ValueOption> profile;
 
-  /// Whether a search is narrowing the lists.
-  final bool searched;
-
   /// Whether the profile values list with no row to fold them away.
   final bool profileForcedOpen;
-
-  bool get nothingMatches => searched && standard.isEmpty && profile.isEmpty;
 
   int sentCount(Set<String> sent) =>
       options.where((o) => sent.contains(o.key)).length;

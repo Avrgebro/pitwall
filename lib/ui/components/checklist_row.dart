@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
-import '../theme/tokens.dart';
+import 'expandable_row.dart';
 import 'row_group.dart';
 import 'app_row.dart';
 
@@ -118,32 +118,16 @@ class ChoiceRow<T> extends StatelessWidget {
       subtitle: subtitle == null ? null : Text(subtitle!),
       onTap: child == null ? () => group?.onChanged(value) : null,
     );
-    if (child == null) return outlined(row);
-    // The whole option is one tap target, so its ripple fills the card
-    // including the opened part. Fields inside take their own taps.
-    return outlined(
-      InkWell(
-        onTap: enabled ? () => group?.onChanged(value) : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            row,
-            AnimatedSize(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: selected
-                  ? Padding(
-                      // The same padding as a content card, so fields line up
-                      // with fields in cards around it.
-                      padding: Insets.card.copyWith(top: 0),
-                      child: child,
-                    )
-                  : const SizedBox(width: double.infinity),
-            ),
-          ],
+    return switch (child) {
+      null => outlined(row),
+      final child => outlined(
+        ExpandableRow(
+          row: row,
+          open: selected,
+          onTap: enabled ? () => group?.onChanged(value) : null,
+          child: child,
         ),
       ),
-    );
+    };
   }
 }

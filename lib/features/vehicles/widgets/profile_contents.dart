@@ -127,53 +127,36 @@ class _UnreadableRowState extends State<_UnreadableRow> {
     final theme = Theme.of(context);
     final signals = widget.signals;
     final names = {for (final signal in signals) signal.name}.toList()..sort();
-    return InkWell(
+    return ExpandableRow(
+      open: _open,
       onTap: () => setState(() => _open = !_open),
+      row: AppRow(
+        leading: const Icon(Symbols.hourglass_empty_rounded),
+        title: ProfileText.unreadable(widget.reason),
+        subtitle: Text(
+          '${ProfileText.values(signals.length)}: '
+          '${ProfileText.categories(ProfileSummary.byCategory(signals))}',
+        ),
+        trailing: Icon(
+          _open ? Icons.expand_less : Icons.expand_more,
+          color: theme.colorScheme.primary,
+        ),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppRow(
-            leading: const Icon(Symbols.hourglass_empty_rounded),
-            title: ProfileText.unreadable(widget.reason),
-            subtitle: Text(
-              '${ProfileText.values(signals.length)}: '
-              '${ProfileText.categories(ProfileSummary.byCategory(signals))}',
-            ),
-            trailing: Icon(
-              _open ? Icons.expand_less : Icons.expand_more,
-              color: theme.colorScheme.primary,
+          Text(
+            ProfileText.unreadableDetail(widget.reason),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: _open
-                ? Padding(
-                    padding: Insets.card.copyWith(top: 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ProfileText.unreadableDetail(widget.reason),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: Insets.s),
-                        for (final name in names)
-                          Padding(
-                            padding: const EdgeInsets.only(top: Insets.xs),
-                            child: Text(
-                              name,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
-                      ],
-                    ),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
+          const SizedBox(height: Insets.s),
+          for (final name in names)
+            Padding(
+              padding: const EdgeInsets.only(top: Insets.xs),
+              child: Text(name, style: theme.textTheme.bodyMedium),
+            ),
         ],
       ),
     );

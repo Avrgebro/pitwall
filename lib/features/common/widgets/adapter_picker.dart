@@ -40,7 +40,7 @@ class AdapterPicker extends ConsumerStatefulWidget {
 }
 
 class _AdapterPickerState extends ConsumerState<AdapterPicker> {
-  String _query = '';
+  TextQuery _query = TextQuery.none;
   bool _showOthers = false;
 
   @override
@@ -99,10 +99,9 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
   }
 
   Widget _list(List<BondedDevice> devices) {
-    final query = TextQuery(_query);
     final matches = [
       for (final device in devices)
-        if (query.matches([device.name, device.address])) device,
+        if (_query.matches([device.name, device.address])) device,
     ];
     final suited = [
       for (final device in matches)
@@ -115,12 +114,12 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     // Kept open while filtering, when nothing suits, or when the chosen
     // device is among them, so the choice is never hidden. Otherwise the
     // user opens and closes them.
-    final disclosure = DisclosureGroup(
+    final othersForcedOpen =
+        !_query.isEmpty ||
+        suited.isEmpty ||
+        others.any((d) => d.address == widget.selectedAddress);
+    final othersToggle = DisclosureGroup(
       open: _showOthers,
-      forcedOpen:
-          !query.isEmpty ||
-          suited.isEmpty ||
-          others.any((d) => d.address == widget.selectedAddress),
       icon: Symbols.devices_other_rounded,
       showLabel: 'Show ${others.length} more',
       hideLabel: 'Hide ${others.length} devices',
@@ -157,19 +156,20 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
         if (devices.length > AdapterPicker.filterAbove) ...[
           FilterField(
             hintText: 'Filter by name or address',
-            noMatchText: matches.isEmpty
-                ? 'No devices match "${query.text}".'
-                : null,
-            onChanged: (text) => setState(() => _query = text),
+            noun: 'devices',
+            query: _query,
+            matches: matches.length,
+            onChanged: (query) => setState(() => _query = query),
           ),
           const SizedBox(height: Insets.m),
         ],
         if (suited.isNotEmpty) group(suited),
         if (others.isNotEmpty && suited.isNotEmpty) ...[
           const SectionHeader('Other devices'),
-          disclosure,
+          if (!othersForcedOpen) othersToggle,
         ],
-        if (others.isNotEmpty && disclosure.listShown) group(others),
+        if (others.isNotEmpty && (othersForcedOpen || _showOthers))
+          group(others),
       ],
     );
   }
