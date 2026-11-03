@@ -24,16 +24,12 @@ class VehicleDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
     vehicleId: vehicleId,
     title: 'Vehicle',
-    builder: (context, vehicle, values) => _page(context, ref, vehicle, values),
+    builder: (context, values) => _page(context, ref, values),
   );
 
-  Widget _page(
-    BuildContext context,
-    WidgetRef ref,
-    Vehicle vehicle,
-    VehicleValues values,
-  ) {
-    final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
+  Widget _page(BuildContext context, WidgetRef ref, VehicleValues values) {
+    final vehicle = values.vehicle;
+    final profile = _profileSummary(values);
     final selected = values.sent;
     final tripStart = TripStartText.summary(vehicle);
 
@@ -77,19 +73,14 @@ class VehicleDetailScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.data_object_rounded,
               title: 'Vehicle profile',
-              subtitle: stored is UnreadableProfile
-                  ? 'OBDb profile can\'t be read'
-                  : _profileSummary(stored, values),
-              subtitleTone: stored is UnreadableProfile
-                  ? StatusTone.error
-                  : null,
+              subtitle: profile.text,
+              subtitleTone: profile.problem ? StatusTone.error : null,
               onTap: () => context.push(Routes.vehicleProfile(vehicle.id)),
             ),
             GroupTile(
               icon: Symbols.checklist_rounded,
               title: 'Values to send',
-              subtitle:
-                  '${selected.length} value${selected.length == 1 ? '' : 's'}',
+              subtitle: ProfileText.values(selected.length),
               onTap: () => context.push(Routes.vehicleValues(vehicle.id)),
             ),
           ],
@@ -115,12 +106,24 @@ class VehicleDetailScreen extends ConsumerWidget {
         final name => '$name (${vehicle.adapterType.label})',
       };
 
-  static String _profileSummary(StoredProfile? stored, VehicleValues values) =>
-      switch ((stored, values.profile)) {
-        (LoadedProfile(), final summary?) =>
-          'OBDb profile: ${ProfileText.forYear(summary)}',
-        (LoadedProfile(), null) => 'OBDb profile: choose the model year',
-        _ => 'Standard values only',
+  static ({String text, bool problem}) _profileSummary(VehicleValues values) =>
+      switch ((values.stored, values.profile)) {
+        (UnreadableProfile(), _) => (
+          text: 'OBDb profile can\'t be read',
+          problem: true,
+        ),
+        (LoadedProfile(), final summary?) => (
+          text: 'OBDb profile: ${ProfileText.forYear(summary)}',
+          problem: false,
+        ),
+        (LoadedProfile(), null) => (
+          text: 'OBDb profile: choose the model year',
+          problem: false,
+        ),
+        (NoProfile() || null, _) => (
+          text: 'Standard values only',
+          problem: false,
+        ),
       };
 
   Future<void> _delete(

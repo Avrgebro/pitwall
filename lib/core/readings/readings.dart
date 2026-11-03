@@ -4,6 +4,7 @@ import '../obd/elm327.dart';
 import '../obd/pids.dart';
 import '../profiles/profile_reader.dart';
 import '../profiles/signal_set.dart';
+import '../profiles/stored_profile.dart';
 import '../vehicles/vehicle.dart';
 
 /// Payload key for the voltage the adapter measures (`ATRV`).
@@ -67,6 +68,8 @@ List<ValueOption> valueOptions(ProfileSummary? profile) => [
 @immutable
 class VehicleValues {
   const VehicleValues._(
+    this.vehicle,
+    this.stored,
     this.options,
     this.sent,
     this._chosen, {
@@ -74,11 +77,13 @@ class VehicleValues {
     required this.profile,
   });
 
-  factory VehicleValues.of(Vehicle vehicle, SignalSet? signals) {
+  /// [stored] is null while the profile loads.
+  factory VehicleValues.of(Vehicle vehicle, StoredProfile? stored) {
     final year = vehicle.modelYear;
-    final profile = signals == null || year == null
-        ? null
-        : signals.summaryFor(year);
+    final profile = switch ((stored, year)) {
+      (LoadedProfile(:final signals), final year?) => signals.summaryFor(year),
+      _ => null,
+    };
     final options = valueOptions(profile);
     final offered = {for (final option in options) option.key};
     final chosen =
@@ -89,6 +94,8 @@ class VehicleValues {
             if (!option.fromProfile) option.key,
         };
     return VehicleValues._(
+      vehicle,
+      stored,
       options,
       chosen.intersection(offered),
       chosen,
@@ -96,6 +103,11 @@ class VehicleValues {
       profile: profile,
     );
   }
+
+  final Vehicle vehicle;
+
+  /// The vehicle's profile as found on the phone, or null while it loads.
+  final StoredProfile? stored;
 
   final List<ValueOption> options;
 

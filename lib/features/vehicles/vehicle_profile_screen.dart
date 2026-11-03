@@ -25,26 +25,11 @@ class VehicleProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
     vehicleId: vehicleId,
     title: 'Vehicle profile',
-    builder: (context, vehicle, values) => _page(context, ref, vehicle, values),
+    builder: (context, values) => _page(context, ref, values),
   );
 
-  Widget _page(
-    BuildContext context,
-    WidgetRef ref,
-    Vehicle vehicle,
-    VehicleValues values,
-  ) {
-    // Loading a profile maps every failure to UnreadableProfile, so an
-    // error here can only come from the settings; it reads the same way.
-    final stored = switch (ref.watch(vehicleProfileProvider(vehicleId))) {
-      // Kept while it reloads, as after an import.
-      AsyncValue(:final value?) => value,
-      AsyncError() => switch (vehicle.profile) {
-        final ref? => UnreadableProfile(ref),
-        null => const NoProfile(),
-      },
-      AsyncLoading() => null,
-    };
+  Widget _page(BuildContext context, WidgetRef ref, VehicleValues values) {
+    final VehicleValues(:vehicle, :stored) = values;
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',
@@ -59,7 +44,7 @@ class VehicleProfileScreen extends ConsumerWidget {
             onRemove: () => _remove(context, ref, vehicle, stored),
             onModelYear: (year) => notifier.setModelYear(vehicle.id, year),
           ),
-        if ((stored, values.profile) case (LoadedProfile(), final summary?))
+        if (values.profile case final summary?)
           ProfileContents(
             summary: summary,
             selected: values.sent,

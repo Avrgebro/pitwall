@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/elm327.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
+import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/readings/readings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 
@@ -37,7 +39,7 @@ void main() {
       expect(options.where((o) => o.key == 'odometer_km'), hasLength(1));
       final sent = VehicleValues.of(
         const Vehicle(id: 'tucson', modelYear: 2018),
-        profile,
+        LoadedProfile(const ProfileRef('default.json'), profile),
       ).sent;
       expect(sent, isNot(contains('test_fuel_vol')));
       expect(sent, contains('odometer_km'));

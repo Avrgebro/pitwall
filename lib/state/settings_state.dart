@@ -246,10 +246,17 @@ final vehicleValuesProvider = Provider.family<VehicleValues?, String>((
 ) {
   final vehicle = ref.watch(vehicleProvider(id));
   if (vehicle == null) return null;
-  return VehicleValues.of(vehicle, switch (ref
-      .watch(vehicleProfileProvider(id))
-      .value) {
-    LoadedProfile(:final signals) => signals,
-    _ => null,
+  return VehicleValues.of(vehicle, switch (ref.watch(
+    vehicleProfileProvider(id),
+  )) {
+    // Kept while it reloads, as after an import.
+    AsyncValue(:final value?) => value,
+    // Loading a profile maps every failure to UnreadableProfile, so an
+    // error can only come from the settings; it reads the same way.
+    AsyncError() => switch (vehicle.profile) {
+      final ref? => UnreadableProfile(ref),
+      null => const NoProfile(),
+    },
+    AsyncLoading() => null,
   });
 });

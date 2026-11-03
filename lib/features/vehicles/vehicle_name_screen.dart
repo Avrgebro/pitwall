@@ -32,22 +32,25 @@ class _VehicleNameScreenState extends ConsumerState<VehicleNameScreen> {
   Widget build(BuildContext context) => VehiclePage(
     vehicleId: widget.vehicleId,
     title: 'Name',
-    builder: (context, vehicle, _) => AppPage(
-      title: 'Name',
-      children: [
-        VehicleNameField(
-          initialName: vehicle.name,
-          autofocus: true,
-          onDone: (name) => _settings.renameVehicle(vehicle.id, name),
-        ),
-        const InfoNote(
-          text: TextSpan(
-            text:
-                'Home Assistant tells your cars apart by this id. Renaming '
-                'changes it, so update automations that use the old one.',
+    builder: (context, values) {
+      final vehicle = values.vehicle;
+      return AppPage(
+        title: 'Name',
+        children: [
+          VehicleNameField(
+            initialName: vehicle.name,
+            autofocus: true,
+            onDone: (name) => _settings.renameVehicle(vehicle.id, name),
           ),
-        ),
-      ],
-    ),
+          const InfoNote(
+            text: TextSpan(
+              text:
+                  'Home Assistant tells your cars apart by this id. Renaming '
+                  'changes it, so update automations that use the old one.',
+            ),
+          ),
+        ],
+      );
+    },
   );
 }

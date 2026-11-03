@@ -16,23 +16,26 @@ class VehicleAdapterScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
     vehicleId: vehicleId,
     title: 'Adapter',
-    builder: (context, vehicle, _) => AppPage(
-      title: 'Adapter',
-      children: [
-        AdapterPicker(
-          selectedAddress: vehicle.adapterAddress,
-          onSelected: (device) => ref
-              .read(appSettingsProvider.notifier)
-              .setAdapter(vehicle.id, device),
-        ),
-        const InfoNote(
-          text: TextSpan(
-            text:
-                'Each vehicle has its own adapter. Pitwall knows which car '
-                'it\'s in by which adapter answers.',
+    builder: (context, values) {
+      final vehicle = values.vehicle;
+      return AppPage(
+        title: 'Adapter',
+        children: [
+          AdapterPicker(
+            selectedAddress: vehicle.adapterAddress,
+            onSelected: (device) => ref
+                .read(appSettingsProvider.notifier)
+                .setAdapter(vehicle.id, device),
           ),
-        ),
-      ],
-    ),
+          const InfoNote(
+            text: TextSpan(
+              text:
+                  'Each vehicle has its own adapter. Pitwall knows which car '
+                  'it\'s in by which adapter answers.',
+            ),
+          ),
+        ],
+      );
+    },
   );
 }

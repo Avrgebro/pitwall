@@ -20,7 +20,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
     vehicleId: vehicleId,
     title: 'Trip start',
-    builder: (context, vehicle, _) => _page(context, ref, vehicle),
+    builder: (context, values) => _page(context, ref, values.vehicle),
   );
 
   Widget _page(BuildContext context, WidgetRef ref, Vehicle vehicle) {

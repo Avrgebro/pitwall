@@ -35,16 +35,16 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     _query = TextQuery.none;
   });
 
-  @override
-  Widget build(BuildContext context) => VehiclePage(
-    vehicleId: widget.vehicleId,
-    title: widget.category ?? 'Values to send',
-    builder: _page,
-  );
+  String get _title => widget.category ?? 'Values to send';
 
-  Widget _page(BuildContext context, Vehicle vehicle, VehicleValues values) {
+  @override
+  Widget build(BuildContext context) =>
+      VehiclePage(vehicleId: widget.vehicleId, title: _title, builder: _page);
+
+  Widget _page(BuildContext context, VehicleValues values) {
+    final vehicle = values.vehicle;
     final category = widget.category;
-    final title = category ?? 'Values to send';
+    final title = _title;
     final view = ValuesView.of(
       values.options,
       category: category,
@@ -62,8 +62,13 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
           'one request between them.',
       onToggle: () => setState(() => _showProfile = !_showProfile),
     );
-    Widget row(ValueOption option) =>
-        _SignalToggle(vehicleId: vehicle.id, option: option);
+    Widget row(ValueOption option) => _SignalToggle(
+      option: option,
+      sent: values.sent.contains(option.key),
+      onChanged: (on) => ref
+          .read(appSettingsProvider.notifier)
+          .setSentValues(vehicle.id, values.withSent(option.key, on: on)),
+    );
 
     // Back closes the search before leaving the page.
     return PopScope(
@@ -179,33 +184,25 @@ class _IntroPanel extends StatelessWidget {
   );
 }
 
-/// One value with its on/off switch. Watches only whether its own value is
-/// sent, so only the row that changed rebuilds.
-class _SignalToggle extends ConsumerWidget {
-  const _SignalToggle({required this.vehicleId, required this.option});
+/// One value with its on/off switch.
+class _SignalToggle extends StatelessWidget {
+  const _SignalToggle({
+    required this.option,
+    required this.sent,
+    required this.onChanged,
+  });
 
-  final String vehicleId;
   final ValueOption option;
+  final bool sent;
+  final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sent = ref.watch(
-      vehicleValuesProvider(vehicleId)
-          .select((values) => values?.sent.contains(option.key) ?? false),
-    );
-    return ToggleRow(
-      title: option.unit.isEmpty
-          ? option.name
-          : '${option.name} (${option.unit})',
-      caption: option.key,
-      value: sent,
-      onChanged: (on) {
-        final values = ref.read(vehicleValuesProvider(vehicleId));
-        if (values == null) return;
-        ref
-            .read(appSettingsProvider.notifier)
-            .setSentValues(vehicleId, values.withSent(option.key, on: on));
-      },
-    );
-  }
+  Widget build(BuildContext context) => ToggleRow(
+    title: option.unit.isEmpty
+        ? option.name
+        : '${option.name} (${option.unit})',
+    caption: option.key,
+    value: sent,
+    onChanged: onChanged,
+  );
 }
