@@ -12,7 +12,7 @@ import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import '../common/vehicle_text.dart';
 import '../common/trip_start_text.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// One vehicle's overview: a row per setting, each opening its own page.
 class VehicleDetailScreen extends ConsumerWidget {
@@ -21,11 +21,19 @@ class VehicleDetailScreen extends ConsumerWidget {
   final String vehicleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) return const VehicleRemovedPage(title: 'Vehicle');
+  Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
+    vehicleId: vehicleId,
+    title: 'Vehicle',
+    builder: (context, vehicle, values) => _page(context, ref, vehicle, values),
+  );
+
+  Widget _page(
+    BuildContext context,
+    WidgetRef ref,
+    Vehicle vehicle,
+    VehicleValues values,
+  ) {
     final stored = ref.watch(vehicleProfileProvider(vehicleId)).value;
-    final values = ref.watch(vehicleValuesProvider(vehicleId))!;
     final selected = values.sent;
     final tripStart = TripStartText.summary(vehicle);
 

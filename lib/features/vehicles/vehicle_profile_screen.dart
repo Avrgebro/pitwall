@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/routes.dart';
 import '../../core/platform/file_gateway.dart';
 import '../../core/profiles/stored_profile.dart';
+import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/infrastructure.dart';
 import '../../state/settings_state.dart';
@@ -12,7 +13,7 @@ import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import 'widgets/profile_card.dart';
 import 'widgets/profile_contents.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// The vehicle's optional OBDb profile: import, model year, what applies.
 class VehicleProfileScreen extends ConsumerWidget {
@@ -21,11 +22,18 @@ class VehicleProfileScreen extends ConsumerWidget {
   final String vehicleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) {
-      return const VehicleRemovedPage(title: 'Vehicle profile');
-    }
+  Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
+    vehicleId: vehicleId,
+    title: 'Vehicle profile',
+    builder: (context, vehicle, values) => _page(context, ref, vehicle, values),
+  );
+
+  Widget _page(
+    BuildContext context,
+    WidgetRef ref,
+    Vehicle vehicle,
+    VehicleValues values,
+  ) {
     // Loading a profile maps every failure to UnreadableProfile, so an
     // error here can only come from the settings; it reads the same way.
     final stored = switch (ref.watch(vehicleProfileProvider(vehicleId))) {
@@ -37,7 +45,6 @@ class VehicleProfileScreen extends ConsumerWidget {
       },
       AsyncLoading() => null,
     };
-    final values = ref.watch(vehicleValuesProvider(vehicleId))!;
     final notifier = ref.read(appSettingsProvider.notifier);
     return AppPage(
       title: 'Vehicle profile',

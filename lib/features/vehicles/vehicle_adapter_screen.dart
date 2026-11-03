@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// Picks which paired adapter belongs to this vehicle.
 class VehicleAdapterScreen extends ConsumerWidget {
@@ -13,10 +13,10 @@ class VehicleAdapterScreen extends ConsumerWidget {
   final String vehicleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final vehicle = ref.watch(vehicleProvider(vehicleId));
-    if (vehicle == null) return const VehicleRemovedPage(title: 'Adapter');
-    return AppPage(
+  Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
+    vehicleId: vehicleId,
+    title: 'Adapter',
+    builder: (context, vehicle, _) => AppPage(
       title: 'Adapter',
       children: [
         AdapterPicker(
@@ -33,6 +33,6 @@ class VehicleAdapterScreen extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 }

@@ -8,7 +8,7 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// What starts the vehicle's trips: its head unit connecting, for now.
 class VehicleTripStartScreen extends ConsumerWidget {
@@ -17,11 +17,13 @@ class VehicleTripStartScreen extends ConsumerWidget {
   final String vehicleId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(appSettingsProvider).value;
-    if (settings == null) return const AppPage.loading(title: 'Trip start');
-    final vehicle = settings.vehicleById(vehicleId);
-    if (vehicle == null) return const VehicleRemovedPage(title: 'Trip start');
+  Widget build(BuildContext context, WidgetRef ref) => VehiclePage(
+    vehicleId: vehicleId,
+    title: 'Trip start',
+    builder: (context, vehicle, _) => _page(context, ref, vehicle),
+  );
+
+  Widget _page(BuildContext context, WidgetRef ref, Vehicle vehicle) {
     final notifier = ref.read(appSettingsProvider.notifier);
     final headUnit = vehicle.headUnitName;
 

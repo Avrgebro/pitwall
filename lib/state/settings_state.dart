@@ -51,6 +51,20 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await saveVehicle(vehicle.copyWith(name: trimmed));
   }
 
+  /// Changes the vehicle's name and adapter together, as setup does when
+  /// its step is visited again.
+  Future<void> updateVehicle(
+    String vehicleId, {
+    required String name,
+    required BondedDevice adapter,
+  }) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null) return;
+    await saveVehicle(
+      _withAdapter(vehicle.copyWith(name: name.trim()), adapter),
+    );
+  }
+
   /// Makes [adapter] the vehicle's adapter.
   Future<void> setAdapter(String vehicleId, BondedDevice adapter) async {
     final vehicle = _current.vehicleById(vehicleId);

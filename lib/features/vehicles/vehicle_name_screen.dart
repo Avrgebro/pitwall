@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/vehicle_name_field.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// Renames a vehicle. The name is saved when typing is done, not on every
 /// key: it becomes the `device` id in readings, which shouldn't go out
@@ -29,10 +29,10 @@ class _VehicleNameScreenState extends ConsumerState<VehicleNameScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
-    if (vehicle == null) return const VehicleRemovedPage(title: 'Name');
-    return AppPage(
+  Widget build(BuildContext context) => VehiclePage(
+    vehicleId: widget.vehicleId,
+    title: 'Name',
+    builder: (context, vehicle, _) => AppPage(
       title: 'Name',
       children: [
         VehicleNameField(
@@ -48,6 +48,6 @@ class _VehicleNameScreenState extends ConsumerState<VehicleNameScreen> {
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
 }

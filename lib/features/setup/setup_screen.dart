@@ -32,16 +32,18 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   void _go(_Step step) => setState(() => _step = step);
 
   /// Creates the vehicle, or updates it when coming back to this step.
-  Future<void> _saveVehicle() async {
+  Future<void> _saveVehicle(NewVehicle draft) async {
     final notifier = ref.read(appSettingsProvider.notifier);
-    final adapter = _draft.adapter!;
     if (_vehicleId case final id?) {
-      await notifier.renameVehicle(id, _draft.name);
-      await notifier.setAdapter(id, adapter);
+      await notifier.updateVehicle(
+        id,
+        name: draft.name,
+        adapter: draft.adapter,
+      );
     } else {
       final vehicle = await notifier.addVehicle(
-        name: _draft.name,
-        adapter: adapter,
+        name: draft.name,
+        adapter: draft.adapter,
       );
       _vehicleId = vehicle.id;
     }
@@ -74,7 +76,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             'Plug it into the port under the dashboard and switch the '
             'ignition on.',
         primaryLabel: 'Continue',
-        onPrimary: _draft.isComplete ? _saveVehicle : null,
+        onPrimary: switch (_draft.complete) {
+          final draft? => () => _saveVehicle(draft),
+          null => null,
+        },
         onBack: () => _go(_Step.welcome),
         // The vehicle can be added later from the Vehicles tab.
         onSkip: () => _go(_Step.permissions),

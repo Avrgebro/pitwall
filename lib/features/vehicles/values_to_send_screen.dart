@@ -8,7 +8,7 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import 'values_view.dart';
-import 'widgets/vehicle_removed_page.dart';
+import 'widgets/vehicle_page.dart';
 
 /// Which values go in each reading, grouped by where they come from.
 class ValuesToSendScreen extends ConsumerStatefulWidget {
@@ -36,12 +36,15 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final vehicle = ref.watch(vehicleProvider(widget.vehicleId));
+  Widget build(BuildContext context) => VehiclePage(
+    vehicleId: widget.vehicleId,
+    title: widget.category ?? 'Values to send',
+    builder: _page,
+  );
+
+  Widget _page(BuildContext context, Vehicle vehicle, VehicleValues values) {
     final category = widget.category;
     final title = category ?? 'Values to send';
-    if (vehicle == null) return VehicleRemovedPage(title: title);
-    final values = ref.watch(vehicleValuesProvider(widget.vehicleId))!;
     final query = TextQuery(_query);
     final view = ValuesView.of(
       values.options,

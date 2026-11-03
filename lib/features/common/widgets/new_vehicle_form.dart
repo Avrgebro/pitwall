@@ -5,6 +5,9 @@ import '../../../ui/ui.dart';
 import 'adapter_picker.dart';
 import 'vehicle_name_field.dart';
 
+/// A vehicle ready to save: its name, trimmed, and its adapter.
+typedef NewVehicle = ({String name, BondedDevice adapter});
+
 /// What the user has entered for a new vehicle so far.
 @immutable
 class VehicleDraft {
@@ -13,8 +16,14 @@ class VehicleDraft {
   final String name;
   final BondedDevice? adapter;
 
-  /// Whether the vehicle can be saved: it has a name and an adapter.
-  bool get isComplete => adapter != null && name.trim().isNotEmpty;
+  /// The vehicle to save, once it has a name and an adapter.
+  NewVehicle? get complete => switch (adapter) {
+    final adapter? when name.trim().isNotEmpty => (
+      name: name.trim(),
+      adapter: adapter,
+    ),
+    _ => null,
+  };
 
   VehicleDraft withName(String name) =>
       VehicleDraft(name: name, adapter: adapter);

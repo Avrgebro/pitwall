@@ -19,10 +19,10 @@ class AddVehicleScreen extends ConsumerStatefulWidget {
 class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   VehicleDraft _draft = const VehicleDraft();
 
-  Future<void> _save() async {
+  Future<void> _save(NewVehicle draft) async {
     final vehicle = await ref
         .read(appSettingsProvider.notifier)
-        .addVehicle(name: _draft.name, adapter: _draft.adapter!);
+        .addVehicle(name: draft.name, adapter: draft.adapter);
     if (!mounted) return;
     // The phone is usually in the car right now, the best moment to pick
     // its stereo.
@@ -63,7 +63,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       child: SizedBox(
         width: double.infinity,
         child: GlassButton(
-          onPressed: _draft.isComplete ? _save : null,
+          onPressed: switch (_draft.complete) {
+            final draft? => () => _save(draft),
+            null => null,
+          },
           child: const Text('Add vehicle'),
         ),
       ),
