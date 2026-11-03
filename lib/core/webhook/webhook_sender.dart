@@ -50,13 +50,8 @@ class WebhookSender {
 
   final status = ValueNotifier(const DeliveryStatus());
 
-  /// How the last attempts went, which only deliveries change.
-  _Outcome _outcome = (
-    failedAttempts: 0,
-    lastSuccess: null,
-    lastFailure: null,
-    lastError: null,
-  );
+  /// How the attempts so far went, which only deliveries change.
+  DeliveryOutcome _outcome = const DeliveryOutcome();
 
   /// Oldest first; sequence numbers only go up.
   List<QueuedReading> _queue = [];
@@ -111,7 +106,7 @@ class WebhookSender {
   /// send fails, and completes then. A delivery already under way is the
   /// one waited for: it takes in readings queued meanwhile. After a failure
   /// that retrying can fix, a retry is scheduled; see
-  /// [DeliveryErrorKind.retryable].
+  /// [DeliveryError.fix].
   Future<void> flush() =>
       _flushing ??= _deliver().whenComplete(() => _flushing = null);
 
@@ -191,10 +186,10 @@ class WebhookSender {
       statusCode = response.statusCode;
       error = _errorFor(response.statusCode);
     } on TimeoutException {
-      error = const DeliveryError(DeliveryErrorKind.timeout);
+      error = const TimedOut();
     } on Exception {
       // Network errors can mention the URL, so only the kind is kept.
-      error = const DeliveryError(DeliveryErrorKind.unreachable);
+      error = const Unreachable();
     }
     stopwatch.stop();
     onAttempt?.call(
@@ -211,46 +206,30 @@ class WebhookSender {
   /// Why [target] can't be sent to, as [WebhookTarget.problem] decides.
   static DeliveryError? _unusable(WebhookTarget target) =>
       switch (target.problem) {
+        final problem? => UnusableWebhook(problem),
         null => null,
-        NoWebhookUrl() => const DeliveryError(DeliveryErrorKind.noUrl),
-        BadWebhookUrl() => const DeliveryError(DeliveryErrorKind.invalidUrl),
-        IncompleteWebhookAuth(:final problem) => DeliveryError(
-          DeliveryErrorKind.authIncomplete,
-          authProblem: problem,
-        ),
       };
 
   static DeliveryError? _errorFor(int statusCode) => switch (statusCode) {
     >= 200 && < 300 => null,
-    401 ||
-    403 => DeliveryError(DeliveryErrorKind.refused, statusCode: statusCode),
-    404 => const DeliveryError(DeliveryErrorKind.notFound, statusCode: 404),
-    _ => DeliveryError(DeliveryErrorKind.serverError, statusCode: statusCode),
+    _ => Rejected(statusCode),
   };
 
   void _succeeded() {
-    _outcome = (
-      failedAttempts: 0,
-      lastSuccess: _clock(),
-      lastFailure: _outcome.lastFailure,
-      lastError: null,
-    );
+    _outcome = _outcome.succeeded(_clock());
     _publish();
   }
 
   void _failed(DeliveryError error) {
-    final attempts = _outcome.failedAttempts + 1;
-    _outcome = (
-      failedAttempts: attempts,
-      lastSuccess: _outcome.lastSuccess,
-      lastFailure: _clock(),
-      lastError: error,
-    );
+    _outcome = _outcome.failed(error, _clock());
     _publish();
     // Only the user can fix the rest; delivery resumes on the next send,
     // when the webhook settings change, or on Retry.
-    if (!error.kind.retryable) return;
-    _retry = Timer(_backoff(attempts - 1), () => unawaited(flush()));
+    if (error.fix != DeliveryFix.retry) return;
+    _retry = Timer(
+      _backoff(_outcome.failedAttempts - 1),
+      () => unawaited(flush()),
+    );
   }
 
   /// Shows the queue and the last delivery outcome as they are now.
@@ -258,11 +237,8 @@ class WebhookSender {
     if (_disposed) return;
     status.value = DeliveryStatus(
       queued: _queue.length,
-      failedAttempts: _outcome.failedAttempts,
-      lastSuccess: _outcome.lastSuccess,
-      lastFailure: _outcome.lastFailure,
-      lastError: _outcome.lastError,
       deliveredThrough: _deliveredThrough,
+      outcome: _outcome,
     );
   }
 
@@ -274,11 +250,3 @@ class WebhookSender {
     ),
   );
 }
-
-/// The part of [DeliveryStatus] that deliveries decide.
-typedef _Outcome = ({
-  int failedAttempts,
-  DateTime? lastSuccess,
-  DateTime? lastFailure,
-  DeliveryError? lastError,
-});

@@ -8,45 +8,44 @@ import '../../core/webhook/webhook_target.dart';
 abstract final class DeliveryText {
   /// A short headline and an explanation for [error].
   static ({String title, String message}) error(DeliveryError error) =>
-      switch (error.kind) {
-        DeliveryErrorKind.noUrl => (
+      switch (error) {
+        UnusableWebhook(problem: NoWebhookUrl()) => (
           title: 'No webhook set',
           message:
               'Readings stay on this phone until you add a webhook URL in '
               'Settings.',
         ),
-        DeliveryErrorKind.authIncomplete => (
+        UnusableWebhook(problem: IncompleteWebhookAuth(:final problem)) => (
           title: 'Authentication isn\'t finished',
-          message: authProblem(error.authProblem!),
+          message: authProblem(problem),
         ),
-        DeliveryErrorKind.invalidUrl => (
+        UnusableWebhook(problem: BadWebhookUrl(:final problem)) => (
           title: 'The webhook URL isn\'t valid',
-          message: 'Check the URL in Settings.',
+          message: urlProblem(problem),
         ),
-        DeliveryErrorKind.refused => (
-          title: 'The webhook is refusing readings',
-          message:
-              'The server says this phone isn\'t allowed to send '
-              '(HTTP ${error.statusCode}). The URL or its token may have '
-              'changed.',
-        ),
-        DeliveryErrorKind.notFound => (
+        Rejected(statusCode: 404) => (
           title: 'The webhook doesn\'t exist',
           message:
               'The server doesn\'t know this webhook (HTTP 404). Check the '
               'URL in Settings.',
         ),
-        DeliveryErrorKind.serverError => (
+        Rejected(:final statusCode) when error.fix == DeliveryFix.server => (
+          title: 'The webhook is refusing readings',
+          message:
+              'The server says this phone isn\'t allowed to send '
+              '(HTTP $statusCode). The URL or its token may have changed.',
+        ),
+        Rejected(:final statusCode) => (
           title: 'The server is having trouble',
           message:
-              'It answered with an error (HTTP ${error.statusCode}). '
-              'Pitwall keeps trying.',
+              'It answered with an error (HTTP $statusCode). Pitwall keeps '
+              'trying.',
         ),
-        DeliveryErrorKind.timeout => (
+        TimedOut() => (
           title: 'The server is slow to answer',
           message: 'Pitwall keeps trying.',
         ),
-        DeliveryErrorKind.unreachable => (
+        Unreachable() => (
           title: 'Couldn\'t reach the server',
           message:
               'Nothing answered at this address. Check that the server is '

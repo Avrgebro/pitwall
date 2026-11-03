@@ -67,7 +67,7 @@ void main() {
     expect(received.first['device'], 'tucson');
     expect(received.first['values'], {'tucson_fli_vol': 47.5});
     expect(pitwall.status.value.queued, 0);
-    expect(pitwall.status.value.lastSuccess, isNotNull);
+    expect(pitwall.status.value.outcome.lastSuccess, isNotNull);
     pitwall.dispose();
   });
 
@@ -79,10 +79,7 @@ void main() {
     await sendFuel(pitwall, 47.5);
     expect(received, isEmpty);
     expect(pitwall.status.value.queued, 1);
-    expect(
-      pitwall.status.value.lastError,
-      const DeliveryError(DeliveryErrorKind.serverError, statusCode: 500),
-    );
+    expect(pitwall.status.value.outcome.lastError, const Rejected(500));
 
     await sendFuel(pitwall, 47);
     // The retries succeed once the server recovers.
@@ -90,7 +87,7 @@ void main() {
 
     expect(received.map((p) => p['seq']), [1, 2]);
     expect(pitwall.status.value.queued, 0);
-    expect(pitwall.status.value.lastError, isNull);
+    expect(pitwall.status.value.outcome.lastError, isNull);
     pitwall.dispose();
   });
 
@@ -120,7 +117,10 @@ void main() {
 
     expect(received, isEmpty);
     expect(pitwall.status.value.queued, 1);
-    expect(pitwall.status.value.lastError?.kind, DeliveryErrorKind.noUrl);
+    expect(
+      pitwall.status.value.outcome.lastError,
+      const UnusableWebhook(NoWebhookUrl()),
+    );
     pitwall.dispose();
   });
 
@@ -135,7 +135,7 @@ void main() {
     final result = await pitwall.sendTest(_target);
 
     // Only the kind is kept: the exception text, which names the URL, isn't.
-    expect(result.error, const DeliveryError(DeliveryErrorKind.unreachable));
+    expect(result.error, const Unreachable());
     pitwall.dispose();
   });
 
@@ -155,10 +155,7 @@ void main() {
     failNext = 1;
     final pitwall = sender(client: server(status: 401));
 
-    expect(
-      (await pitwall.sendTest(_target)).error,
-      const DeliveryError(DeliveryErrorKind.refused, statusCode: 401),
-    );
+    expect((await pitwall.sendTest(_target)).error, const Rejected(401));
     pitwall.dispose();
   });
 
@@ -204,7 +201,7 @@ void main() {
 
     // Three failures, each backing off further, then a success.
     expect(waits, [0, 1, 2]);
-    expect(pitwall.status.value.failedAttempts, 0);
+    expect(pitwall.status.value.outcome.failedAttempts, 0);
     expect(received, hasLength(1));
     pitwall.dispose();
   });
@@ -238,11 +235,8 @@ void main() {
     expect(received, isEmpty);
     expect(pitwall.status.value.queued, 1);
     expect(
-      pitwall.status.value.lastError,
-      const DeliveryError(
-        DeliveryErrorKind.authIncomplete,
-        authProblem: AuthProblem.missingToken,
-      ),
+      pitwall.status.value.outcome.lastError,
+      const UnusableWebhook(IncompleteWebhookAuth(AuthProblem.missingToken)),
     );
     pitwall.dispose();
   });

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/webhook/webhook_auth.dart';
+import '../../../core/webhook/webhook_target.dart';
 import '../../../state/webhook_state.dart';
 import '../../../ui/ui.dart';
 import '../delivery_text.dart';
@@ -83,9 +84,11 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
               label: 'Webhook URL',
               keyboardType: TextInputType.url,
               helperText: 'Stored securely on this phone',
-              errorText: switch (draft.urlProblem) {
-                final problem? => DeliveryText.urlProblem(problem),
-                null => null,
+              errorText: switch (draft.problem) {
+                BadWebhookUrl(:final problem) => DeliveryText.urlProblem(
+                  problem,
+                ),
+                _ => null,
               },
               multilineWhenShown: true,
               onChanged: _webhook.editUrl,

@@ -11,24 +11,45 @@ enum WebhookUrlProblem {
 }
 
 /// Why readings can't be sent to a webhook target.
+@immutable
 sealed class WebhookProblem {
   const WebhookProblem();
 }
 
 final class NoWebhookUrl extends WebhookProblem {
   const NoWebhookUrl();
+
+  @override
+  bool operator ==(Object other) => other is NoWebhookUrl;
+
+  @override
+  int get hashCode => (NoWebhookUrl).hashCode;
 }
 
 final class BadWebhookUrl extends WebhookProblem {
   const BadWebhookUrl(this.problem);
 
   final WebhookUrlProblem problem;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BadWebhookUrl && other.problem == problem;
+
+  @override
+  int get hashCode => problem.hashCode;
 }
 
 final class IncompleteWebhookAuth extends WebhookProblem {
   const IncompleteWebhookAuth(this.problem);
 
   final AuthProblem problem;
+
+  @override
+  bool operator ==(Object other) =>
+      other is IncompleteWebhookAuth && other.problem == problem;
+
+  @override
+  int get hashCode => problem.hashCode;
 }
 
 /// Where readings go: the webhook URL and its credentials. Kept together in
@@ -43,11 +64,11 @@ class WebhookTarget {
   final String url;
   final WebhookAuth auth;
 
-  bool get hasUrl => url.isNotEmpty;
+  bool get _hasUrl => url.isNotEmpty;
 
   /// Why the URL can't be used, or null if it can or there's none.
-  WebhookUrlProblem? get urlProblem {
-    if (!hasUrl) return null;
+  WebhookUrlProblem? get _urlProblem {
+    if (!_hasUrl) return null;
     final uri = Uri.tryParse(url);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       return WebhookUrlProblem.incomplete;
@@ -59,17 +80,27 @@ class WebhookTarget {
   }
 
   /// Plain http: readings, and any credentials, travel unencrypted.
-  bool get isInsecure => urlProblem == null && Uri.parse(url).scheme == 'http';
+  bool get isInsecure =>
+      _hasUrl && _urlProblem == null && Uri.parse(url).scheme == 'http';
 
   /// Why readings can't be sent here, or null if they can.
   WebhookProblem? get problem {
-    if (!hasUrl) return const NoWebhookUrl();
-    if (urlProblem case final problem?) return BadWebhookUrl(problem);
+    if (!_hasUrl) return const NoWebhookUrl();
+    if (_urlProblem case final problem?) return BadWebhookUrl(problem);
     if (auth.problem case final problem?) return IncompleteWebhookAuth(problem);
     return null;
   }
 
   bool get isUsable => problem == null;
+
+  /// Whether it has a URL, usable or not.
+  bool get hasUrl => problem is! NoWebhookUrl;
+
+  /// Whether the URL can be used, whatever the credentials.
+  bool get urlUsable => switch (problem) {
+    NoWebhookUrl() || BadWebhookUrl() => false,
+    IncompleteWebhookAuth() || null => true,
+  };
 
   WebhookTarget copyWith({String? url, WebhookAuth? auth}) =>
       WebhookTarget(url ?? this.url, auth ?? this.auth);

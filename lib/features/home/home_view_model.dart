@@ -251,8 +251,8 @@ class HomeViewModel {
   ) {
     String count(int n) => n == 0 ? 'None' : '$n';
     final queued = status.queued;
-    final error = status.lastError;
-    final lastSuccess = status.lastSuccess;
+    final DeliveryOutcome(:failedAttempts, :lastSuccess, lastError: error) =
+        status.outcome;
     // The same three facts on every card that has sent or tried to.
     List<({DeliveryStatKind kind, String label, String value})> stats({
       String lastSentLabel = 'Last sent',
@@ -265,7 +265,7 @@ class HomeViewModel {
       (
         kind: DeliveryStatKind.failed,
         label: 'Failed',
-        value: count(status.failedAttempts),
+        value: count(failedAttempts),
       ),
       (kind: DeliveryStatKind.queued, label: 'Queued', value: count(queued)),
     ];
@@ -298,24 +298,22 @@ class HomeViewModel {
       }
       return DeliveryCardModel(
         kind: DeliveryCardKind.healthy,
-        title: status.lastSuccess == null
-            ? 'Ready to send'
-            : 'Delivery healthy',
+        title: lastSuccess == null ? 'Ready to send' : 'Delivery healthy',
         stats: stats(),
       );
     }
 
     // Retried on its own, so there's nothing to offer.
-    if (error.kind.retryable) {
+    if (error.fix == DeliveryFix.retry) {
       final readings = queued == 1 ? '1 reading' : '$queued readings';
       return DeliveryCardModel(
         kind: DeliveryCardKind.queued,
-        title: switch (error.kind) {
-          DeliveryErrorKind.unreachable => 'No signal, $readings queued',
-          DeliveryErrorKind.timeout => 'Server slow, $readings queued',
+        title: switch (error) {
+          Unreachable() => 'No signal, $readings queued',
+          TimedOut() => 'Server slow, $readings queued',
           _ => 'Server trouble, $readings queued',
         },
-        message: error.kind == DeliveryErrorKind.unreachable
+        message: error is Unreachable
             ? 'They\'ll be sent automatically when the phone is back '
                   'online. Nothing to do.'
             : DeliveryText.error(error).message,
@@ -333,7 +331,7 @@ class HomeViewModel {
       stats: stats(lastSentLabel: 'Last success'),
       actions: {
         DeliveryAction.openSettings,
-        if (error.kind.fix == DeliveryFix.server) DeliveryAction.retry,
+        if (error.fix == DeliveryFix.server) DeliveryAction.retry,
       },
     );
   }
@@ -362,11 +360,11 @@ class HomeViewModel {
         false => 'Latest readings',
         null => 'Last values',
       },
-      meta: switch ((delivered, status.lastError)) {
+      meta: switch ((delivered, status.outcome.lastError)) {
         (true, _) => 'Updated $ago',
         (null, _) => 'Read $ago',
         (false, null) => 'Read $ago, sending',
-        (false, final error?) when error.kind.retryable =>
+        (false, final error?) when error.fix == DeliveryFix.retry =>
           'Read $ago, not sent yet',
         (false, _) => 'Read $ago, not delivered',
       },

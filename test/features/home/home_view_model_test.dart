@@ -60,7 +60,9 @@ void main() {
     final model = build(
       activity: driving,
       delivery: DeliveryStatus(
-        lastSuccess: now.subtract(const Duration(seconds: 40)),
+        outcome: DeliveryOutcome(
+          lastSuccess: now.subtract(const Duration(seconds: 40)),
+        ),
         deliveredThrough: 1,
       ),
       lastValues: lastReading(),
@@ -91,7 +93,9 @@ void main() {
   test('1b parked, waiting for the car', () {
     final model = build(
       delivery: DeliveryStatus(
-        lastSuccess: now.subtract(const Duration(hours: 2)),
+        outcome: DeliveryOutcome(
+          lastSuccess: now.subtract(const Duration(hours: 2)),
+        ),
         deliveredThrough: 1,
       ),
       lastValues: lastReading(at: now.subtract(const Duration(hours: 2))),
@@ -170,9 +174,11 @@ void main() {
       activity: driving,
       delivery: DeliveryStatus(
         queued: 3,
-        failedAttempts: 4,
-        lastSuccess: now.subtract(const Duration(minutes: 3)),
-        lastError: const DeliveryError(DeliveryErrorKind.unreachable),
+        outcome: DeliveryOutcome(
+          failedAttempts: 4,
+          lastSuccess: now.subtract(const Duration(minutes: 3)),
+          lastError: const Unreachable(),
+        ),
       ),
       lastValues: lastReading(),
     );
@@ -193,11 +199,10 @@ void main() {
       activity: driving,
       delivery: DeliveryStatus(
         queued: 12,
-        failedAttempts: 12,
-        lastSuccess: now.subtract(const Duration(days: 1)),
-        lastError: const DeliveryError(
-          DeliveryErrorKind.refused,
-          statusCode: 401,
+        outcome: DeliveryOutcome(
+          failedAttempts: 12,
+          lastSuccess: now.subtract(const Duration(days: 1)),
+          lastError: const Rejected(401),
         ),
       ),
       lastValues: lastReading(),
@@ -269,13 +274,19 @@ void main() {
   test('delivered goes by the reading\'s number, not the vehicle\'s name', () {
     // The vehicle was renamed since; its values still know their reading.
     final model = build(
-      delivery: DeliveryStatus(lastSuccess: now, deliveredThrough: 1),
+      delivery: DeliveryStatus(
+        outcome: DeliveryOutcome(lastSuccess: now),
+        deliveredThrough: 1,
+      ),
       lastValues: lastReading(),
     );
     expect(model.values!.title, 'Last values sent');
 
     final waiting = build(
-      delivery: DeliveryStatus(lastSuccess: now, deliveredThrough: 0),
+      delivery: DeliveryStatus(
+        outcome: DeliveryOutcome(lastSuccess: now),
+        deliveredThrough: 0,
+      ),
       lastValues: lastReading(),
     );
     expect(waiting.values!.title, 'Latest readings');

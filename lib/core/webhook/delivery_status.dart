@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'webhook_auth.dart';
+import 'webhook_target.dart';
 
 /// What gets a failed delivery going again.
 enum DeliveryFix {
@@ -15,83 +15,94 @@ enum DeliveryFix {
   server,
 }
 
-enum DeliveryErrorKind {
-  /// No webhook URL is set.
-  noUrl(DeliveryFix.settings),
-
-  /// Authentication is chosen but incomplete.
-  authIncomplete(DeliveryFix.settings),
-
-  /// The URL can't be parsed.
-  invalidUrl(DeliveryFix.settings),
-
-  /// HTTP 401 or 403: the server doesn't accept these credentials or URL.
-  refused(DeliveryFix.server),
-
-  /// HTTP 404: the server doesn't know this webhook.
-  notFound(DeliveryFix.server),
-
-  /// Any other non-2xx answer.
-  serverError(DeliveryFix.retry),
-
-  /// The server didn't answer in time.
-  timeout(DeliveryFix.retry),
-
-  /// The server couldn't be reached: no signal, wrong host, server down.
-  unreachable(DeliveryFix.retry);
-
-  const DeliveryErrorKind(this.fix);
-
-  final DeliveryFix fix;
-
-  /// Whether retrying later can help without the user changing anything.
-  /// The sender retries only these.
-  bool get retryable => fix == DeliveryFix.retry;
-
-  /// Whether the user has to change something, in Settings or on the
-  /// server.
-  bool get needsUser => !retryable;
-}
-
 /// Why a delivery failed. Descriptions for people are written by the UI;
 /// nothing here contains the URL or credentials.
 @immutable
-class DeliveryError {
-  const DeliveryError(this.kind, {this.statusCode, this.authProblem});
+sealed class DeliveryError {
+  const DeliveryError();
 
-  final DeliveryErrorKind kind;
+  /// What gets delivery going again. The sender retries only
+  /// [DeliveryFix.retry].
+  DeliveryFix get fix;
+}
 
-  /// The HTTP status, for errors the server answered with.
-  final int? statusCode;
+/// The webhook settings can't be used, so nothing was sent.
+final class UnusableWebhook extends DeliveryError {
+  const UnusableWebhook(this.problem);
 
-  /// For [DeliveryErrorKind.authIncomplete], what's wrong.
-  final AuthProblem? authProblem;
+  final WebhookProblem problem;
+
+  @override
+  DeliveryFix get fix => DeliveryFix.settings;
 
   @override
   bool operator ==(Object other) =>
-      other is DeliveryError &&
-      other.kind == kind &&
-      other.statusCode == statusCode &&
-      other.authProblem == authProblem;
+      other is UnusableWebhook && other.problem == problem;
 
   @override
-  int get hashCode => Object.hash(kind, statusCode, authProblem);
+  int get hashCode => problem.hashCode;
 }
 
-/// How delivery is going, for the status shown to the user.
+/// The server answered with an error status.
+final class Rejected extends DeliveryError {
+  const Rejected(this.statusCode);
+
+  final int statusCode;
+
+  /// 401 and 403 refuse this phone or its credentials, and 404 doesn't know
+  /// the webhook: only a change on the server or in the settings helps.
+  /// Anything else may pass.
+  @override
+  DeliveryFix get fix => switch (statusCode) {
+    401 || 403 || 404 => DeliveryFix.server,
+    _ => DeliveryFix.retry,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is Rejected && other.statusCode == statusCode;
+
+  @override
+  int get hashCode => statusCode.hashCode;
+}
+
+/// The server didn't answer in time.
+final class TimedOut extends DeliveryError {
+  const TimedOut();
+
+  @override
+  DeliveryFix get fix => DeliveryFix.retry;
+
+  @override
+  bool operator ==(Object other) => other is TimedOut;
+
+  @override
+  int get hashCode => (TimedOut).hashCode;
+}
+
+/// The server couldn't be reached: no signal, wrong host, server down.
+final class Unreachable extends DeliveryError {
+  const Unreachable();
+
+  @override
+  DeliveryFix get fix => DeliveryFix.retry;
+
+  @override
+  bool operator ==(Object other) => other is Unreachable;
+
+  @override
+  int get hashCode => (Unreachable).hashCode;
+}
+
+/// How the attempts so far went. Only deliveries change it.
 @immutable
-class DeliveryStatus {
-  const DeliveryStatus({
-    this.queued = 0,
+class DeliveryOutcome {
+  const DeliveryOutcome({
     this.failedAttempts = 0,
     this.lastSuccess,
     this.lastFailure,
     this.lastError,
-    this.deliveredThrough = 0,
   });
-
-  /// Readings waiting to be delivered.
-  final int queued;
 
   /// Failed attempts since the last success.
   final int failedAttempts;
@@ -101,11 +112,36 @@ class DeliveryStatus {
   /// Why the last attempt failed. Null after a success.
   final DeliveryError? lastError;
 
+  DeliveryOutcome succeeded(DateTime at) =>
+      DeliveryOutcome(lastSuccess: at, lastFailure: lastFailure);
+
+  DeliveryOutcome failed(DeliveryError error, DateTime at) => DeliveryOutcome(
+    failedAttempts: failedAttempts + 1,
+    lastSuccess: lastSuccess,
+    lastFailure: at,
+    lastError: error,
+  );
+}
+
+/// How delivery is going, for the status shown to the user.
+@immutable
+class DeliveryStatus {
+  const DeliveryStatus({
+    this.queued = 0,
+    this.deliveredThrough = 0,
+    this.outcome = const DeliveryOutcome(),
+  });
+
+  /// Readings waiting to be delivered.
+  final int queued;
+
   /// The newest reading delivered; see `WebhookSender.queue`. Readings go
   /// out in order, so every one before it has left the queue too: delivered,
   /// or dropped when the queue was full. Only the oldest are ever dropped,
   /// never the newest.
   final int deliveredThrough;
+
+  final DeliveryOutcome outcome;
 }
 
 /// One POST to the webhook, for the developer log.

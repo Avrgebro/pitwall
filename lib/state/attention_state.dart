@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/webhook/delivery_status.dart';
+
 import 'permissions_state.dart';
 import 'settings_state.dart';
 import 'webhook_state.dart';
@@ -8,9 +10,9 @@ import 'webhook_state.dart';
 /// or a missing permission.
 final settingsAttentionProvider = Provider<bool>((ref) {
   final error = ref.watch(
-    deliveryStatusProvider.select((status) => status.lastError),
+    deliveryStatusProvider.select((status) => status.outcome.lastError),
   );
-  return (error != null && error.kind.needsUser) ||
+  return (error != null && error.fix != DeliveryFix.retry) ||
       ref.watch(missingPermissionsProvider) > 0;
 });
 

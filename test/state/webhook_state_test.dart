@@ -32,7 +32,10 @@ void main() {
       await webhook.save();
       // Not a usable URL, so the working one stays.
       final state = container.read(webhookProvider).requireValue;
-      expect(state.draft.urlProblem, WebhookUrlProblem.incomplete);
+      expect(
+        state.draft.problem,
+        const BadWebhookUrl(WebhookUrlProblem.incomplete),
+      );
       expect(state.saved, working);
       expect(store.webhook, working);
 

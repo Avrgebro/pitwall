@@ -5,29 +5,27 @@ import 'package:pitwall/core/webhook/webhook_target.dart';
 void main() {
   test('accepts https and http URLs', () {
     expect(
-      const WebhookTarget('https://example.com/api/webhook/abc').urlProblem,
+      const WebhookTarget('https://example.com/api/webhook/abc').problem,
       isNull,
     );
-    expect(
-      const WebhookTarget('http://192.168.1.10:8123/x').urlProblem,
-      isNull,
-    );
+    expect(const WebhookTarget('http://192.168.1.10:8123/x').problem, isNull);
   });
 
   test('rejects anything else', () {
     expect(
-      const WebhookTarget('example.com/hook').urlProblem,
-      WebhookUrlProblem.incomplete,
+      const WebhookTarget('example.com/hook').problem,
+      const BadWebhookUrl(WebhookUrlProblem.incomplete),
     );
     expect(
-      const WebhookTarget('ftp://example.com/hook').urlProblem,
-      WebhookUrlProblem.unsupportedScheme,
+      const WebhookTarget('ftp://example.com/hook').problem,
+      const BadWebhookUrl(WebhookUrlProblem.unsupportedScheme),
     );
   });
 
-  test('no URL is not a problem with the URL, but not usable', () {
-    expect(WebhookTarget.none.urlProblem, isNull);
+  test('no URL is its own problem', () {
+    expect(WebhookTarget.none.problem, const NoWebhookUrl());
     expect(WebhookTarget.none.isUsable, isFalse);
+    expect(WebhookTarget.none.hasUrl, isFalse);
   });
 
   test('plain http is flagged as unencrypted', () {

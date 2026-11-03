@@ -31,7 +31,7 @@ class WebhookSettings {
   bool get hasUrl => saved.hasUrl;
 
   /// Whether the draft has a URL that saving would keep.
-  bool get draftHasUrl => draft.hasUrl && draft.urlProblem == null;
+  bool get draftHasUrl => draft.urlUsable;
 
   /// A test saves the draft first, so the result says what readings get.
   bool get canTest => draft.isUsable;
@@ -81,7 +81,8 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
     final current = _current;
     final draft = current.draft;
     final saved = current.saved.copyWith(
-      url: draft.urlProblem == null ? draft.url : null,
+      // No URL is kept too: it removes the saved one.
+      url: draft.problem is BadWebhookUrl ? null : draft.url,
       auth: draft.auth.problem == null ? draft.auth : null,
     );
     if (saved == current.saved) return;

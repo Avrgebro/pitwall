@@ -13,11 +13,10 @@ abstract final class SettingsSummary {
     DateTime now,
   ) {
     if (!webhook.hasUrl) return (text: 'Not set yet', problem: true);
-    final error = status.lastError;
-    if (error != null && error.kind.needsUser) {
-      return (text: DeliveryText.error(error).title, problem: true);
+    final DeliveryOutcome(:lastError, :lastSuccess) = status.outcome;
+    if (lastError != null && lastError.fix != DeliveryFix.retry) {
+      return (text: DeliveryText.error(lastError).title, problem: true);
     }
-    final lastSuccess = status.lastSuccess;
     return (
       text: lastSuccess == null
           ? 'Nothing sent yet'
