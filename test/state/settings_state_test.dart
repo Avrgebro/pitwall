@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
@@ -250,6 +252,45 @@ void main() {
       expect(vehicle.modelYear, 2023);
     });
 
+    test('a rename while the profile is written is kept', () async {
+      final (container, store) = await start();
+      final notifier = container.read(appSettingsProvider.notifier);
+      final write = Completer<void>();
+      store.profileWrite = write.future;
+
+      final importing = notifier.importProfile(
+        'tucson',
+        const PickedFile(name: 'default.json', contents: testProfileJson),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await notifier.renameVehicle('tucson', 'Hyundai Tucson');
+      write.complete();
+      await importing;
+
+      final vehicle = store.settings.vehicleById('tucson')!;
+      expect(vehicle.name, 'Hyundai Tucson');
+      expect(vehicle.profile?.name, 'default.json');
+    });
+
+    test('a vehicle deleted while its profile is written stays gone', () async {
+      final (container, store) = await start();
+      final notifier = container.read(appSettingsProvider.notifier);
+      final write = Completer<void>();
+      store.profileWrite = write.future;
+
+      final importing = notifier.importProfile(
+        'tucson',
+        const PickedFile(name: 'default.json', contents: testProfileJson),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await notifier.deleteVehicle('tucson');
+      write.complete();
+      await importing;
+
+      expect(store.settings.vehicles, isEmpty);
+      expect(store.profiles, isEmpty);
+    });
+
     test('Undo doesn\'t replace a profile imported since', () async {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
@@ -318,5 +359,27 @@ void main() {
         .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2), seq: 3);
 
     expect(storage.saved.of('tucson'), isEmpty);
+  });
+
+  test('settings land on disk in the order they were made', () async {
+    final store = FakeSettingsStore(
+      settings: const AppSettings(
+        vehicles: [Vehicle(id: 'tucson', name: 'A')],
+      ),
+    );
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    await container.read(appSettingsProvider.future);
+    final notifier = container.read(appSettingsProvider.notifier);
+    // The first write is slow; the second must not land before it.
+    final slow = Completer<void>();
+    store.nextSave = slow.future;
+
+    final first = notifier.renameVehicle('tucson', 'B');
+    final second = notifier.renameVehicle('tucson', 'C');
+    slow.complete();
+    await (first, second).wait;
+
+    expect(store.settings.vehicleById('tucson')!.name, 'C');
   });
 }

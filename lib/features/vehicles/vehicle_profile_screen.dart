@@ -57,8 +57,7 @@ class VehicleProfileScreen extends ConsumerWidget {
             profile: stored,
             onImport: () => _import(context, ref, vehicle),
             onRemove: () => _remove(context, ref, vehicle, stored),
-            onModelYear: (year) =>
-                notifier.saveVehicle(vehicle.copyWith(modelYear: year)),
+            onModelYear: (year) => notifier.setModelYear(vehicle.id, year),
           ),
         if ((stored, values.profile) case (LoadedProfile(), final summary?))
           ProfileContents(

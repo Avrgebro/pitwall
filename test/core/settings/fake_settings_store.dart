@@ -13,11 +13,23 @@ class FakeSettingsStore implements SettingsStore {
   WebhookTarget webhook = WebhookTarget.none;
   final Map<String, String> profiles = {};
 
+  /// Holds profile writes until it completes, to test what happens while
+  /// one is under way.
+  Future<void>? profileWrite;
+
+  /// Holds the next settings write until it completes.
+  Future<void>? nextSave;
+
   @override
   Future<AppSettings> load() async => settings;
 
   @override
-  Future<void> save(AppSettings settings) async => this.settings = settings;
+  Future<void> save(AppSettings settings) async {
+    final hold = nextSave;
+    nextSave = null;
+    if (hold != null) await hold;
+    this.settings = settings;
+  }
 
   @override
   Future<WebhookTarget> loadWebhook() async => webhook;
@@ -41,8 +53,10 @@ class FakeSettingsStore implements SettingsStore {
   }
 
   @override
-  Future<void> saveProfile(String vehicleId, SignalSet profile) async =>
-      profiles[vehicleId] = profile.source;
+  Future<void> saveProfile(String vehicleId, SignalSet profile) async {
+    if (profileWrite case final hold?) await hold;
+    profiles[vehicleId] = profile.source;
+  }
 
   @override
   Future<void> deleteProfile(String vehicleId) async =>

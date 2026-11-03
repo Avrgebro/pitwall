@@ -40,13 +40,17 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     required int seq,
   }) async {
     if (values.isEmpty) return;
-    final settings = await ref.read(appSettingsProvider.future);
+    await (future, ref.read(appSettingsProvider.future)).wait;
+    // Nothing is awaited from here to the change, so a delete can't fall
+    // in between and be undone.
+    final settings = ref.read(appSettingsProvider).requireValue;
     if (settings.vehicleById(vehicleId) == null) return;
-    await _save((await future).record(vehicleId, values, at, seq: seq));
+    await _save(state.requireValue.record(vehicleId, values, at, seq: seq));
   }
 
   Future<void> _keepOnly(Set<String> vehicleIds) async {
-    final current = await future;
+    await future;
+    final current = state.requireValue;
     final kept = current.only(vehicleIds);
     if (kept.byVehicle.length != current.byVehicle.length) await _save(kept);
   }
@@ -56,8 +60,16 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     FlutterErrorDetails(exception: error, stack: stack, library: 'last values'),
   );
 
-  Future<void> _save(LastValues values) async {
+  /// Writes to storage, one after another, so the file ends up with the
+  /// newest values.
+  Future<void> _writes = Future.value();
+
+  /// Makes [values] current, then writes them; see
+  /// `AppSettingsNotifier._save`.
+  Future<void> _save(LastValues values) {
     state = AsyncData(values);
-    await _storage.save(values);
+    final write = _writes.then((_) => _storage.save(values));
+    _writes = write.then((_) {}, onError: (_) {});
+    return write;
   }
 }
