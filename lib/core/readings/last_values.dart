@@ -7,14 +7,14 @@ import '../storage/app_files.dart';
 /// A value as last read from the car, and when.
 @immutable
 class LastValue {
-  const LastValue(this.value, this.readAt, {this.seq});
+  const LastValue(this.value, this.readAt, {required this.seq});
 
   final num value;
   final DateTime readAt;
 
   /// The sequence number of the reading it went out in, to tell whether
-  /// it's delivered. Null for values kept by earlier versions.
-  final int? seq;
+  /// it's delivered.
+  final int seq;
 
   @override
   bool operator ==(Object other) =>
@@ -40,11 +40,30 @@ class LastValues {
   Map<String, LastValue> of(String vehicleId) =>
       byVehicle[vehicleId] ?? const {};
 
+  /// The vehicle's values for [keys] only, and the newest of them. A value
+  /// it no longer sends says nothing about the car now.
+  ({Map<String, LastValue> values, LastValue? newest}) sentOf(
+    String vehicleId,
+    Set<String> keys,
+  ) {
+    final values = {
+      for (final MapEntry(:key, :value) in of(vehicleId).entries)
+        if (keys.contains(key)) key: value,
+    };
+    LastValue? newest;
+    for (final value in values.values) {
+      if (newest == null || value.readAt.isAfter(newest.readAt)) {
+        newest = value;
+      }
+    }
+    return (values: values, newest: newest);
+  }
+
   LastValues record(
     String vehicleId,
     Map<String, num> values,
     DateTime at, {
-    int? seq,
+    required int seq,
   }) => LastValues({
     ...byVehicle,
     vehicleId: {
@@ -67,12 +86,14 @@ class LastValues {
           key: {
             'value': value.value,
             'at': value.readAt.toIso8601String(),
-            'seq': ?value.seq,
+            'seq': value.seq,
           },
       },
   };
 
-  /// Entries that don't parse are left out.
+  /// Entries that don't parse are left out. Values kept before readings
+  /// were numbered went out long ago, so they read as delivered, numbered
+  /// 0; the next save keeps them that way.
   factory LastValues.fromJson(Map<String, Object?> json) => LastValues({
     for (final MapEntry(key: vehicleId, value: values) in json.entries)
       if (values is Map)
@@ -88,7 +109,7 @@ class LastValues {
                   readAt,
                   seq: switch (values[key]) {
                     {'seq': final int seq} => seq,
-                    _ => null,
+                    _ => 0,
                   },
                 ),
         },

@@ -52,7 +52,7 @@ void main() {
     delivery: delivery,
     hasWebhook: hasWebhook,
     values: VehicleValues.of(vehicle, null),
-    lastValues: lastValues,
+    lastValues: LastValues({vehicle.id: lastValues}),
     now: now,
   );
 
@@ -114,11 +114,12 @@ void main() {
 
   test('another car\'s newer reading doesn\'t hide this car\'s values', () {
     final model = build(
-      delivery: DeliveryStatus(),
+      delivery: const DeliveryStatus(deliveredThrough: 1),
       lastValues: {
         'odometer_km': LastValue(
           33999.7,
           now.subtract(const Duration(hours: 1)),
+          seq: 1,
         ),
       },
     );
@@ -128,28 +129,35 @@ void main() {
       label: 'Last reading',
       value: '1 h ago',
     ));
-    expect(model.values!.title, 'Last values');
-    expect(model.values!.meta, 'Read 1 h ago');
+    expect(model.values!.title, 'Last values sent');
+    expect(model.values!.meta, 'Updated 1 h ago');
     expect(model.values!.tiles.single.value, '34,000');
   });
 
   test('values the car stopped reporting keep their own time', () {
     // Switching off: the last reading had only the battery voltage.
     final model = build(
+      delivery: const DeliveryStatus(deliveredThrough: 1),
       lastValues: {
-        'battery_v': LastValue(12.4, now.subtract(const Duration(minutes: 2))),
+        'battery_v': LastValue(
+          12.4,
+          now.subtract(const Duration(minutes: 2)),
+          seq: 1,
+        ),
         'odometer_km': LastValue(
           33999.7,
           now.subtract(const Duration(minutes: 6)),
+          seq: 1,
         ),
         'coolant_temp_c': LastValue(
           89,
           now.subtract(const Duration(minutes: 2, seconds: 30)),
+          seq: 1,
         ),
       },
     );
 
-    expect(model.values!.meta, 'Read 2 min ago');
+    expect(model.values!.meta, 'Updated 2 min ago');
     final notes = {for (final t in model.values!.tiles) t.label: t.note};
     expect(notes['Battery'], isNull);
     // Within a minute of the newest: no need to say.
@@ -160,8 +168,8 @@ void main() {
   test('values no longer sent aren\'t shown', () {
     final model = build(
       lastValues: {
-        'battery_v': LastValue(12.4, now),
-        'tucson_fli_vol': LastValue(47.5, now),
+        'battery_v': LastValue(12.4, now, seq: 1),
+        'tucson_fli_vol': LastValue(47.5, now, seq: 1),
       },
     );
 
@@ -295,9 +303,13 @@ void main() {
   test('a value no longer sent says nothing about the last reading', () {
     final model = build(
       lastValues: {
-        'battery_v': LastValue(12.4, now.subtract(const Duration(hours: 1))),
+        'battery_v': LastValue(
+          12.4,
+          now.subtract(const Duration(hours: 1)),
+          seq: 1,
+        ),
         // Fresher, but a profile value that's off.
-        'tucson_fli_vol': LastValue(47.5, now),
+        'tucson_fli_vol': LastValue(47.5, now, seq: 1),
       },
     );
 

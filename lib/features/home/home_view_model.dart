@@ -113,22 +113,11 @@ class HomeViewModel {
     required DeliveryStatus delivery,
     required bool hasWebhook,
     required VehicleValues values,
-    required Map<String, LastValue> lastValues,
+    required LastValues lastValues,
     required DateTime now,
   }) {
     final card = _delivery(delivery, hasWebhook, now);
-    // Only the values it still sends: one that's no longer sent says nothing
-    // about the car now.
-    final sent = {
-      for (final MapEntry(:key, :value) in lastValues.entries)
-        if (values.sent.contains(key)) key: value,
-    };
-    final newest = sent.values.fold<LastValue?>(
-      null,
-      (newest, value) => newest == null || value.readAt.isAfter(newest.readAt)
-          ? value
-          : newest,
-    );
+    final (values: sent, :newest) = lastValues.sentOf(vehicle.id, values.sent);
     return HomeViewModel(
       hero: _hero(
         vehicle: vehicle,
@@ -348,21 +337,12 @@ class HomeViewModel {
   }) {
     if (newest == null) return null;
     final ago = Formatters.ago(newest.readAt, now);
-    // Whether the reading it went out in is delivered; unknown for values
-    // kept before readings were numbered.
-    final delivered = switch (newest.seq) {
-      final seq? => seq <= status.deliveredThrough,
-      null => null,
-    };
+    // Whether the reading it went out in is delivered.
+    final delivered = newest.seq <= status.deliveredThrough;
     return ValuesModel(
-      title: switch (delivered) {
-        true => 'Last values sent',
-        false => 'Latest readings',
-        null => 'Last values',
-      },
+      title: delivered ? 'Last values sent' : 'Latest readings',
       meta: switch ((delivered, status.outcome.lastError)) {
         (true, _) => 'Updated $ago',
-        (null, _) => 'Read $ago',
         (false, null) => 'Read $ago, sending',
         (false, final error?) when error.fix == DeliveryFix.retry =>
           'Read $ago, not sent yet',

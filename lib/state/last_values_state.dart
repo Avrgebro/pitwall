@@ -37,7 +37,7 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     String vehicleId,
     Map<String, num> values,
     DateTime at, {
-    int? seq,
+    required int seq,
   }) async {
     if (values.isEmpty) return;
     final settings = await ref.read(appSettingsProvider.future);

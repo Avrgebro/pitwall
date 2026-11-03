@@ -277,8 +277,8 @@ void main() {
   test('a deleted vehicle\'s last values go with it', () async {
     final storage = FakeLastValuesStorage()
       ..saved = const LastValues()
-          .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2))
-          .record('mazda', {'rpm': 900}, DateTime(2026, 11, 2));
+          .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2), seq: 1)
+          .record('mazda', {'rpm': 900}, DateTime(2026, 11, 2), seq: 1);
     final container = ProviderContainer(
       overrides: testOverrides(
         settings: const AppSettings(

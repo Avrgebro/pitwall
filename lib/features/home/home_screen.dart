@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/routes.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
+import '../../core/readings/last_values.dart';
 import '../../state/last_values_state.dart';
 import '../../state/live_activity_state.dart';
 import '../../state/permissions_state.dart';
@@ -56,7 +57,7 @@ class HomeScreen extends ConsumerWidget {
       delivery: ref.watch(deliveryStatusProvider),
       hasWebhook: webhook.hasUrl,
       values: ref.watch(vehicleValuesProvider(vehicle.id))!,
-      lastValues: ref.watch(lastValuesProvider).value?.of(vehicle.id) ?? {},
+      lastValues: ref.watch(lastValuesProvider).value ?? const LastValues(),
       now: ref.watch(nowProvider),
     );
     final delivery = DeliveryStatusCard(
