@@ -8,24 +8,23 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.EventChannel
 
 /**
- * Whether Bluetooth is on, on `pitwall/bluetooth_state`: the current state
- * when Dart starts listening, then each change.
+ * Whether Bluetooth is on, as Dart's `bluetoothEnabled` stream: the current
+ * state when Dart starts listening, then each change.
  */
 class BluetoothStateChannel(private val context: Context, messenger: BinaryMessenger) :
-    EventChannel.StreamHandler {
+    BluetoothEnabledStreamHandler() {
 
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
     private var receiver: BroadcastReceiver? = null
 
     init {
-        EventChannel(messenger, "pitwall/bluetooth_state").setStreamHandler(this)
+        register(messenger, this)
     }
 
-    override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+    override fun onListen(p0: Any?, sink: PigeonEventSink<Boolean>) {
         sink.success(adapter?.isEnabled == true)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -46,7 +45,7 @@ class BluetoothStateChannel(private val context: Context, messenger: BinaryMesse
         this.receiver = receiver
     }
 
-    override fun onCancel(arguments: Any?) {
+    override fun onCancel(p0: Any?) {
         receiver?.let(context::unregisterReceiver)
         receiver = null
     }

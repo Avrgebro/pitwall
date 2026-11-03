@@ -20,7 +20,7 @@ import '../core/webhook/webhook_sender.dart';
 final settingsStoreProvider = Provider<SettingsStore>((ref) => SettingsStore());
 
 final bluetoothGatewayProvider = Provider<BluetoothGateway>(
-  (ref) => const ClassicBluetoothGateway(),
+  (ref) => ClassicBluetoothGateway(),
 );
 
 /// Whether Bluetooth is on, kept current.

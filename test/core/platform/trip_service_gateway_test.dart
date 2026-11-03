@@ -1,118 +1,75 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/platform/messages.g.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('pitwall/service');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  late List<MethodCall> calls;
-  Object? pending;
+  const startService = 'dev.flutter.pigeon.pitwall.TripServiceApi.startService';
 
-  setUp(() {
-    calls = [];
-    pending = null;
-    messenger.setMockMethodCallHandler(channel, (call) async {
-      calls.add(call);
-      return call.method == 'takeTripRequest' ? pending : null;
-    });
-  });
-  tearDown(() => messenger.setMockMethodCallHandler(channel, null));
-
-  /// Sends `tripStart` from Android with [arguments].
-  Future<void> androidStarts(Object? arguments) =>
-      messenger.handlePlatformMessage(
-        channel.name,
-        channel.codec.encodeMethodCall(MethodCall('tripStart', arguments)),
-        (_) {},
-      );
-
-  test('the app\'s request travels to Android', () async {
-    final gateway = AndroidTripServiceGateway();
-
-    await gateway.startService(const VehicleTarget('mazda'));
-    await gateway.startService(const AnyVehicleTarget());
-
-    expect(calls.map((c) => c.arguments), [
-      {'kind': 'vehicle', 'id': 'mazda'},
-      {'kind': 'any'},
-    ]);
-  });
-
-  test('Android\'s starts come back as targets', () async {
-    final gateway = AndroidTripServiceGateway();
-    final targets = <TripTarget>[];
-    gateway.starts.listen(targets.add);
-
-    await androidStarts({'kind': 'headUnit', 'address': 'AA:BB'});
-    await androidStarts({'kind': 'vehicle', 'id': 'mazda'});
-    await androidStarts({'kind': 'any'});
-    await Future<void>.delayed(Duration.zero);
-
-    expect(
-      targets[0],
-      isA<HeadUnitTarget>().having((t) => t.address, 'address', 'AA:BB'),
-    );
-    expect(targets[1], isA<VehicleTarget>().having((t) => t.id, 'id', 'mazda'));
-    expect(targets[2], isA<AnyVehicleTarget>());
-  });
-
-  test('a start Android held for Dart keeps its target', () async {
-    final gateway = AndroidTripServiceGateway();
-    pending = {'kind': 'vehicle', 'id': 'mazda'};
-    expect(
-      await gateway.takeTripRequest(),
-      isA<VehicleTarget>().having((t) => t.id, 'id', 'mazda'),
-    );
-    pending = null;
-    expect(await gateway.takeTripRequest(), isNull);
-  });
-
-  test('anything but one head unit, one vehicle or any is an error', () async {
-    final gateway = AndroidTripServiceGateway();
-    for (final bad in <Object>[
-      {'kind': 'headUnit', 'address': 'AA:BB', 'id': 'mazda'},
-      {'kind': 'vehicle', 'id': 7},
-      {'kind': 'vehicle'},
-      {'vehicleId': 'mazda'},
-      <String, String>{},
-      'any',
-    ]) {
-      pending = bad;
-      await expectLater(
-        gateway.takeTripRequest(),
-        throwsFormatException,
-        reason: '$bad',
-      );
-    }
-  });
-
-  test(
-    'a start Android sends that can\'t be read arrives as an error',
-    () async {
-      final gateway = AndroidTripServiceGateway();
-      final errors = <Object>[];
-      gateway.starts.listen((_) {}, onError: errors.add);
-
-      await androidStarts({'kind': 'car'});
-      await Future<void>.delayed(Duration.zero);
-
-      expect(errors.single, isFormatException);
-    },
-  );
-
-  test('a target reads back as itself', () {
+  test('every target reads back as itself', () {
     for (final target in const [
       HeadUnitTarget('AA:BB'),
       VehicleTarget('mazda'),
       AnyVehicleTarget(),
     ]) {
-      expect(
-        TripTarget.fromArguments(target.toArguments()).toArguments(),
-        target.toArguments(),
-      );
+      final back = tripTargetFrom(target.toMessage());
+      expect(back.toMessage().encode(), target.toMessage().encode());
     }
+  });
+
+  test('a kind without what it names, or with another\'s, is an error', () {
+    for (final message in [
+      TripTargetMessage(kind: TripTargetKind.headUnit),
+      TripTargetMessage(kind: TripTargetKind.vehicle, address: 'AA:BB'),
+      TripTargetMessage(
+        kind: TripTargetKind.headUnit,
+        address: 'AA:BB',
+        vehicleId: 'mazda',
+      ),
+      TripTargetMessage(kind: TripTargetKind.anyVehicle, vehicleId: 'mazda'),
+    ]) {
+      expect(() => tripTargetFrom(message), throwsFormatException);
+    }
+  });
+
+  test('Android\'s starts come back as targets, or errors', () async {
+    final gateway = AndroidTripServiceGateway();
+    final targets = <TripTarget>[];
+    final errors = <Object>[];
+    gateway.starts.listen(targets.add, onError: errors.add);
+
+    gateway.tripStart(
+      TripTargetMessage(kind: TripTargetKind.headUnit, address: 'AA:BB'),
+    );
+    gateway.tripStart(TripTargetMessage(kind: TripTargetKind.vehicle));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      targets.single,
+      isA<HeadUnitTarget>().having((t) => t.address, 'address', 'AA:BB'),
+    );
+    expect(errors.single, isFormatException);
+  });
+
+  test('the app\'s request travels as its message', () async {
+    TripTargetMessage? sent;
+    messenger.setMockMessageHandler(startService, (data) async {
+      final args =
+          TripServiceApi.pigeonChannelCodec.decodeMessage(data)!
+              as List<Object?>;
+      sent = args.single! as TripTargetMessage;
+      return TripServiceApi.pigeonChannelCodec.encodeMessage(<Object?>[null]);
+    });
+    addTearDown(() => messenger.setMockMessageHandler(startService, null));
+
+    await AndroidTripServiceGateway().startService(
+      const VehicleTarget('mazda'),
+    );
+
+    expect(sent?.kind, TripTargetKind.vehicle);
+    expect(sent?.vehicleId, 'mazda');
   });
 }

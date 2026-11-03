@@ -7,79 +7,62 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.plugin.common.EventChannel
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-import java.util.concurrent.Executors
 
 /**
- * Serial (RFCOMM) connection to a classic Bluetooth OBD adapter.
- *
- * Methods on `pitwall/classic_bluetooth`: `bondedDevices`, `connect`, `write`,
- * `disconnect`. Bytes from the adapter arrive on `pitwall/classic_bluetooth/input`,
+ * Serial (RFCOMM) connection to a classic Bluetooth OBD adapter, for Dart's
+ * [ClassicBluetoothApi]. Bytes from the adapter go out as `adapterInput`,
  * which ends with a `disconnected` error if the link drops.
  */
 class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
-    MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
+    ClassicBluetoothApi, AdapterInputStreamHandler() {
 
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
     private val main = Handler(Looper.getMainLooper())
 
     // Connects and writes run one at a time, off the main thread.
-    private val io = Executors.newSingleThreadExecutor()
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val io = Dispatchers.IO.limitedParallelism(1)
 
     @Volatile
     private var socket: BluetoothSocket? = null
-    private var events: EventChannel.EventSink? = null
+    private var events: PigeonEventSink<ByteArray>? = null
 
     init {
-        MethodChannel(messenger, "pitwall/classic_bluetooth").setMethodCallHandler(this)
-        EventChannel(messenger, "pitwall/classic_bluetooth/input").setStreamHandler(this)
+        ClassicBluetoothApi.setUp(messenger, this)
+        register(messenger, this)
     }
 
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when (call.method) {
-            "bondedDevices" -> bondedDevices(result)
-            "connect" -> connect(call.argument<String>("address")!!, result)
-            "write" -> write(call.arguments as ByteArray, result)
-            "disconnect" -> io.execute {
-                close()
-                main.post { result.success(null) }
-            }
-            else -> result.notImplemented()
-        }
-    }
-
-    override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+    override fun onListen(p0: Any?, sink: PigeonEventSink<ByteArray>) {
         events = sink
     }
 
-    override fun onCancel(arguments: Any?) {
+    override fun onCancel(p0: Any?) {
         events = null
     }
 
-    private fun bondedDevices(result: MethodChannel.Result) {
-        val adapter = adapter
-        if (adapter == null) return result.error("unavailable", "No Bluetooth on this device", null)
-        if (!adapter.isEnabled) return result.error("disabled", "Bluetooth is off", null)
+    override fun bondedDevices(): List<BondedDeviceMessage> {
+        val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
+        if (!adapter.isEnabled) throw FlutterError("disabled", "Bluetooth is off")
         try {
-            result.success(adapter.bondedDevices.map {
-                mapOf(
-                    "name" to (it.name ?: it.address),
-                    "address" to it.address,
+            return adapter.bondedDevices.map {
+                BondedDeviceMessage(
+                    name = it.name ?: it.address,
+                    address = it.address,
                     // Major and minor class; uncategorized when not given.
-                    "deviceClass" to (it.bluetoothClass?.deviceClass ?: 0x1F00),
+                    deviceClass = (it.bluetoothClass?.deviceClass ?: 0x1F00).toLong(),
                 )
-            })
+            }
         } catch (e: SecurityException) {
-            result.error("permission", e.message, null)
+            throw FlutterError("permission", e.message)
         }
     }
 
-    private fun connect(address: String, result: MethodChannel.Result) = io.execute {
+    override suspend fun connect(address: String) = withContext(io) {
         close()
         try {
             val device = adapter!!.getRemoteDevice(address)
@@ -91,24 +74,24 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
             }
             socket = connected
             startReading(connected)
-            main.post { result.success(null) }
         } catch (e: IOException) {
-            main.post { result.error("connect_failed", e.message, null) }
+            throw FlutterError("connect_failed", e.message)
         } catch (e: SecurityException) {
-            main.post { result.error("permission", e.message, null) }
+            throw FlutterError("permission", e.message)
         }
     }
 
-    private fun write(bytes: ByteArray, result: MethodChannel.Result) = io.execute {
+    override suspend fun write(bytes: ByteArray) = withContext(io) {
         try {
             val out = socket?.outputStream ?: throw IOException("Not connected")
             out.write(bytes)
             out.flush()
-            main.post { result.success(null) }
         } catch (e: IOException) {
-            main.post { result.error("write_failed", e.message, null) }
+            throw FlutterError("write_failed", e.message)
         }
     }
+
+    override suspend fun disconnect() = withContext(io) { close() }
 
     private fun startReading(connected: BluetoothSocket) = Thread {
         val buffer = ByteArray(1024)

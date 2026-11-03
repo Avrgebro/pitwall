@@ -72,3 +72,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // The Pigeon-generated channel code runs async calls as coroutines.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+}

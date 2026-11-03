@@ -4,9 +4,9 @@ import android.content.Intent
 
 /**
  * Which vehicle a trip is for, as named by whatever started it. Matches
- * `TripTarget` in Dart. Both sides write a target as its `kind` and what
- * that kind names, and read it strictly: anything else is a mistake, not a
- * trip for any vehicle.
+ * `TripTarget` in Dart, which it reaches as a [TripTargetMessage]: read
+ * strictly on both sides, so anything else is a mistake, not a trip for any
+ * vehicle.
  */
 sealed class TripTarget {
     /** A car's head unit connected. */
@@ -18,64 +18,60 @@ sealed class TripTarget {
     /** The app asked for a trip for whichever vehicle's adapter answers. */
     data object AnyVehicle : TripTarget()
 
-    /** The channel arguments Dart reads with `TripTarget.fromArguments`. */
-    fun toArguments(): Map<String, String> = when (this) {
-        is HeadUnit -> mapOf(KEY_KIND to KIND_HEAD_UNIT, KEY_ADDRESS to address)
-        is Vehicle -> mapOf(KEY_KIND to KIND_VEHICLE, KEY_ID to id)
-        AnyVehicle -> mapOf(KEY_KIND to KIND_ANY)
+    fun toMessage(): TripTargetMessage = when (this) {
+        is HeadUnit -> TripTargetMessage(kind = TripTargetKind.HEAD_UNIT, address = address)
+        is Vehicle -> TripTargetMessage(kind = TripTargetKind.VEHICLE, vehicleId = id)
+        AnyVehicle -> TripTargetMessage(kind = TripTargetKind.ANY_VEHICLE)
     }
 
     /** Puts this target in a service start [intent]; see [from]. */
     fun putIn(intent: Intent): Intent {
-        toArguments().forEach { (key, value) -> intent.putExtra(key, value) }
+        val message = toMessage()
         return intent
+            .putExtra(KEY_KIND, message.kind.name)
+            .putExtra(KEY_ADDRESS, message.address)
+            .putExtra(KEY_VEHICLE_ID, message.vehicleId)
     }
 
     companion object {
         private const val KEY_KIND = "kind"
         private const val KEY_ADDRESS = "address"
-        private const val KEY_ID = "id"
-        private const val KIND_HEAD_UNIT = "headUnit"
-        private const val KIND_VEHICLE = "vehicle"
-        private const val KIND_ANY = "any"
+        private const val KEY_VEHICLE_ID = "vehicleId"
 
-        /**
-         * The target [putIn] put in [intent], or null if there isn't one.
-         * Only its own keys are read, so other extras don't matter.
-         */
-        fun from(intent: Intent?): TripTarget? = intent?.let {
-            parse(
-                it.getStringExtra(KEY_KIND),
-                address = it.getStringExtra(KEY_ADDRESS),
-                id = it.getStringExtra(KEY_ID),
+        /** The target [putIn] put in [intent], or null if there isn't one. */
+        fun from(intent: Intent?): TripTarget? {
+            if (intent == null) return null
+            val kind = intent.getStringExtra(KEY_KIND)
+                ?.let { name -> TripTargetKind.entries.find { it.name == name } }
+                ?: return null
+            return fromMessage(
+                TripTargetMessage(
+                    kind = kind,
+                    address = intent.getStringExtra(KEY_ADDRESS),
+                    vehicleId = intent.getStringExtra(KEY_VEHICLE_ID),
+                ),
             )
         }
 
         /**
-         * What the app asks for in channel [arguments]: one vehicle or any,
-         * exactly as Dart writes it, or null otherwise. Only a head unit
-         * names itself, so the app never asks for one.
+         * What the app asks for: one vehicle or any, or null otherwise. Only
+         * a head unit names itself, so the app never asks for one.
          */
-        fun fromApp(arguments: Map<*, *>?): TripTarget? {
-            if (arguments == null) return null
-            val target = parse(
-                arguments[KEY_KIND] as? String,
-                address = arguments[KEY_ADDRESS] as? String,
-                id = arguments[KEY_ID] as? String,
-            )
-            return when (target) {
-                is Vehicle -> target.takeIf { arguments.size == 2 }
-                AnyVehicle -> target.takeIf { arguments.size == 1 }
+        fun fromApp(message: TripTargetMessage): TripTarget? =
+            when (val target = fromMessage(message)) {
+                is Vehicle, AnyVehicle -> target
                 is HeadUnit, null -> null
             }
-        }
 
-        private fun parse(kind: String?, address: String?, id: String?): TripTarget? =
-            when (kind) {
-                KIND_HEAD_UNIT -> address?.let(::HeadUnit)
-                KIND_VEHICLE -> id?.let(::Vehicle)
-                KIND_ANY -> AnyVehicle
-                else -> null
+        /** The target [message] names, or null if it names one wrongly. */
+        private fun fromMessage(message: TripTargetMessage): TripTarget? =
+            when (message.kind) {
+                TripTargetKind.HEAD_UNIT ->
+                    message.address?.takeIf { message.vehicleId == null }?.let(::HeadUnit)
+                TripTargetKind.VEHICLE ->
+                    message.vehicleId?.takeIf { message.address == null }?.let(::Vehicle)
+                TripTargetKind.ANY_VEHICLE ->
+                    AnyVehicle.takeIf { message.address == null && message.vehicleId == null }
             }
     }
 }
