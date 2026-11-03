@@ -1,5 +1,6 @@
 import '../obd/elm327.dart';
 import '../profiles/signal_set.dart';
+import '../readings/metric.dart';
 import '../readings/readings.dart';
 import 'car_state.dart';
 
@@ -53,12 +54,16 @@ Future<CarReading> readCar(
     );
     // Values the adapter measures itself come back with the car switched
     // off too; without any from the car, make sure it still answers.
-    if (values.keys.every((key) => key == batteryVoltageKey)) {
+    if (values.keys.every((key) => key == Metrics.batteryVoltage.key)) {
       await elm.checkCarAnswers();
     }
     // The engine's state needs the battery voltage, sent or not.
-    final voltage = values[batteryVoltageKey] ?? await elm.readBatteryVoltage();
-    final carState = carStateFrom({...values, batteryVoltageKey: ?voltage});
+    final voltage =
+        values[Metrics.batteryVoltage.key] ?? await elm.readBatteryVoltage();
+    final carState = carStateFrom({
+      ...values,
+      Metrics.batteryVoltage.key: ?voltage,
+    });
     return values.isEmpty ? CarAwake(carState) : CarAnswered(values, carState);
   } on ElmException catch (e) {
     if (e.error != ElmError.unableToConnect) rethrow;

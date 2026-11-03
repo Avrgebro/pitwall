@@ -29,7 +29,7 @@ void main() {
   });
 
   test('payload keys are unique', () {
-    final keys = standardPids.map((d) => d.key);
+    final keys = standardPids.map((d) => d.metric.key);
     expect(keys.toSet().length, keys.length);
   });
 }

@@ -1,19 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/format/text_query.dart';
+import 'package:pitwall/core/readings/metric.dart';
 import 'package:pitwall/core/readings/readings.dart';
 import 'package:pitwall/features/vehicles/values_view.dart';
 
-const _speed = ValueOption(key: 'speed_kmh', name: 'Speed', unit: 'km/h');
+const _speed = ValueOption(Metrics.vehicleSpeed);
 const _fuel = ValueOption(
-  key: 'tucson_fli_vol',
-  name: 'Fuel level',
-  unit: 'L',
+  Metric(key: 'tucson_fli_vol', name: 'Fuel level', unit: 'L'),
   category: 'Fuel',
 );
 const _tyre = ValueOption(
-  key: 'tucson_tp_fl',
-  name: 'Front left tyre pressure',
-  unit: 'kPa',
+  Metric(key: 'tucson_tp_fl', name: 'Front left tyre pressure', unit: 'kPa'),
   category: 'Tires',
 );
 const _all = [_speed, _fuel, _tyre];

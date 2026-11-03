@@ -6,33 +6,23 @@ import '../profiles/profile_reader.dart';
 import '../profiles/signal_set.dart';
 import '../profiles/stored_profile.dart';
 import '../vehicles/vehicle.dart';
-
-/// Payload key for the voltage the adapter measures (`ATRV`).
-const batteryVoltageKey = 'battery_v';
+import 'metric.dart';
 
 /// A value Pitwall can send, for choosing what goes in the payload.
+@immutable
 class ValueOption {
-  const ValueOption({
-    required this.key,
-    required this.name,
-    required this.unit,
-    this.shortName,
-    this.category,
-  });
+  const ValueOption(this.metric, {this.category});
 
-  final String key;
-  final String name;
-
-  /// A compact label for tiles, e.g. "Fuel", when [name] is long.
-  final String? shortName;
-
-  /// What a tile says.
-  String get label => shortName ?? name;
-  final String unit;
+  final Metric metric;
 
   /// For profile values, where OBDb files them, such as `Engine`; null for
   /// the standard ones.
   final String? category;
+
+  String get key => metric.key;
+  String get name => metric.name;
+  String get unit => metric.unit;
+  String get label => metric.label;
 
   /// From the vehicle's profile rather than standard OBD-II. These aren't
   /// sent by default: a profile can have hundreds, mostly diagnostic.
@@ -40,26 +30,13 @@ class ValueOption {
 }
 
 /// Every value Pitwall can send for this car: battery voltage, the standard
-/// PIDs, and the values [profile] says it can read.
+/// PIDs, and the values [profile] says it can read, each its own metric.
 List<ValueOption> valueOptions(ProfileSummary? profile) => [
-  const ValueOption(
-    key: batteryVoltageKey,
-    name: 'Battery voltage',
-    shortName: 'Battery',
-    unit: 'V',
-  ),
-  for (final definition in standardPids)
-    ValueOption(
-      key: definition.key,
-      name: definition.name,
-      shortName: definition.shortName,
-      unit: definition.unit,
-    ),
+  const ValueOption(Metrics.batteryVoltage),
+  for (final definition in standardPids) ValueOption(definition.metric),
   for (final signal in profile?.readable ?? const <ProfileSignal>[])
     ValueOption(
-      key: signal.key,
-      name: signal.name,
-      unit: signal.unit,
+      Metric(key: signal.key, name: signal.name, unit: signal.unit),
       category: signal.category,
     ),
 ];
@@ -142,15 +119,15 @@ Future<Map<String, double>> readValues(
   int? modelYear,
 }) async {
   final standard = <String, double>{};
-  if (keys.contains(batteryVoltageKey)) {
+  if (keys.contains(Metrics.batteryVoltage.key)) {
     final voltage = await elm.readBatteryVoltage();
-    if (voltage != null) standard[batteryVoltageKey] = voltage;
+    if (voltage != null) standard[Metrics.batteryVoltage.key] = voltage;
   }
   for (final definition in standardPids) {
-    if (!keys.contains(definition.key)) continue;
+    if (!keys.contains(definition.metric.key)) continue;
     if (!supportedPids.contains(definition.pid)) continue;
     final value = await elm.read(definition);
-    if (value != null) standard[definition.key] = value;
+    if (value != null) standard[definition.metric.key] = value;
   }
   final fromProfile = profile != null && modelYear != null
       ? await readProfile(elm, profile, modelYear, keys: keys)
