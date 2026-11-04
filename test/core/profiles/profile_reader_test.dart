@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/elm327.dart';
 import 'package:pitwall/core/profiles/profile_reader.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
+import 'package:pitwall/core/readings/unreported.dart';
 
 import '../obd/fake_transport.dart';
 import 'test_profile.dart';
@@ -32,7 +33,11 @@ void main() {
     () async {
       final transport = FakeTransport(replies);
 
-      final values = await readProfile(Elm327(transport), signalSet, 2023);
+      final (:values, unreported: _) = await readProfile(
+        Elm327(transport),
+        signalSet,
+        2023,
+      );
 
       // Raw ids and the profile's own units: miles stay miles.
       expect(values['test_fuel_vol'], 52);
@@ -73,7 +78,7 @@ void main() {
     await elm.initialize();
     transport.sent.clear();
 
-    final values = await readProfile(elm, signalSet, 2023);
+    final (:values, unreported: _) = await readProfile(elm, signalSet, 2023);
 
     expect(values, isNot(contains('test_fcm1')));
     // Not even addressed: known before reading, not found out while.
@@ -87,7 +92,11 @@ void main() {
   test('older model years include their extra commands', () async {
     final transport = FakeTransport(replies);
 
-    final values = await readProfile(Elm327(transport), signalSet, 2018);
+    final (:values, unreported: _) = await readProfile(
+      Elm327(transport),
+      signalSet,
+      2018,
+    );
 
     expect(values['test_old_only'], 0x2A);
     expect(transport.sent, containsAllInOrder(['ATSH7E0', '220042']));
@@ -96,10 +105,46 @@ void main() {
   test('a refused request gives no values', () async {
     final transport = FakeTransport({...replies, '221234': '7F2231'});
 
-    final values = await readProfile(Elm327(transport), signalSet, 2023);
+    final (:values, :unreported) = await readProfile(
+      Elm327(transport),
+      signalSet,
+      2023,
+    );
 
     expect(values, isNot(contains('test_fuel_vol')));
     expect(values, isNot(contains('test_odo_mi')));
+    expect(unreported['test_fuel_vol'], Unreported.noAnswer);
+  });
+
+  test('a value its reply is too short for is said to be missing', () async {
+    // The odometer's bytes are cut off; the fuel's are there.
+    final transport = FakeTransport({...replies, '221234': '6212340068'});
+
+    final (:values, :unreported) = await readProfile(
+      Elm327(transport),
+      signalSet,
+      2023,
+    );
+
+    expect(values['test_fuel_vol'], 52);
+    expect(unreported, {'test_odo_mi': Unreported.notInReply});
+  });
+
+  test('a value the car marks unavailable says so', () async {
+    final profile = SignalSet.parse(r'''
+      {"commands": [{"hdr": "7E0", "rax": "7E8", "cmd": {"22": "0001"},
+        "signals": [{"id": "SOC", "fmt": {"len": 8, "nullmax": 255}}]}]}
+    ''');
+    final transport = FakeTransport({...replies, '220001': '620001FF'});
+
+    final (:values, :unreported) = await readProfile(
+      Elm327(transport),
+      profile,
+      2023,
+    );
+
+    expect(values, isEmpty);
+    expect(unreported, {'soc': Unreported.unavailable});
   });
 
   test('a key two requests carry is read through the first only', () async {
@@ -119,7 +164,11 @@ void main() {
       '220002': '6200020907',
     });
 
-    final values = await readProfile(Elm327(transport), profile, 2023);
+    final (:values, unreported: _) = await readProfile(
+      Elm327(transport),
+      profile,
+      2023,
+    );
 
     // Only ever from the first request, whose name and unit the profile's
     // summary shows: the second request's value, in its own terms, isn't

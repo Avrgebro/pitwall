@@ -465,9 +465,13 @@ class SignalFormat {
   final num? max;
   final String unit;
 
+  /// Whether [data] is long enough to hold the value.
+  bool fits(List<int> data) =>
+      bitIndex >= 0 && bitIndex + bitLength <= data.length * 8;
+
   double? decode(List<int> data) {
     if (bitLength < 1 || bitLength > 48) return null;
-    if (bitIndex < 0 || bitIndex + bitLength > data.length * 8) return null;
+    if (!fits(data)) return null;
     var raw = 0;
     if (littleEndian) {
       if (bitIndex % 8 != 0 || bitLength % 8 != 0) return null;

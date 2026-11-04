@@ -9,6 +9,7 @@ import '../core/obd/obd_transport.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/profiles/stored_profile.dart';
+import '../core/readings/unreported.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
 import '../core/vehicles/vehicle.dart';
@@ -204,21 +205,47 @@ class SessionController extends Notifier<SessionState> {
         // The ignition went off; the adapter is still there.
         log.note('Car stopped answering', warning: true);
         _update((live) => live.copyWith(carState: CarState.off));
-      case StepDone(value: VehicleReading(reading: CarAwake(:final carState))):
+      case StepDone(
+        value: VehicleReading(
+          reading: CarAwake(:final carState, :final unreported),
+        ),
+      ):
         log.note('Nothing to send: the car reported none of the values');
+        _noteUnreported(unreported);
         _update((live) => live.copyWith(carState: carState));
       case StepDone(
         value: VehicleReading(
-          reading: CarAnswered(:final values, :final carState),
+          reading: CarAnswered(
+            :final values,
+            :final carState,
+            :final unreported,
+          ),
         ),
       ):
         values.forEach(log.value);
+        _noteUnreported(unreported);
         _update((live) => live.copyWith(carState: carState));
       case StepRefused() || StepFailed():
         break;
     }
     return outcome;
   });
+
+  /// Says in the log which chosen values didn't come back, and why.
+  void _noteUnreported(Map<String, Unreported> unreported) {
+    final log = ref.read(adapterLogProvider);
+    for (final MapEntry(:key, value: why) in unreported.entries) {
+      log.note(
+        '$key not sent: ${switch (why) {
+          Unreported.unsupported => 'the car doesn\'t list it',
+          Unreported.noAnswer => 'its request got no answer',
+          Unreported.notInReply => 'not in the car\'s reply',
+          Unreported.unavailable => 'the car marked it unavailable',
+        }}',
+        warning: true,
+      );
+    }
+  }
 
   /// Runs [ask] for the vehicle the session is connected to, on that
   /// connection, or says why there's none to ask for. [ask] hands the

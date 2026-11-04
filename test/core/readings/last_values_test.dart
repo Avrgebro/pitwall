@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/readings/last_values.dart';
+import 'package:pitwall/core/readings/unreported.dart';
 
 void main() {
   final earlier = DateTime.utc(2026, 11, 2, 0, 25);
@@ -46,7 +47,7 @@ void main() {
   });
 
   test('broken entries are left out', () {
-    final values = LastValues.fromJson({
+    final values = LastValues.fromValuesJson({
       'tucson': {
         'battery_v': {'value': 12.4, 'at': later.toIso8601String(), 'seq': 1},
         'coolant_temp_c': {'value': 90, 'at': later.toIso8601String()},
@@ -83,5 +84,40 @@ void main() {
 
     expect(sent.keys, ['rpm']);
     expect(newest?.readAt, earlier);
+  });
+
+  test('values asked for and not reported are kept until they come', () {
+    final missing = const LastValues().record(
+      'tucson',
+      {'rpm': 800},
+      earlier,
+      seq: 1,
+      missing: {'tucson_aux_soc': Unreported.notInReply},
+    );
+    expect(missing.unreportedOf('tucson'), {
+      'tucson_aux_soc': UnreportedValue(Unreported.notInReply, earlier),
+    });
+
+    // Kept through JSON, as written to the file.
+    final back = LastValues.fromJson(missing.toJson());
+    expect(back.unreportedOf('tucson'), missing.unreportedOf('tucson'));
+    expect(back.of('tucson')['rpm']?.value, 800);
+
+    final arrived = back.record(
+      'tucson',
+      {'tucson_aux_soc': 80},
+      later,
+      seq: 2,
+    );
+    expect(arrived.unreportedOf('tucson'), isEmpty);
+  });
+
+  test('a reading with nothing to send still notes what didn\'t come', () {
+    final values = const LastValues().noteUnreported('tucson', {
+      'rpm': Unreported.noAnswer,
+    }, later);
+
+    expect(values.of('tucson'), isEmpty);
+    expect(values.unreportedOf('tucson')['rpm']?.reason, Unreported.noAnswer);
   });
 }

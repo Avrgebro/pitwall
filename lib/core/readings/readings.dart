@@ -7,6 +7,7 @@ import '../profiles/signal_set.dart';
 import '../profiles/stored_profile.dart';
 import '../vehicles/vehicle.dart';
 import 'metric.dart';
+import 'unreported.dart';
 
 /// A value Pitwall can send, for choosing what goes in the payload.
 @immutable
@@ -106,27 +107,46 @@ class VehicleValues {
 
 /// Reads the values in [keys]: battery voltage from the adapter, standard
 /// PIDs the car supports, and profile signals for [modelYear]. Only the
-/// requests those keys need are sent.
-Future<Map<String, double>> readValues(
+/// requests those keys need are sent; why any of them didn't come back is
+/// said too.
+Future<ValuesRead> readValues(
   Elm327 elm, {
   required Set<String> keys,
   required Set<int> supportedPids,
   SignalSet? profile,
   int? modelYear,
 }) async {
-  final standard = <String, double>{};
+  final values = <String, double>{};
+  final unreported = <String, Unreported>{};
   if (keys.contains(Metrics.batteryVoltage.key)) {
-    final voltage = await elm.readBatteryVoltage();
-    if (voltage != null) standard[Metrics.batteryVoltage.key] = voltage;
+    switch (await elm.readBatteryVoltage()) {
+      case final voltage?:
+        values[Metrics.batteryVoltage.key] = voltage;
+      case null:
+        unreported[Metrics.batteryVoltage.key] = Unreported.unavailable;
+    }
   }
   for (final definition in standardPids) {
-    if (!keys.contains(definition.metric.key)) continue;
-    if (!supportedPids.contains(definition.pid)) continue;
-    final value = await elm.read(definition);
-    if (value != null) standard[definition.metric.key] = value;
+    final key = definition.metric.key;
+    if (!keys.contains(key)) continue;
+    if (!supportedPids.contains(definition.pid)) {
+      // Only news once the car has said what it supports.
+      if (supportedPids.isNotEmpty) unreported[key] = Unreported.unsupported;
+      continue;
+    }
+    switch (await elm.requestPid(definition.pid)) {
+      case null:
+        unreported[key] = Unreported.noAnswer;
+      case final data when data.length < definition.length:
+        unreported[key] = Unreported.notInReply;
+      case final data:
+        values[key] = definition.decode(data);
+    }
   }
-  final fromProfile = profile != null && modelYear != null
-      ? await readProfile(elm, profile, modelYear, keys: keys)
-      : <String, double>{};
-  return {...standard, ...fromProfile};
+  if (profile != null && modelYear != null) {
+    final fromProfile = await readProfile(elm, profile, modelYear, keys: keys);
+    values.addAll(fromProfile.values);
+    unreported.addAll(fromProfile.unreported);
+  }
+  return (values: values, unreported: unreported);
 }

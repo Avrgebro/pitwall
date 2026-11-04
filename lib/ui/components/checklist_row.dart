@@ -52,27 +52,48 @@ class ToggleRow extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.caption,
+    this.warning,
   });
 
   final String title;
 
   /// A technical detail shown in monospace, such as a payload key.
   final String? caption;
+
+  /// Something about it that needs noticing, shown under the caption.
+  final String? warning;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => AppRow(
-    title: title,
-    subtitle: caption == null
-        ? null
-        : Text(caption!, style: Theme.of(context).textTheme.mono),
-    trailing: Checkbox(
-      value: value,
-      onChanged: (checked) => onChanged(checked ?? false),
-    ),
-    onTap: () => onChanged(!value),
-  );
+  Widget build(BuildContext context) {
+    final caption = this.caption;
+    final warning = this.warning;
+    final theme = Theme.of(context);
+    return AppRow(
+      title: title,
+      subtitle: caption == null && warning == null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (caption != null) Text(caption, style: theme.textTheme.mono),
+                if (warning != null)
+                  Text(
+                    warning,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: context.tone(StatusTone.warning).accent,
+                    ),
+                  ),
+              ],
+            ),
+      trailing: Checkbox(
+        value: value,
+        onChanged: (checked) => onChanged(checked ?? false),
+      ),
+      onTap: () => onChanged(!value),
+    );
+  }
 }
 
 /// One option of several, inside a `RadioGroup<T>`. Tapping anywhere on

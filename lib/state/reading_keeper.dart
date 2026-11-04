@@ -22,10 +22,26 @@ class ReadingKeeper {
   /// failing disk can't hold it.
   Future<ReadOutcome> readAndKeep() async {
     final outcome = await _ref.read(sessionProvider.notifier).read();
-    if (outcome case StepDone(
-      value: VehicleReading(:final vehicle, reading: final CarAnswered reading),
-    )) {
-      await _keep(vehicle, reading);
+    switch (outcome) {
+      case StepDone(
+        value: VehicleReading(
+          :final vehicle,
+          reading: final CarAnswered reading,
+        ),
+      ):
+        await _keep(vehicle, reading);
+      case StepDone(
+        value: VehicleReading(
+          :final vehicle,
+          reading: CarAwake(:final unreported),
+        ),
+      ):
+        // Nothing to send, but what was asked for and didn't come is news.
+        await _ref
+            .read(lastValuesProvider.notifier)
+            .noteUnreported(vehicle.id, unreported, DateTime.now());
+      case StepDone() || StepRefused() || StepFailed():
+        break;
     }
     return outcome;
   }
@@ -54,6 +70,12 @@ class ReadingKeeper {
         );
     await _ref
         .read(lastValuesProvider.notifier)
-        .record(vehicle.id, reading.values, DateTime.now(), seq: seq);
+        .record(
+          vehicle.id,
+          reading.values,
+          DateTime.now(),
+          seq: seq,
+          missing: reading.unreported,
+        );
   }
 }

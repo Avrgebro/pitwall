@@ -7,8 +7,11 @@ import '../../core/format/text_query.dart';
 import '../../core/readings/metric.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
+import '../../state/infrastructure.dart';
+import '../../state/last_values_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
+import '../common/value_text.dart';
 import 'values_view.dart';
 import 'widgets/vehicle_page.dart';
 
@@ -52,9 +55,20 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       query: _query,
       profileOpen: _showProfile,
     );
+    // What the latest readings asked for and didn't get, to say beside
+    // the values still sent.
+    final unreported =
+        ref.watch(lastValuesProvider).value?.unreportedOf(vehicle.id) ??
+        const {};
+    final now = ref.watch(nowProvider);
     Widget row(ValueOption option) => _SignalToggle(
       option: option,
       sent: values.sent.contains(option.metric.key),
+      warning: switch (unreported[option.metric.key]) {
+        final missing? when values.sent.contains(option.metric.key) =>
+          '${missing.reason.label}, ${Formatters.ago(missing.at, now)}',
+        _ => null,
+      },
       onChanged: (on) => ref
           .read(appSettingsProvider.notifier)
           .setSentValues(
@@ -192,10 +206,14 @@ class _SignalToggle extends StatelessWidget {
     required this.option,
     required this.sent,
     required this.onChanged,
+    this.warning,
   });
 
   final ValueOption option;
   final bool sent;
+
+  /// Why the car didn't report it lately, if it didn't.
+  final String? warning;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -205,6 +223,7 @@ class _SignalToggle extends StatelessWidget {
       Metric(:final name, :final unit) => '$name ($unit)',
     },
     caption: option.metric.key,
+    warning: warning,
     value: sent,
     onChanged: onChanged,
   );

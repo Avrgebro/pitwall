@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/readings/last_values.dart';
+import '../core/readings/unreported.dart';
 import 'infrastructure.dart';
 import 'settings_state.dart';
 
@@ -31,8 +32,9 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     return _storage.load();
   }
 
-  /// Keeps [values], read [at], as sent in the reading numbered [seq].
-  /// A vehicle deleted meanwhile, say as its reading came in, keeps none.
+  /// Keeps [values], read [at], as sent in the reading numbered [seq], and
+  /// the values the reading asked for and didn't get, [missing]. A vehicle
+  /// deleted meanwhile, say as its reading came in, keeps none.
   /// Neither do last values that couldn't be loaded: they're only shown,
   /// and the file they couldn't be read from isn't written over.
   Future<void> record(
@@ -40,8 +42,32 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     Map<String, num> values,
     DateTime at, {
     required int seq,
+    Map<String, Unreported> missing = const {},
+  }) => _change(
+    vehicleId,
+    (current) =>
+        current.record(vehicleId, values, at, seq: seq, missing: missing),
+    unless: values.isEmpty && missing.isEmpty,
+  );
+
+  /// Keeps [missing], asked for in a reading at [at] that had nothing to
+  /// send.
+  Future<void> noteUnreported(
+    String vehicleId,
+    Map<String, Unreported> missing,
+    DateTime at,
+  ) => _change(
+    vehicleId,
+    (current) => current.noteUnreported(vehicleId, missing, at),
+    unless: missing.isEmpty,
+  );
+
+  Future<void> _change(
+    String vehicleId,
+    LastValues Function(LastValues current) change, {
+    required bool unless,
   }) async {
-    if (values.isEmpty) return;
+    if (unless) return;
     try {
       await (future, ref.read(appSettingsProvider.future)).wait;
     } on ParallelWaitError {
@@ -51,7 +77,7 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     // in between and be undone.
     final settings = ref.read(appSettingsProvider).requireValue;
     if (settings.vehicleById(vehicleId) == null) return;
-    await _save(state.requireValue.record(vehicleId, values, at, seq: seq));
+    await _save(change(state.requireValue));
   }
 
   Future<void> _keepOnly(Set<String> vehicleIds) async {

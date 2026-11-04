@@ -5,6 +5,7 @@ import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
 import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/readings/readings.dart';
+import 'package:pitwall/core/readings/unreported.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 
 import '../obd/fake_transport.dart';
@@ -94,15 +95,18 @@ void main() {
       'ATCRA': 'OK',
     });
 
-    final values = await readValues(
+    final (:values, :unreported) = await readValues(
       Elm327(transport),
-      keys: {'rpm', 'test_fuel_vol'},
+      keys: {'rpm', 'test_fuel_vol', 'coolant_temp_c'},
       supportedPids: {0x0C, 0x0D, 0x2F},
       profile: profile,
       modelYear: 2023,
     );
 
     expect(values, {'rpm': 1726, 'test_fuel_vol': 52});
+    // The car doesn't list it, so it isn't asked for, and that's said.
+    expect(unreported, {'coolant_temp_c': Unreported.unsupported});
+    expect(transport.sent, isNot(contains('0105')));
     expect(transport.sent, isNot(contains('ATRV')));
     expect(transport.sent, isNot(contains('010D')));
     expect(transport.sent, contains('221234'));

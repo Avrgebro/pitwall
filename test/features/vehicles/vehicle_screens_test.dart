@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
+import 'package:pitwall/core/readings/last_values.dart';
+import 'package:pitwall/core/readings/unreported.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/features/vehicles/values_to_send_screen.dart';
@@ -57,6 +59,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Couldn\'t read the settings.'), findsOneWidget);
+  });
+
+  testWidgets('a value sent but not reported says why', (tester) async {
+    final lastValues = FakeLastValuesStorage()
+      ..saved = const LastValues().noteUnreported('tucson', {
+        'rpm': Unreported.noAnswer,
+      }, testNow.subtract(const Duration(minutes: 3)));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          settings: const AppSettings(
+            vehicles: [Vehicle(id: 'tucson', name: 'Tucson')],
+          ),
+          lastValues: lastValues,
+        ),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const ValuesToSendScreen(vehicleId: 'tucson'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('The car didn\'t answer its request, 3 min ago'),
+      findsOneWidget,
+    );
   });
 
   group('with a profile', () {

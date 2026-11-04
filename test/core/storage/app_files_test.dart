@@ -30,6 +30,18 @@ void main() {
     expect((await storage.load()).byVehicle['tucson']?['rpm']?.value, 800);
   });
 
+  test('last values saved before unreported ones were still load', () async {
+    file('last_values.json').writeAsStringSync(
+      '{"version": 2, "data": {"tucson": {"rpm": {"value": 800, '
+      '"at": "2026-11-03T10:00:00.000", "seq": 1}}}}',
+    );
+
+    final values = await FileLastValuesStorage().load();
+
+    expect(values.of('tucson')['rpm']?.value, 800);
+    expect(values.unreportedOf('tucson'), isEmpty);
+  });
+
   test('a file saved before versions is read as it is', () async {
     file('last_values.json').writeAsStringSync(
       '{"tucson": {"rpm": {"value": 800, "at": "2026-11-03T10:00:00.000", "seq": 1}}}',

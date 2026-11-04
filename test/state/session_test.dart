@@ -71,14 +71,19 @@ void main() {
   /// connection waits in it with its transport open.
   var answersReset = true;
 
+  /// Replies the adapters handed out next give, over their usual ones.
+  var answers = <String, String>{};
+
   Future<ProviderContainer> start() async {
     adapters = [];
     writesFail = false;
     answersReset = true;
+    answers = {};
     bluetooth = FakeBluetoothGateway(
       adapter: (_) {
         final adapter = _Adapter()..writesFail = writesFail;
         if (!answersReset) adapter.replies.remove('ATZ');
+        adapter.replies.addAll(answers);
         adapters.add(adapter);
         return adapter;
       },
@@ -232,6 +237,27 @@ void main() {
         'vehicle',
         'tucson',
       ),
+    );
+  });
+
+  test('the log says which chosen values didn\'t come, and why', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    answers = {
+      // Engine speed and vehicle speed, 0C and 0D, are supported.
+      '0100': '410000180000',
+      '010C': '410C1AF8',
+      '010D': 'NO DATA',
+    };
+    await session.connect(_tucson);
+
+    await session.read();
+
+    final notes = c.read(adapterLogProvider).entries.value.map((e) => e.text);
+    expect(notes, contains('speed_kmh not sent: its request got no answer'));
+    expect(
+      notes,
+      contains('coolant_temp_c not sent: the car doesn\'t list it'),
     );
   });
 
