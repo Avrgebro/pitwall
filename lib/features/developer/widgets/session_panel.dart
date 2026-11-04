@@ -6,7 +6,6 @@ import '../../../core/session/car_state.dart';
 import '../../../core/trips/trip_target.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../core/platform/permission_gateway.dart';
-import '../../../state/infrastructure.dart';
 import '../../../state/manual_controls.dart';
 import '../../../state/permissions_state.dart';
 import '../../../state/reading_keeper.dart';
@@ -30,17 +29,13 @@ class SessionPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final vehicle = this.vehicle;
     final session = ref.watch(sessionProvider);
     final trip = ref.watch(tripProvider);
-    final controls = ref.watch(manualControlsProvider);
+    final controls = ref.watch(manualControlsProvider(vehicle?.id));
     final tripController = ref.read(tripProvider.notifier);
     final controller = ref.read(sessionProvider.notifier);
     final readings = ref.read(readingKeeperProvider);
-    final vehicle = this.vehicle;
-    // Assumed on until Android says otherwise, so nothing flashes.
-    final bluetoothOn = ref.watch(bluetoothOnProvider).value ?? true;
-    final needsAdapter = vehicle?.needs.contains(VehicleNeed.adapter) ?? false;
-    final canConnect = vehicle != null && !needsAdapter && bluetoothOn;
 
     final (chip, detail) = switch (session) {
       SessionConnected(
@@ -75,13 +70,19 @@ class SessionPanel extends ConsumerWidget {
           emphasis: Emphasis.outlined,
           icon: Symbols.bluetooth_disabled_rounded,
         ),
-        switch (vehicle) {
-          null => 'Add a vehicle first.',
-          _ when needsAdapter => '${VehicleNeed.adapter.label} first.',
-          _ when !bluetoothOn => 'Bluetooth is off. Turn it on to connect.',
-          final vehicle =>
+        switch (controls) {
+          BlockedControls(blocker: IdleBlocker.noVehicle) =>
+            'Add a vehicle first.',
+          BlockedControls(blocker: IdleBlocker.needsAdapter) =>
+            '${VehicleNeed.adapter.label} first.',
+          BlockedControls(blocker: IdleBlocker.bluetoothOff) =>
+            'Bluetooth is off. Turn it on to connect.',
+          IdleControls(:final vehicle) =>
             problem?.label ??
                 'Connect to ${vehicle.adapter?.name} to read by hand.',
+          // Between a trip's connections.
+          TripControls() || SessionControls() || WaitingControls() =>
+            problem?.label ?? 'The background trip uses the adapter.',
         },
       ),
     };
@@ -135,34 +136,41 @@ class SessionPanel extends ConsumerWidget {
                 ),
               ],
               WaitingControls() => const [],
-              IdleControls() => [
+              IdleControls(:final vehicle) => [
                 FilledButton.icon(
-                  onPressed: canConnect
-                      ? () async {
-                          // Asked here, where there's a screen to ask on;
-                          // connecting only checks.
-                          await ref
-                              .read(permissionsProvider.notifier)
-                              .request(AppPermission.bluetooth);
-                          await controller.connect(vehicle);
-                        }
-                      : null,
+                  onPressed: () async {
+                    // Asked here, where there's a screen to ask on;
+                    // connecting only checks.
+                    await ref
+                        .read(permissionsProvider.notifier)
+                        .request(AppPermission.bluetooth);
+                    await controller.connect(vehicle);
+                  },
                   icon: const Icon(Symbols.bluetooth_connected_rounded),
                   label: const Text('Connect'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: canConnect
-                      ? () => tripController.startManually(
-                          VehicleTarget(vehicle.id),
-                        )
-                      : null,
+                  onPressed: () =>
+                      tripController.startManually(VehicleTarget(vehicle.id)),
+                  icon: const Icon(Symbols.play_circle_rounded),
+                  label: const Text('Simulate auto-start'),
+                ),
+              ],
+              BlockedControls() => [
+                FilledButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Symbols.bluetooth_connected_rounded),
+                  label: const Text('Connect'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: null,
                   icon: const Icon(Symbols.play_circle_rounded),
                   label: const Text('Simulate auto-start'),
                 ),
               ],
             },
           ),
-          if (controls is IdleControls && canConnect) ...[
+          if (controls is IdleControls) ...[
             const SizedBox(height: Insets.m),
             Text(
               'Connect opens a manual session. Simulate auto-start runs the '

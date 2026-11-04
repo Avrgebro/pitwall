@@ -121,13 +121,6 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
           others.any((d) => d.address == widget.selectedAddress),
       open: _showOthers,
     );
-    final othersToggle = DisclosureGroup(
-      open: _showOthers,
-      icon: Symbols.devices_other_rounded,
-      showLabel: 'Show ${others.length} more',
-      hideLabel: 'Hide ${others.length} devices',
-      onToggle: () => setState(() => _showOthers = !_showOthers),
-    );
 
     Widget group(List<BondedDevice> list) => RowGroup(
       children: [
@@ -171,7 +164,13 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
         if (suited.isNotEmpty) group(suited),
         if (others.isNotEmpty && suited.isNotEmpty) ...[
           const SectionHeader('Other devices'),
-          if (othersList.showsToggle) othersToggle,
+          DisclosureGroup(
+            disclosure: othersList,
+            icon: Symbols.devices_other_rounded,
+            count: others.length,
+            noun: 'devices',
+            onToggle: () => setState(() => _showOthers = !_showOthers),
+          ),
         ],
         if (others.isNotEmpty && othersList.showsList) group(others),
       ],

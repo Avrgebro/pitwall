@@ -136,7 +136,7 @@ void main() {
     final result = await pitwall.sendTest(_target);
 
     // Only the kind is kept: the exception text, which names the URL, isn't.
-    expect(result.error, const Unreachable());
+    expect(result.result, const Unreachable());
     pitwall.dispose();
   });
 
@@ -152,11 +152,24 @@ void main() {
     pitwall.dispose();
   });
 
+  test('every status gets one reason, which decides the fix', () {
+    for (final (status, reason, fix) in [
+      (401, RejectionReason.notAllowed, DeliveryFix.server),
+      (403, RejectionReason.notAllowed, DeliveryFix.server),
+      (404, RejectionReason.unknownWebhook, DeliveryFix.server),
+      (500, RejectionReason.serverTrouble, DeliveryFix.retry),
+      (429, RejectionReason.serverTrouble, DeliveryFix.retry),
+    ]) {
+      expect(Rejected(status).reason, reason, reason: '$status');
+      expect(Rejected(status).fix, fix, reason: '$status');
+    }
+  });
+
   test('refused requests report the status code', () async {
     failNext = 1;
     final pitwall = sender(client: server(status: 401));
 
-    expect((await pitwall.sendTest(_target)).error, const Rejected(401));
+    expect((await pitwall.sendTest(_target)).result, const Rejected(401));
     pitwall.dispose();
   });
 

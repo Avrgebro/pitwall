@@ -70,8 +70,8 @@ final webhookSenderProvider = Provider<WebhookSender>((ref) {
 void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
   final target = attempt.test ? 'webhook (test)' : 'webhook';
   final elapsed = '${attempt.elapsed.inMilliseconds} ms';
-  final result = switch (attempt.error) {
-    null => '← ${attempt.statusCode}',
+  final result = switch (attempt.result) {
+    Accepted(:final statusCode) ||
     Rejected(:final statusCode) => '← $statusCode',
     UnusableWebhook() => '✕ webhook not usable',
     TimedOut() => '✕ timeout',
@@ -79,7 +79,7 @@ void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
   };
   log.delivery(
     'POST $target $result, $elapsed',
-    warning: attempt.error != null,
+    warning: attempt.result is DeliveryError,
   );
 }
 

@@ -44,23 +44,11 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
   Widget _page(BuildContext context, VehicleValues values) {
     final vehicle = values.vehicle;
     final category = widget.category;
-    final title = _title;
     final view = ValuesView.of(
       values.options,
       category: category,
       query: _query,
       profileOpen: _showProfile,
-    );
-    final profileToggle = DisclosureGroup(
-      open: _showProfile,
-      icon: Symbols.manage_search_rounded,
-      showLabel: 'Show ${view.profile.length} signals',
-      hideLabel: 'Hide ${view.profile.length} signals',
-      subtitle:
-          'Sent under their OBDb names, in the profile\'s units. '
-          'Values from the same request share it, so they cost '
-          'one request between them.',
-      onToggle: () => setState(() => _showProfile = !_showProfile),
     );
     Widget row(ValueOption option) => _SignalToggle(
       option: option,
@@ -79,7 +67,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
       // Slivers, so a profile's hundreds of signals build only as they
       // scroll into view.
       child: AppPage.slivers(
-        title: title,
+        title: _title,
         subtitle:
             '${vehicle.name}, '
             '${view.sentCount(values.sent)} of ${view.options.length} on',
@@ -125,7 +113,17 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                   'Profile signals',
                   trailing: _profileLabel(vehicle),
                 ),
-                if (view.profileList.showsToggle) profileToggle,
+                DisclosureGroup(
+                  disclosure: view.profileList,
+                  icon: Symbols.manage_search_rounded,
+                  count: view.profile.length,
+                  noun: 'signals',
+                  subtitle:
+                      'Sent under their OBDb names, in the profile\'s units. '
+                      'Values from the same request share it, so they cost '
+                      'one request between them.',
+                  onToggle: () => setState(() => _showProfile = !_showProfile),
+                ),
               ],
             ],
           ),

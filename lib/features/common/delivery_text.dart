@@ -23,19 +23,19 @@ abstract final class DeliveryText {
           title: 'The webhook URL isn\'t valid',
           message: urlProblem(problem),
         ),
-        Rejected(statusCode: 404) => (
+        Rejected(reason: RejectionReason.unknownWebhook) => (
           title: 'The webhook doesn\'t exist',
           message:
               'The server doesn\'t know this webhook (HTTP 404). Check the '
               'URL in Settings.',
         ),
-        Rejected(statusCode: (401 || 403) && final statusCode) => (
+        Rejected(reason: RejectionReason.notAllowed, :final statusCode) => (
           title: 'The webhook is refusing readings',
           message:
               'The server says this phone isn\'t allowed to send '
               '(HTTP $statusCode). The URL or its token may have changed.',
         ),
-        Rejected(:final statusCode) => (
+        Rejected(reason: RejectionReason.serverTrouble, :final statusCode) => (
           title: 'The server is having trouble',
           message:
               'It answered with an error (HTTP $statusCode). Pitwall keeps '

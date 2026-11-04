@@ -56,9 +56,14 @@ class LogEntry {
     null => null,
   };
 
+  /// The time a line starts with.
+  String get clock => Formatters.clockWithSeconds(time);
+
+  /// Between a line's parts, on screen and when copied alike.
+  static const gap = '  ';
+
   /// The whole line as plain text, for copying.
-  String toLine() =>
-      [Formatters.clockWithSeconds(time), lead, ?trail].join(' ');
+  String toLine() => [clock, lead, ?trail].join(gap);
 }
 
 /// Recent adapter and delivery activity, for the developer tools. Kept in

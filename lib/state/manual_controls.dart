@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/vehicles/vehicle.dart';
+import 'infrastructure.dart';
 import 'session_state.dart';
+import 'settings_state.dart';
 import 'trip_state.dart';
 
 /// What Developer tools can do by hand, from the session and the trip
@@ -31,26 +34,54 @@ final class WaitingControls extends ManualControls {
   const WaitingControls();
 }
 
-/// Nothing running: connect by hand, or start a trip as if the car's
-/// Bluetooth connected.
+/// Nothing running: connect to [vehicle] by hand, or start a trip for it
+/// as if the car's Bluetooth connected.
 final class IdleControls extends ManualControls {
-  const IdleControls();
+  const IdleControls(this.vehicle);
+
+  final Vehicle vehicle;
 }
 
-ManualControls manualControlsFrom(SessionState session, TripState trip) =>
-    switch ((session, trip)) {
-      (_, TripIdle()) => switch (session) {
-        SessionConnected(:final busy) => SessionControls(canRead: !busy),
-        SessionConnecting() => const WaitingControls(),
-        SessionIdle() => const IdleControls(),
-      },
-      (_, TripEnding()) => const TripControls(canStop: false),
-      (_, TripConnecting() || TripRunning()) => const TripControls(
-        canStop: true,
-      ),
-    };
+/// Nothing running, and nothing can start until [blocker] is dealt with.
+final class BlockedControls extends ManualControls {
+  const BlockedControls(this.blocker);
 
-final manualControlsProvider = Provider<ManualControls>(
-  (ref) =>
-      manualControlsFrom(ref.watch(sessionProvider), ref.watch(tripProvider)),
+  final IdleBlocker blocker;
+}
+
+/// Why nothing can be started by hand.
+enum IdleBlocker { noVehicle, needsAdapter, bluetoothOff }
+
+/// The controls for [vehicle], or none, given the session and the trip.
+/// Bluetooth is assumed on until Android says otherwise, so nothing
+/// flashes.
+ManualControls manualControlsFrom(
+  SessionState session,
+  TripState trip, {
+  required Vehicle? vehicle,
+  bool bluetoothOn = true,
+}) => switch (trip) {
+  TripIdle() => switch (session) {
+    SessionConnected(:final busy) => SessionControls(canRead: !busy),
+    SessionConnecting() => const WaitingControls(),
+    SessionIdle() => switch (vehicle) {
+      null => const BlockedControls(IdleBlocker.noVehicle),
+      _ when vehicle.needs.contains(VehicleNeed.adapter) =>
+        const BlockedControls(IdleBlocker.needsAdapter),
+      _ when !bluetoothOn => const BlockedControls(IdleBlocker.bluetoothOff),
+      final vehicle => IdleControls(vehicle),
+    },
+  },
+  TripEnding() => const TripControls(canStop: false),
+  TripConnecting() || TripRunning() => const TripControls(canStop: true),
+};
+
+/// The controls for the vehicle with this id, or for none.
+final manualControlsProvider = Provider.family<ManualControls, String?>(
+  (ref, vehicleId) => manualControlsFrom(
+    ref.watch(sessionProvider),
+    ref.watch(tripProvider),
+    vehicle: vehicleId == null ? null : ref.watch(vehicleProvider(vehicleId)),
+    bluetoothOn: ref.watch(bluetoothOnProvider).value ?? true,
+  ),
 );

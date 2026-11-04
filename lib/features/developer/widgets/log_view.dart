@@ -1,5 +1,3 @@
-import '../../../core/format/formatters.dart';
-
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/logging/adapter_log.dart';
@@ -32,7 +30,7 @@ class LogView extends StatelessWidget {
 
     TextSpan line(LogEntry entry) {
       final time = TextSpan(
-        text: '${Formatters.clockWithSeconds(entry.time)}  ',
+        text: '${entry.clock}${LogEntry.gap}',
         style: TextStyle(color: muted),
       );
       final leadColor = switch (entry.kind) {
@@ -48,7 +46,7 @@ class LogView extends StatelessWidget {
         ),
         if (entry.trail case final trail?)
           TextSpan(
-            text: '  $trail',
+            text: '${LogEntry.gap}$trail',
             style: entry.warning ? TextStyle(color: warning) : null,
           ),
       ];

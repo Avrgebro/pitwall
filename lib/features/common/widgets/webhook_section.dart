@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../core/webhook/delivery_status.dart';
 import '../../../core/webhook/webhook_auth.dart';
 import '../../../core/webhook/webhook_target.dart';
 import '../../../state/webhook_state.dart';
@@ -127,7 +128,7 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
           ),
           if (settings.lastTest case (:final result, :final at)) ...[
             const SizedBox(height: Insets.m),
-            if (result.error case final error?)
+            if (result.result case final DeliveryError error)
               ResultBanner(
                 tone: StatusTone.error,
                 title: DeliveryText.error(error).title,

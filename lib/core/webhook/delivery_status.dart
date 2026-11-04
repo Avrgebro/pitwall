@@ -15,10 +15,29 @@ enum DeliveryFix {
   server,
 }
 
+/// How one send went: accepted, or why not.
+@immutable
+sealed class SendResult {
+  const SendResult();
+}
+
+/// The server took it, with this 2xx status.
+final class Accepted extends SendResult {
+  const Accepted(this.statusCode);
+
+  final int statusCode;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Accepted && other.statusCode == statusCode;
+
+  @override
+  int get hashCode => statusCode.hashCode;
+}
+
 /// Why a delivery failed. Descriptions for people are written by the UI;
 /// nothing here contains the URL or credentials.
-@immutable
-sealed class DeliveryError {
+sealed class DeliveryError extends SendResult {
   const DeliveryError();
 
   /// What gets delivery going again. The sender retries only
@@ -43,19 +62,39 @@ final class UnusableWebhook extends DeliveryError {
   int get hashCode => problem.hashCode;
 }
 
+/// What a rejection says, from its status.
+enum RejectionReason {
+  /// 401 or 403: this phone or its credentials are refused.
+  notAllowed,
+
+  /// 404: the server doesn't know the webhook.
+  unknownWebhook,
+
+  /// Anything else, which may pass.
+  serverTrouble,
+}
+
 /// The server answered with an error status.
 final class Rejected extends DeliveryError {
   const Rejected(this.statusCode);
 
   final int statusCode;
 
-  /// 401 and 403 refuse this phone or its credentials, and 404 doesn't know
-  /// the webhook: only a change on the server or in the settings helps.
-  /// Anything else may pass.
+  /// The one place statuses are grouped: what to do and what to say both
+  /// follow from it.
+  RejectionReason get reason => switch (statusCode) {
+    401 || 403 => RejectionReason.notAllowed,
+    404 => RejectionReason.unknownWebhook,
+    _ => RejectionReason.serverTrouble,
+  };
+
+  /// Only a change on the server or in the settings helps, unless it may
+  /// pass on its own.
   @override
-  DeliveryFix get fix => switch (statusCode) {
-    401 || 403 || 404 => DeliveryFix.server,
-    _ => DeliveryFix.retry,
+  DeliveryFix get fix => switch (reason) {
+    RejectionReason.notAllowed ||
+    RejectionReason.unknownWebhook => DeliveryFix.server,
+    RejectionReason.serverTrouble => DeliveryFix.retry,
   };
 
   @override
@@ -149,27 +188,22 @@ class DeliveryStatus {
 class DeliveryAttempt {
   const DeliveryAttempt({
     required this.elapsed,
-    this.statusCode,
-    this.error,
+    required this.result,
     this.test = false,
   });
 
   final Duration elapsed;
-
-  /// The status the server accepted it with. A rejection's status is in
-  /// its [error].
-  final int? statusCode;
-  final DeliveryError? error;
+  final SendResult result;
   final bool test;
 }
 
 /// The outcome of a test send.
 @immutable
 class TestResult {
-  const TestResult({required this.elapsed, this.error});
+  const TestResult({required this.elapsed, required this.result});
 
   final Duration elapsed;
-  final DeliveryError? error;
+  final SendResult result;
 
-  bool get succeeded => error == null;
+  bool get succeeded => result is Accepted;
 }

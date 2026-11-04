@@ -121,13 +121,13 @@ class WebhookSender {
       }
       // Kept, as a full queue can drop it from the front while it's posted.
       final sent = _queue.first;
-      final (:error, :elapsed) = await _post(
+      final (:result, elapsed: _) = await _post(
         target,
         jsonEncode(sent.toPayload()),
       );
       // The reading stays queued; the next run delivers it.
       if (_disposed) return;
-      if (error != null) {
+      if (result case final DeliveryError error) {
         _failed(error);
         return;
       }
@@ -141,9 +141,9 @@ class WebhookSender {
   /// Sends a test payload straight to [target], without queueing it.
   Future<TestResult> sendTest(WebhookTarget target) async {
     if (_unusable(target) case final error?) {
-      return TestResult(elapsed: Duration.zero, error: error);
+      return TestResult(elapsed: Duration.zero, result: error);
     }
-    final (:error, :elapsed) = await _post(
+    final (:result, :elapsed) = await _post(
       target,
       jsonEncode({
         ...buildPayload(
@@ -157,7 +157,7 @@ class WebhookSender {
       }),
       test: true,
     );
-    return TestResult(elapsed: elapsed, error: error);
+    return TestResult(elapsed: elapsed, result: result);
   }
 
   void dispose() {
@@ -167,14 +167,13 @@ class WebhookSender {
     status.dispose();
   }
 
-  Future<({DeliveryError? error, Duration elapsed})> _post(
+  Future<({SendResult result, Duration elapsed})> _post(
     WebhookTarget target,
     String body, {
     bool test = false,
   }) async {
     final stopwatch = Stopwatch()..start();
-    int? statusCode;
-    DeliveryError? error;
+    SendResult result;
     try {
       final response = await _client
           .post(
@@ -186,24 +185,21 @@ class WebhookSender {
             body: body,
           )
           .timeout(timeout);
-      error = _errorFor(response.statusCode);
-      if (error == null) statusCode = response.statusCode;
+      result = switch (response.statusCode) {
+        final status when status >= 200 && status < 300 => Accepted(status),
+        final status => Rejected(status),
+      };
     } on TimeoutException {
-      error = const TimedOut();
+      result = const TimedOut();
     } on Exception {
       // Network errors can mention the URL, so only the kind is kept.
-      error = const Unreachable();
+      result = const Unreachable();
     }
     stopwatch.stop();
     onAttempt?.call(
-      DeliveryAttempt(
-        elapsed: stopwatch.elapsed,
-        statusCode: statusCode,
-        error: error,
-        test: test,
-      ),
+      DeliveryAttempt(elapsed: stopwatch.elapsed, result: result, test: test),
     );
-    return (error: error, elapsed: stopwatch.elapsed);
+    return (result: result, elapsed: stopwatch.elapsed);
   }
 
   /// Why [target] can't be sent to, as [WebhookTarget.problem] decides.
@@ -212,11 +208,6 @@ class WebhookSender {
         final problem? => UnusableWebhook(problem),
         null => null,
       };
-
-  static DeliveryError? _errorFor(int statusCode) => switch (statusCode) {
-    >= 200 && < 300 => null,
-    _ => Rejected(statusCode),
-  };
 
   void _succeeded() {
     _outcome = _outcome.succeeded(_clock());

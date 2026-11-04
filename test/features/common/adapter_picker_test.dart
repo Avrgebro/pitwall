@@ -64,7 +64,7 @@ void main() {
 
     expect(find.text('vLinker MC+'), findsOneWidget);
     expect(find.text('Earbuds 1'), findsNothing);
-    await tester.tap(find.text('Show 2 more'));
+    await tester.tap(find.text('Show 2 devices'));
     await tester.pumpAndSettle();
     expect(find.text('Earbuds 1'), findsOneWidget);
 
