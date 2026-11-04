@@ -27,7 +27,7 @@ class ProfileContents extends StatelessWidget {
   Widget build(BuildContext context) {
     final readable = summary.readable;
     int on(Iterable<ProfileSignal> signals) =>
-        signals.where((s) => selected.contains(s.key)).length;
+        signals.where((s) => selected.contains(s.metric.key)).length;
     final notYet = summary.notYetReadable;
     final neverSent = summary.neverSentRequests;
 
@@ -126,7 +126,8 @@ class _UnreadableRowState extends State<_UnreadableRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final signals = widget.signals;
-    final names = {for (final signal in signals) signal.name}.toList()..sort();
+    final names = {for (final signal in signals) signal.metric.name}.toList()
+      ..sort();
     return ExpandableRow(
       open: _open,
       onTap: () => setState(() => _open = !_open),

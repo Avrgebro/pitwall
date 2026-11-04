@@ -14,7 +14,7 @@ void main() {
 
   group('value options', () {
     test('without a profile: battery voltage and standard values', () {
-      final keys = valueOptions(null).map((o) => o.key);
+      final keys = valueOptions(null).map((o) => o.metric.key);
 
       expect(keys, [
         'battery_v',
@@ -31,7 +31,7 @@ void main() {
       final options = valueOptions(profile.summaryFor(2018));
       final profileKeys = [
         for (final option in options)
-          if (option.fromProfile) option.key,
+          if (option.fromProfile) option.metric.key,
       ];
 
       expect(profileKeys, [
@@ -41,7 +41,7 @@ void main() {
         'test_fcm1',
       ]);
       // A tagged odometer doesn't take over the standard one.
-      expect(options.where((o) => o.key == 'odometer_km'), hasLength(1));
+      expect(options.where((o) => o.metric.key == 'odometer_km'), hasLength(1));
       final sent = VehicleValues.of(
         const Vehicle(id: 'tucson', modelYear: 2018),
         LoadedProfile(const ProfileRef('default.json'), profile),

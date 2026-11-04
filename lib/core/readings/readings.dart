@@ -19,11 +19,6 @@ class ValueOption {
   /// the standard ones.
   final String? category;
 
-  String get key => metric.key;
-  String get name => metric.name;
-  String get unit => metric.unit;
-  String get label => metric.label;
-
   /// From the vehicle's profile rather than standard OBD-II. These aren't
   /// sent by default: a profile can have hundreds, mostly diagnostic.
   bool get fromProfile => category != null;
@@ -35,10 +30,7 @@ List<ValueOption> valueOptions(ProfileSummary? profile) => [
   const ValueOption(Metrics.batteryVoltage),
   for (final definition in standardPids) ValueOption(definition.metric),
   for (final signal in profile?.readable ?? const <ProfileSignal>[])
-    ValueOption(
-      Metric(key: signal.key, name: signal.name, unit: signal.unit),
-      category: signal.category,
-    ),
+    ValueOption(signal.metric, category: signal.category),
 ];
 
 /// A vehicle's values: every one it can send, and the ones it does.
@@ -62,13 +54,13 @@ class VehicleValues {
       _ => null,
     };
     final options = valueOptions(profile);
-    final offered = {for (final option in options) option.key};
+    final offered = {for (final option in options) option.metric.key};
     final chosen =
         vehicle.selectedKeys ??
         {
           // Until the user chooses: the standard ones.
           for (final option in options)
-            if (!option.fromProfile) option.key,
+            if (!option.fromProfile) option.metric.key,
         };
     return VehicleValues._(
       vehicle,

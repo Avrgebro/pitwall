@@ -18,7 +18,8 @@ Future<Map<String, double>> readProfile(
   int modelYear, {
   Set<String>? keys,
 }) async {
-  bool wanted(ProfileSignal signal) => keys?.contains(signal.key) ?? true;
+  bool wanted(ProfileSignal signal) =>
+      keys?.contains(signal.metric.key) ?? true;
   final values = <String, double>{};
   try {
     for (final (:command, :signals) in signalSet.readsFor(modelYear)) {
@@ -39,7 +40,7 @@ Future<Map<String, double>> readProfile(
       if (replies.isEmpty) continue;
       for (final signal in read) {
         if (signal.decode(replies.first) case final value?) {
-          values[signal.key] = value;
+          values[signal.metric.key] = value;
         }
       }
     }

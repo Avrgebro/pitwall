@@ -13,7 +13,9 @@ abstract final class ValueDisplay {
     List<ValueOption> options, {
     Map<String, String> notes = const {},
   }) {
-    final metrics = {for (final option in options) option.key: option.metric};
+    final metrics = {
+      for (final option in options) option.metric.key: option.metric,
+    };
     Metric metricOf(String key) =>
         metrics[key] ?? Metric(key: key, name: key, unit: '');
     final keys = values.keys.toList()

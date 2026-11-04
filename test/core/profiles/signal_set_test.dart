@@ -41,14 +41,18 @@ void main() {
           .signals;
 
       // Even with OBDb's suggestedMetric tags, nothing is renamed.
-      expect(signals.map((s) => s.key), ['test_fuel_vol', 'test_odo_mi']);
-      expect(signals.map((s) => s.unit), ['liters', 'miles']);
+      expect(signals.map((s) => s.metric.key), [
+        'test_fuel_vol',
+        'test_odo_mi',
+      ]);
+      expect(signals.map((s) => s.metric.unit), ['liters', 'miles']);
       expect(
         signalSet.requests
             .whereType<ProfileCommand>()
             .elementAt(1)
             .signals
             .single
+            .metric
             .key,
         'test_old_only',
       );
@@ -83,8 +87,8 @@ void main() {
       // A year that isn't a number is no year.
       expect(command.filter?.from, isNull);
       final signal = command.signals.single;
-      expect(signal.name, 'GOOD');
-      expect(signal.unit, '');
+      expect(signal.metric.name, 'GOOD');
+      expect(signal.metric.unit, '');
       expect(signal.format.multiply, 1);
     });
   });
@@ -157,7 +161,7 @@ void main() {
           .signals
           .last;
 
-      expect(odometer.unit, 'miles');
+      expect(odometer.metric.unit, 'miles');
       expect(odometer.decode([0x00, 0x00, 0x00, 0x32, 0xF2]), 13042);
     });
   });
@@ -168,7 +172,7 @@ void main() {
     test('readable values, by category', () {
       final summary = signalSet.summaryFor(2023);
 
-      expect(summary.readable.map((s) => s.key), [
+      expect(summary.readable.map((s) => s.metric.key), [
         'test_fuel_vol',
         'test_odo_mi',
         'test_fcm1',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/format/text_query.dart';
+import '../../core/readings/metric.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
@@ -52,10 +53,13 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
     );
     Widget row(ValueOption option) => _SignalToggle(
       option: option,
-      sent: values.sent.contains(option.key),
+      sent: values.sent.contains(option.metric.key),
       onChanged: (on) => ref
           .read(appSettingsProvider.notifier)
-          .setSentValues(vehicle.id, values.withSent(option.key, on: on)),
+          .setSentValues(
+            vehicle.id,
+            values.withSent(option.metric.key, on: on),
+          ),
     );
 
     // Back closes the search before leaving the page.
@@ -196,10 +200,11 @@ class _SignalToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ToggleRow(
-    title: option.unit.isEmpty
-        ? option.name
-        : '${option.name} (${option.unit})',
-    caption: option.key,
+    title: switch (option.metric) {
+      Metric(:final name, unit: '') => name,
+      Metric(:final name, :final unit) => '$name ($unit)',
+    },
+    caption: option.metric.key,
     value: sent,
     onChanged: onChanged,
   );

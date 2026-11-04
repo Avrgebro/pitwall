@@ -21,7 +21,7 @@ class ValuesView {
           ];
     final shown = [
       for (final option in options)
-        if (query.matches([option.name, option.key])) option,
+        if (query.matches([option.metric.name, option.metric.key])) option,
     ];
     return ValuesView._(
       options: options,
@@ -62,5 +62,5 @@ class ValuesView {
   final Disclosure profileList;
 
   int sentCount(Set<String> sent) =>
-      options.where((o) => sent.contains(o.key)).length;
+      options.where((o) => sent.contains(o.metric.key)).length;
 }

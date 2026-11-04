@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/readings/metric.dart';
 import '../../../core/vehicles/device_id.dart';
 import '../../../core/webhook/payload.dart';
 import '../../../ui/ui.dart';
@@ -20,11 +21,11 @@ class WebhookStep extends StatelessWidget {
         device: deviceIdFor(vehicleName),
         seq: 1,
         timestamp: DateTime.now(),
-        values: const {
-          'fuel_level_pct': 87.5,
-          'odometer_km': 33999,
-          'battery_v': 13.6,
-          'coolant_temp_c': 89,
+        values: {
+          Metrics.fuelLevel.key: 87.5,
+          Metrics.odometer.key: 33999,
+          Metrics.batteryVoltage.key: 13.6,
+          Metrics.coolantTemperature.key: 89,
         },
         connected: true,
       ),

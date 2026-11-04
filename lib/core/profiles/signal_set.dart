@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../obd/can_id.dart';
+import '../readings/metric.dart';
 
 /// A vehicle profile in OBDb's signal-set format (v3), as found in
 /// `signalsets/v3/default.json` in each https://github.com/OBDb repository.
@@ -87,7 +88,7 @@ class SignalSet {
           command: command,
           signals: [
             for (final signal in command.signals)
-              if (claimed.add(signal.key)) signal,
+              if (claimed.add(signal.metric.key)) signal,
           ],
         ),
     ];
@@ -97,7 +98,7 @@ class SignalSet {
   ProfileSummary summaryFor(int modelYear) {
     final readable = {
       for (final (:signals, command: _) in readsFor(modelYear))
-        for (final signal in signals) signal.key: signal,
+        for (final signal in signals) signal.metric.key: signal,
     };
     final missing = <SkipReason, Map<String, ProfileSignal>>{};
     var neverSent = 0;
@@ -111,7 +112,8 @@ class SignalSet {
           final byKey = missing[reason] ??= {};
           for (final signal in signals) {
             // Read through another request, so not missing after all.
-            if (!readable.containsKey(signal.key)) byKey[signal.key] = signal;
+            final key = signal.metric.key;
+            if (!readable.containsKey(key)) byKey[key] = signal;
           }
       }
     }
@@ -331,16 +333,18 @@ class YearFilter {
 class ProfileSignal {
   const ProfileSignal({
     required this.id,
-    required this.name,
-    required this.key,
-    required this.unit,
+    required this.metric,
     required this.format,
     this.path,
   });
 
   /// OBDb's signal id, e.g. `TUCSON_FLI_VOL`.
   final String id;
-  final String name;
+
+  /// What the value is: its payload key, the OBDb id in lowercase, such as
+  /// `tucson_fli_vol`, with OBDb's name and unit. Pitwall doesn't rename
+  /// signals or convert their units; the profile is the source of truth.
+  final Metric metric;
 
   /// Where OBDb files the signal, e.g. `Engine.Misfires`.
   final String? path;
@@ -351,13 +355,7 @@ class ProfileSignal {
     _ => 'Other',
   };
 
-  /// Field name in the webhook payload: the OBDb id in lowercase, e.g.
-  /// `tucson_fli_vol`. Pitwall doesn't rename signals or convert their
-  /// units; the profile is the source of truth.
-  final String key;
-
-  /// OBDb's unit name, e.g. `liters`.
-  final String unit;
+  /// Where the value sits in a reply, and how it scales, in OBDb's unit.
   final SignalFormat format;
 
   /// Decodes this signal from a reply's data, or returns null if the reply
@@ -370,12 +368,14 @@ class ProfileSignal {
     if (id is! String || format == null) return null;
     return ProfileSignal(
       id: id,
-      name: switch (json['name']) {
-        final String name => name,
-        _ => id,
-      },
-      key: id.toLowerCase(),
-      unit: format.unit,
+      metric: Metric(
+        key: id.toLowerCase(),
+        name: switch (json['name']) {
+          final String name => name,
+          _ => id,
+        },
+        unit: format.unit,
+      ),
       format: format,
       path: switch (json['path']) {
         final String path => path,
