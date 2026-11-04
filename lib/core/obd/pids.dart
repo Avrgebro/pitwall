@@ -21,6 +21,10 @@ class PidDefinition {
   final int length;
 
   final double Function(List<int> data) decode;
+
+  /// The value in a reply's [data], or null if it's too short to hold it.
+  double? tryDecode(List<int> data) =>
+      data.length < length ? null : decode(data);
 }
 
 final List<PidDefinition> standardPids = [

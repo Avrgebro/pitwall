@@ -73,6 +73,9 @@ class FakeBluetoothGateway implements BluetoothGateway {
   /// answer.
   Future<void>? opening;
 
+  /// Connections closed while they were still opening, by address.
+  final closedWhileOpening = <String>[];
+
   @override
   Future<List<BondedDevice>> bondedDevices() async => devices;
 
@@ -83,19 +86,28 @@ class FakeBluetoothGateway implements BluetoothGateway {
   AdapterConnection connect(String address) {
     attempts++;
     connected.add(address);
-    return _FakeConnection(adapter?.call(address), opening);
+    return _FakeConnection(
+      adapter?.call(address),
+      opening,
+      onClosedWhileOpening: () => closedWhileOpening.add(address),
+    );
   }
 }
 
 /// Like Android's: closing it before it opens makes it fail to open.
 class _FakeConnection implements AdapterConnection {
-  _FakeConnection(this._adapter, this._opening) {
+  _FakeConnection(
+    this._adapter,
+    this._opening, {
+    required this.onClosedWhileOpening,
+  }) {
     // Starts opening now, not when first awaited.
     opened;
   }
 
   final ClosableAdapter? _adapter;
   final Future<void>? _opening;
+  final void Function() onClosedWhileOpening;
   bool _closed = false;
 
   /// Started at once, as Android's is.
@@ -109,14 +121,21 @@ class _FakeConnection implements AdapterConnection {
     if (adapter == null || _closed) {
       throw PlatformException(code: 'connect_failed');
     }
+    _opened = true;
     return adapter;
   }
 
+  /// Before it opened, there's no transport to close: the adapter was
+  /// never handed out.
   @override
   Future<void> close() async {
+    final wasOpen = _opened;
+    if (!wasOpen && !_closed) onClosedWhileOpening();
     _closed = true;
-    await _adapter?.close();
+    if (wasOpen) await _adapter?.close();
   }
+
+  bool _opened = false;
 }
 
 /// Records what Dart asks of the Android trip service.

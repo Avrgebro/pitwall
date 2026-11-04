@@ -228,7 +228,7 @@ void main() {
     });
 
     test('without flow control, its requests are listed, not read', () {
-      final summary = signalSet.summaryFor(2023, flowControl: false);
+      final summary = signalSet.forAdapter(flowControl: false).summaryFor(2023);
 
       expect(summary.readable.map((s) => s.metric.key), [
         'test_fuel_vol',

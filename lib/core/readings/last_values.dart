@@ -35,6 +35,23 @@ class UnreportedValue {
   final Unreported reason;
   final DateTime at;
 
+  /// What [toJson] wrote, or null if it isn't.
+  static UnreportedValue? tryParse(Object? json) => switch (json) {
+    {'reason': final String reason, 'at': final String at} => switch ((
+      Unreported.values.asNameMap()[reason],
+      DateTime.tryParse(at),
+    )) {
+      (final why?, final at?) => UnreportedValue(why, at),
+      _ => null,
+    },
+    _ => null,
+  };
+
+  Map<String, Object?> toJson() => {
+    'reason': reason.name,
+    'at': at.toIso8601String(),
+  };
+
   @override
   bool operator ==(Object other) =>
       other is UnreportedValue && other.reason == reason && other.at == at;
@@ -55,7 +72,7 @@ class LastValues {
   final Map<String, Map<String, LastValue>> byVehicle;
 
   /// By vehicle id, then key: the values its latest reading asked for and
-  /// didn't get. One that comes back later leaves this.
+  /// didn't get, and why.
   final Map<String, Map<String, UnreportedValue>> unreported;
 
   Map<String, LastValue> of(String vehicleId) =>
@@ -102,11 +119,11 @@ class LastValues {
                 key: LastValue(value, at, seq: seq),
             },
           },
+    // Each reading asks for every value sent, so its own are all there
+    // is to say: a value no longer asked for leaves with the rest.
     {
       ...unreported,
       vehicleId: {
-        for (final MapEntry(:key, :value) in unreportedOf(vehicleId).entries)
-          if (!values.containsKey(key) && !missing.containsKey(key)) key: value,
         for (final MapEntry(:key, value: why) in missing.entries)
           key: UnreportedValue(why, at),
       },
@@ -175,16 +192,11 @@ class LastValues {
           if (missing is Map)
             vehicleId: {
               for (final MapEntry(:key, :value) in missing.entries)
-                if ((key, value) case (
+                if ((key, UnreportedValue.tryParse(value)) case (
                   final String key,
-                  {'reason': final String reason, 'at': final String at},
+                  final missing?,
                 ))
-                  if ((
-                        Unreported.values.asNameMap()[reason],
-                        DateTime.tryParse(at),
-                      )
-                      case (final why?, final at?))
-                    key: UnreportedValue(why, at),
+                  key: missing,
             },
     },
   );

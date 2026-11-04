@@ -26,8 +26,8 @@ Map<String, Object?>? dataOf(Map<String, Object?> json) =>
 /// a newer version of the app saved it.
 ///
 /// The policy for every store: what was read but can't be understood is
-/// set aside, never written over, and the store starts as if nothing were
-/// saved. The copy set aside is only kept, never read back, so a downgrade
+/// set aside, as `<name>.unreadable.<time>`, never written over, and the
+/// store starts as if nothing were saved. The copy set aside is only kept, never read back, so a downgrade
 /// can't destroy a newer version's data, nor bring old data back over what
 /// was set up since.
 T? decodeVersioned<T>(String source, VersionReaders<T> readers) {

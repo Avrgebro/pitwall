@@ -11,6 +11,14 @@ void main() {
 
   File file(String name) => File('${directory.path}/$name');
 
+  /// What was set aside of [name], under the time it was.
+  List<File> setAside(String name) => [
+    for (final entry in directory.listSync())
+      if (entry is File &&
+          entry.uri.pathSegments.last.startsWith('$name.unreadable.'))
+        entry,
+  ];
+
   test('a file from a newer version is set aside, not written over', () async {
     const newer = '{"version": 99, "data": {"tucson": {}}}';
     file('last_values.json').writeAsStringSync(newer);
@@ -26,7 +34,7 @@ void main() {
       ),
     );
 
-    expect(file('last_values.json.unreadable').readAsStringSync(), newer);
+    expect(setAside('last_values.json').single.readAsStringSync(), newer);
     expect((await storage.load()).byVehicle['tucson']?['rpm']?.value, 800);
   });
 
@@ -50,7 +58,7 @@ void main() {
     final values = await FileLastValuesStorage().load();
 
     expect(values.byVehicle['tucson']?['rpm']?.seq, 1);
-    expect(file('last_values.json.unreadable').existsSync(), isFalse);
+    expect(setAside('last_values.json'), isEmpty);
   });
 
   test('a file that can\'t be read is left as it is', () async {
@@ -61,6 +69,31 @@ void main() {
       FileLastValuesStorage().load(),
       throwsA(isA<FileSystemException>()),
     );
-    expect(file('last_values.json.unreadable').existsSync(), isFalse);
+    expect(setAside('last_values.json'), isEmpty);
+  });
+
+  test('a copy set aside before is kept when another is', () async {
+    final storage = FileLastValuesStorage();
+    file('last_values.json').writeAsStringSync('{"version": 98}');
+    await storage.load();
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+    file('last_values.json').writeAsStringSync('{"version": 99}');
+
+    await storage.load();
+
+    expect(setAside('last_values.json'), hasLength(2));
+  });
+
+  test('a file that can\'t be set aside is left, and loading fails', () async {
+    file('last_values.json').writeAsStringSync('{"version": 99}');
+    // Read-only: the rename can't happen.
+    Process.runSync('chmod', ['a-w', directory.path]);
+    addTearDown(() => Process.runSync('chmod', ['u+w', directory.path]));
+
+    await expectLater(
+      FileLastValuesStorage().load(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(file('last_values.json').readAsStringSync(), '{"version": 99}');
   });
 }

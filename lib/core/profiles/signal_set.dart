@@ -66,98 +66,27 @@ class SignalSet {
     return SignalSet._(source, requests);
   }
 
-  /// The requests that apply to a car of [modelYear], through an adapter
-  /// that can set flow control, or not, as `Elm327.setsFlowControl` says.
-  /// Without it, a request that needs it is skipped: its reply would come
-  /// back cut short.
-  Iterable<ProfileRequest> requestsFor(
-    int modelYear, {
-    bool flowControl = true,
-  }) => [
-    for (final request in requests)
-      if (request.appliesTo(modelYear))
-        switch (request) {
-          ProfileCommand(needsFlowControl: true) when !flowControl =>
-            SkippedRequest(
-              request.description,
-              SkipReason.needsFlowControl,
-              filter: request.filter,
-              signals: request.signals,
-            ),
-          _ => request,
-        },
-  ];
+  /// The profile as read through an adapter that can set flow control, or
+  /// not, as `Elm327.setsFlowControl` says.
+  ProfileForAdapter forAdapter({required bool flowControl}) =>
+      ProfileForAdapter._(this, flowControl: flowControl);
 
-  /// The requests Pitwall sends to a car of [modelYear]; see
-  /// [requestsFor].
-  Iterable<ProfileCommand> commandsFor(
-    int modelYear, {
-    bool flowControl = true,
-  }) => requestsFor(
-    modelYear,
-    flowControl: flowControl,
-  ).whereType<ProfileCommand>();
+  /// Through an adapter that can set flow control; see [forAdapter].
+  Iterable<ProfileRequest> requestsFor(int modelYear) =>
+      forAdapter(flowControl: true).requestsFor(modelYear);
 
-  /// The requests Pitwall sends to a car of [modelYear], each with the
-  /// values read through it. A value several requests carry is read
-  /// through the first this adapter can send, so its name, unit and
-  /// reading all come from one place.
+  /// Through an adapter that can set flow control; see [forAdapter].
+  Iterable<ProfileCommand> commandsFor(int modelYear) =>
+      forAdapter(flowControl: true).commandsFor(modelYear);
+
+  /// Through an adapter that can set flow control; see [forAdapter].
   List<({ProfileCommand command, List<ProfileSignal> signals})> readsFor(
-    int modelYear, {
-    bool flowControl = true,
-  }) {
-    final claimed = <String>{};
-    return [
-      for (final command in commandsFor(modelYear, flowControl: flowControl))
-        (
-          command: command,
-          signals: [
-            for (final signal in command.signals)
-              if (claimed.add(signal.metric.key)) signal,
-          ],
-        ),
-    ];
-  }
+    int modelYear,
+  ) => forAdapter(flowControl: true).readsFor(modelYear);
 
-  /// What this profile offers a car of [modelYear], through an adapter
-  /// that can set flow control or not; see [ProfileSummary] and
-  /// [requestsFor].
-  ProfileSummary summaryFor(int modelYear, {bool flowControl = true}) {
-    final readable = {
-      for (final (:signals, command: _) in readsFor(
-        modelYear,
-        flowControl: flowControl,
-      ))
-        for (final signal in signals) signal.metric.key: signal,
-    };
-    final missing = <SkipReason, Map<String, ProfileSignal>>{};
-    var neverSent = 0;
-    for (final request in requestsFor(modelYear, flowControl: flowControl)) {
-      switch (request) {
-        case ProfileCommand():
-          break;
-        case SkippedRequest(reason: SkipReason.notReadOnly):
-          neverSent++;
-        case SkippedRequest(:final reason, :final signals):
-          final byKey = missing[reason] ??= {};
-          for (final signal in signals) {
-            // Read through another request, so not missing after all.
-            final key = signal.metric.key;
-            if (!readable.containsKey(key)) byKey[key] = signal;
-          }
-      }
-    }
-    return ProfileSummary(
-      year: modelYear,
-      readable: readable.values.toList(),
-      notYetReadable: [
-        for (final MapEntry(key: reason, value: byKey) in missing.entries)
-          if (byKey.isNotEmpty)
-            (reason: reason, signals: byKey.values.toList()),
-      ],
-      neverSentRequests: neverSent,
-    );
-  }
+  /// Through an adapter that can set flow control; see [forAdapter].
+  ProfileSummary summaryFor(int modelYear) =>
+      forAdapter(flowControl: true).summaryFor(modelYear);
 
   static ProfileCommand _parseCommand(
     Map entry,
@@ -213,6 +142,94 @@ class SignalSet {
         ? cmd.entries.map((e) => '${e.key} ${e.value}').join(' ')
         : '?';
     return '${entry['hdr'] ?? '?'}: $request';
+  }
+}
+
+/// A profile as an adapter reads it: one that can set flow control reads
+/// every request, one that can't skips those that need it.
+final class ProfileForAdapter {
+  const ProfileForAdapter._(this.profile, {required this.flowControl});
+
+  final SignalSet profile;
+  final bool flowControl;
+
+  /// The requests that apply to a car of [modelYear]. Without flow
+  /// control, a request that needs it is skipped: its reply would come back
+  /// cut short.
+  Iterable<ProfileRequest> requestsFor(int modelYear) => [
+    for (final request in profile.requests)
+      if (request.appliesTo(modelYear))
+        switch (request) {
+          ProfileCommand(needsFlowControl: true) when !flowControl =>
+            SkippedRequest(
+              request.description,
+              SkipReason.needsFlowControl,
+              filter: request.filter,
+              signals: request.signals,
+            ),
+          _ => request,
+        },
+  ];
+
+  /// The requests Pitwall sends to a car of [modelYear]; see
+  /// [requestsFor].
+  Iterable<ProfileCommand> commandsFor(int modelYear) =>
+      requestsFor(modelYear).whereType<ProfileCommand>();
+
+  /// The requests Pitwall sends to a car of [modelYear], each with the
+  /// values read through it. A value several requests carry is read
+  /// through the first this adapter can send, so its name, unit and
+  /// reading all come from one place.
+  List<({ProfileCommand command, List<ProfileSignal> signals})> readsFor(
+    int modelYear,
+  ) {
+    final claimed = <String>{};
+    return [
+      for (final command in commandsFor(modelYear))
+        (
+          command: command,
+          signals: [
+            for (final signal in command.signals)
+              if (claimed.add(signal.metric.key)) signal,
+          ],
+        ),
+    ];
+  }
+
+  /// What the profile offers a car of [modelYear], through this adapter;
+  /// see [ProfileSummary] and [requestsFor].
+  ProfileSummary summaryFor(int modelYear) {
+    final readable = {
+      for (final (:signals, command: _) in readsFor(modelYear))
+        for (final signal in signals) signal.metric.key: signal,
+    };
+    final missing = <SkipReason, Map<String, ProfileSignal>>{};
+    var neverSent = 0;
+    for (final request in requestsFor(modelYear)) {
+      switch (request) {
+        case ProfileCommand():
+          break;
+        case SkippedRequest(reason: SkipReason.notReadOnly):
+          neverSent++;
+        case SkippedRequest(:final reason, :final signals):
+          final byKey = missing[reason] ??= {};
+          for (final signal in signals) {
+            // Read through another request, so not missing after all.
+            final key = signal.metric.key;
+            if (!readable.containsKey(key)) byKey[key] = signal;
+          }
+      }
+    }
+    return ProfileSummary(
+      year: modelYear,
+      readable: readable.values.toList(),
+      notYetReadable: [
+        for (final MapEntry(key: reason, value: byKey) in missing.entries)
+          if (byKey.isNotEmpty)
+            (reason: reason, signals: byKey.values.toList()),
+      ],
+      neverSentRequests: neverSent,
+    );
   }
 }
 

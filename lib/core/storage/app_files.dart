@@ -37,8 +37,11 @@ Future<void> writeVersionedFile(String name, int version, Object? data) async {
   await writeAtomically(file, encodeVersioned(version, data));
 }
 
-/// Keeps [file] beside itself, replacing any copy set aside before.
-Future<void> _setAside(File file) => file.rename('${file.path}.unreadable');
+/// Keeps [file] beside itself, under the time it was set aside, so a copy
+/// set aside before is kept too.
+Future<void> _setAside(File file) => file.rename(
+  '${file.path}.unreadable.${DateTime.now().millisecondsSinceEpoch}',
+);
 
 /// Writes [contents] through a temporary file, so a crash mid-write can't
 /// leave a half-written file behind.

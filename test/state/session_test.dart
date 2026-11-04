@@ -139,8 +139,9 @@ void main() {
       await session.disconnect();
 
       // Closed while still connecting, not once the connect is done.
-      expect(adapters.single.closed, isTrue);
+      expect(bluetooth.closedWhileOpening, [_tucson.adapter!.address]);
       slow.complete();
+      // So it never opens, and nothing is sent.
       expect(await connecting, isA<StepFailed<SessionConnected>>());
       expect(adapters.single.sent, isEmpty);
       expect(c.read(sessionProvider), isA<SessionIdle>());

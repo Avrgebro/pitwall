@@ -59,6 +59,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Couldn\'t read the settings.'), findsOneWidget);
+    // And it's reported.
+    expect(tester.takeException(), isA<StateError>());
   });
 
   testWidgets('a value sent but not reported says why', (tester) async {

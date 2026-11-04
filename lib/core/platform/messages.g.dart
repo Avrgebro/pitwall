@@ -10,9 +10,9 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
 Object? _extractReplyValueOrThrow(
-    List<Object?>? replyList,
-    String channelName, {
-    required bool isNullValid,
+  List<Object?>? replyList,
+  String channelName, {
+  required bool isNullValid,
 }) {
   if (replyList == null) {
     throw PlatformException(
@@ -34,8 +34,11 @@ Object? _extractReplyValueOrThrow(
   return replyList.firstOrNull;
 }
 
-
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
   if (empty) {
     return <Object?>[];
   }
@@ -44,6 +47,7 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   }
   return <Object?>[error.code, error.message, error.details];
 }
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) {
     return true;
@@ -56,8 +60,9 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -106,34 +111,27 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
-
 /// Which vehicle a trip is for, as it travels between Dart and Android.
-sealed class TripTargetMessage {
-}
+sealed class TripTargetMessage {}
 
 /// A car's head unit connected: the trip is for the vehicle whose trips
 /// it starts.
 class HeadUnitMessage extends TripTargetMessage {
-  HeadUnitMessage({
-    required this.address,
-  });
+  HeadUnitMessage({required this.address});
 
   String address;
 
   List<Object?> _toList() {
-    return <Object?>[
-      address,
-    ];
+    return <Object?>[address];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static HeadUnitMessage decode(Object result) {
     result as List<Object?>;
-    return HeadUnitMessage(
-      address: result[0]! as String,
-    );
+    return HeadUnitMessage(address: result[0]! as String);
   }
 
   @override
@@ -160,26 +158,21 @@ class HeadUnitMessage extends TripTargetMessage {
 
 /// The app asked for the trip.
 class AppRequestMessage extends TripTargetMessage {
-  AppRequestMessage({
-    required this.target,
-  });
+  AppRequestMessage({required this.target});
 
   AppTripTargetMessage target;
 
   List<Object?> _toList() {
-    return <Object?>[
-      target,
-    ];
+    return <Object?>[target];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AppRequestMessage decode(Object result) {
     result as List<Object?>;
-    return AppRequestMessage(
-      target: result[0]! as AppTripTargetMessage,
-    );
+    return AppRequestMessage(target: result[0]! as AppTripTargetMessage);
   }
 
   @override
@@ -206,31 +199,25 @@ class AppRequestMessage extends TripTargetMessage {
 
 /// What the app can ask for: one vehicle, or any. Only a head unit names
 /// itself, so the app never asks for one.
-sealed class AppTripTargetMessage {
-}
+sealed class AppTripTargetMessage {}
 
 /// A trip for one vehicle.
 class VehicleMessage extends AppTripTargetMessage {
-  VehicleMessage({
-    required this.id,
-  });
+  VehicleMessage({required this.id});
 
   String id;
 
   List<Object?> _toList() {
-    return <Object?>[
-      id,
-    ];
+    return <Object?>[id];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static VehicleMessage decode(Object result) {
     result as List<Object?>;
-    return VehicleMessage(
-      id: result[0]! as String,
-    );
+    return VehicleMessage(id: result[0]! as String);
   }
 
   @override
@@ -260,17 +247,16 @@ class AnyVehicleMessage extends AppTripTargetMessage {
   AnyVehicleMessage();
 
   List<Object?> _toList() {
-    return <Object?>[
-    ];
+    return <Object?>[];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AnyVehicleMessage decode(Object result) {
     result as List<Object?>;
-    return AnyVehicleMessage(
-    );
+    return AnyVehicleMessage();
   }
 
   @override
@@ -308,15 +294,12 @@ class BondedDeviceMessage {
   int deviceClass;
 
   List<Object?> _toList() {
-    return <Object?>[
-      name,
-      address,
-      deviceClass,
-    ];
+    return <Object?>[name, address, deviceClass];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static BondedDeviceMessage decode(Object result) {
     result as List<Object?>;
@@ -336,7 +319,9 @@ class BondedDeviceMessage {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(name, other.name) && _deepEquals(address, other.address) && _deepEquals(deviceClass, other.deviceClass);
+    return _deepEquals(name, other.name) &&
+        _deepEquals(address, other.address) &&
+        _deepEquals(deviceClass, other.deviceClass);
   }
 
   @override
@@ -350,29 +335,23 @@ class BondedDeviceMessage {
 }
 
 /// Something from an adapter connection.
-sealed class AdapterEvent {
-}
+sealed class AdapterEvent {}
 
 /// Bytes the adapter sent.
 class AdapterBytes extends AdapterEvent {
-  AdapterBytes({
-    required this.connection,
-    required this.bytes,
-  });
+  AdapterBytes({required this.connection, required this.bytes});
 
   int connection;
 
   Uint8List bytes;
 
   List<Object?> _toList() {
-    return <Object?>[
-      connection,
-      bytes,
-    ];
+    return <Object?>[connection, bytes];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AdapterBytes decode(Object result) {
     result as List<Object?>;
@@ -391,7 +370,8 @@ class AdapterBytes extends AdapterEvent {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(connection, other.connection) && _deepEquals(bytes, other.bytes);
+    return _deepEquals(connection, other.connection) &&
+        _deepEquals(bytes, other.bytes);
   }
 
   @override
@@ -407,26 +387,21 @@ class AdapterBytes extends AdapterEvent {
 /// The connection dropped; nothing more comes from it. Not sent for a
 /// connection closed on purpose: by Dart, or by connecting again.
 class AdapterDropped extends AdapterEvent {
-  AdapterDropped({
-    required this.connection,
-  });
+  AdapterDropped({required this.connection});
 
   int connection;
 
   List<Object?> _toList() {
-    return <Object?>[
-      connection,
-    ];
+    return <Object?>[connection];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static AdapterDropped decode(Object result) {
     result as List<Object?>;
-    return AdapterDropped(
-      connection: result[0]! as int,
-    );
+    return AdapterDropped(connection: result[0]! as int);
   }
 
   @override
@@ -451,7 +426,6 @@ class AdapterDropped extends AdapterEvent {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -459,25 +433,25 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is HeadUnitMessage) {
+    } else if (value is HeadUnitMessage) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    }    else if (value is AppRequestMessage) {
+    } else if (value is AppRequestMessage) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    }    else if (value is VehicleMessage) {
+    } else if (value is VehicleMessage) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is AnyVehicleMessage) {
+    } else if (value is AnyVehicleMessage) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    }    else if (value is BondedDeviceMessage) {
+    } else if (value is BondedDeviceMessage) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
-    }    else if (value is AdapterBytes) {
+    } else if (value is AdapterBytes) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
-    }    else if (value is AdapterDropped) {
+    } else if (value is AdapterDropped) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
     } else {
@@ -508,7 +482,9 @@ class _PigeonCodec extends StandardMessageCodec {
   }
 }
 
-const StandardMethodCodec pigeonMethodCodec = StandardMethodCodec(_PigeonCodec());
+const StandardMethodCodec pigeonMethodCodec = StandardMethodCodec(
+  _PigeonCodec(),
+);
 
 /// The trip service, called from Dart.
 class TripServiceApi {
@@ -516,58 +492,63 @@ class TripServiceApi {
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
   TripServiceApi({
-      BinaryMessenger? binaryMessenger, 
-      String messageChannelSuffix = '', 
-      })
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
 
   final BinaryMessenger? pigeonVar_binaryMessenger;
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
-
   /// The head units whose connection starts a trip.
   Future<void> configure(List<String> headUnitAddresses) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.TripServiceApi.configure$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.configure$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[headUnitAddresses]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[headUnitAddresses],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Starts the service for a trip the app asked for: a vehicle, or any.
   Future<void> startService(AppTripTargetMessage target) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.TripServiceApi.startService$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.startService$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[target]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[target],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> stopService() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.TripServiceApi.stopService$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.stopService$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -577,35 +558,37 @@ class TripServiceApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> updateNotification(String text) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.TripServiceApi.updateNotification$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.updateNotification$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[text]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[text],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// The trip Android asked for before Dart was listening, if any. Asking
   /// also tells Android that Dart is now listening.
   Future<TripTargetMessage?> takeTripRequest() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.TripServiceApi.takeTripRequest$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.takeTripRequest$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -615,11 +598,10 @@ class TripServiceApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
     return pigeonVar_replyValue as TripTargetMessage?;
   }
 }
@@ -630,16 +612,20 @@ abstract class TripStartApi {
 
   void tripStart(TripTargetMessage target);
 
-  static void setUp(TripStartApi? api, {
-    BinaryMessenger? binaryMessenger, 
+  static void setUp(
+    TripStartApi? api, {
+    BinaryMessenger? binaryMessenger,
     String messageChannelSuffix = '',
-  }) 
-{
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  }) {
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty
+        ? '.$messageChannelSuffix'
+        : '';
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.pitwall.TripStartApi.tripStart$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.pitwall.TripStartApi.tripStart$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -651,8 +637,10 @@ abstract class TripStartApi {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }
@@ -674,20 +662,21 @@ class ClassicBluetoothApi {
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
   ClassicBluetoothApi({
-      BinaryMessenger? binaryMessenger, 
-      String messageChannelSuffix = '', 
-      })
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
 
   final BinaryMessenger? pigeonVar_binaryMessenger;
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
-
   Future<List<BondedDeviceMessage>> bondedDevices() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.bondedDevices$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.bondedDevices$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -697,11 +686,10 @@ class ClassicBluetoothApi {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return (pigeonVar_replyValue! as List<Object?>).cast<BondedDeviceMessage>();
   }
 
@@ -709,58 +697,64 @@ class ClassicBluetoothApi {
   /// then fails. Fails with `unavailable`, `permission` or
   /// `connect_failed`, also when it was closed before it opened.
   Future<void> connect(int connection, String address) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.connect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.connect$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[connection, address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection, address],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> write(int connection, Uint8List bytes) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.write$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.write$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[connection, bytes]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection, bytes],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   /// Closes the connection, or the attempt to make it, at once.
   Future<void> disconnect(int connection) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.disconnect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.disconnect$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[connection]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 }
 
@@ -773,17 +767,19 @@ class ClassicBluetoothApi {
 /// not be called multiple times for the same `instanceName`. To deliver
 /// events to multiple listeners, call this method once and listen to the
 /// returned broadcast stream multiple times instead.
-Stream<AdapterEvent> adapterEvents( {String instanceName = ''}) {
+Stream<AdapterEvent> adapterEvents({String instanceName = ''}) {
   if (instanceName.isNotEmpty) {
     instanceName = '.$instanceName';
   }
-  final EventChannel adapterEventsChannel =
-      EventChannel('dev.flutter.pigeon.pitwall.BluetoothEvents.adapterEvents$instanceName', pigeonMethodCodec);
+  final EventChannel adapterEventsChannel = EventChannel(
+    'dev.flutter.pigeon.pitwall.BluetoothEvents.adapterEvents$instanceName',
+    pigeonMethodCodec,
+  );
   return adapterEventsChannel.receiveBroadcastStream().map((dynamic event) {
     return event as AdapterEvent;
   });
 }
-    
+
 /// Whether Bluetooth is on: now, then each change.
 ///
 /// Returns a broadcast [Stream] of events from the `bluetoothEnabled` event channel.
@@ -792,14 +788,15 @@ Stream<AdapterEvent> adapterEvents( {String instanceName = ''}) {
 /// not be called multiple times for the same `instanceName`. To deliver
 /// events to multiple listeners, call this method once and listen to the
 /// returned broadcast stream multiple times instead.
-Stream<bool> bluetoothEnabled( {String instanceName = ''}) {
+Stream<bool> bluetoothEnabled({String instanceName = ''}) {
   if (instanceName.isNotEmpty) {
     instanceName = '.$instanceName';
   }
-  final EventChannel bluetoothEnabledChannel =
-      EventChannel('dev.flutter.pigeon.pitwall.BluetoothEvents.bluetoothEnabled$instanceName', pigeonMethodCodec);
+  final EventChannel bluetoothEnabledChannel = EventChannel(
+    'dev.flutter.pigeon.pitwall.BluetoothEvents.bluetoothEnabled$instanceName',
+    pigeonMethodCodec,
+  );
   return bluetoothEnabledChannel.receiveBroadcastStream().map((dynamic event) {
     return event as bool;
   });
 }
-    

@@ -27,4 +27,12 @@ class TripTargetExtrasTest {
         assertNull(TripTargetExtras.decode("PARKED:tucson"))
         assertNull(TripTargetExtras.decode(""))
     }
+
+    @Test
+    fun aKindWithoutWhatItNeedsIsNoTarget() {
+        // No separator: not "a vehicle called VEHICLE".
+        assertNull(TripTargetExtras.decode("VEHICLE"))
+        assertNull(TripTargetExtras.decode("HEAD_UNIT:"))
+        assertNull(TripTargetExtras.decode("VEHICLE:"))
+    }
 }

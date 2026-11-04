@@ -41,7 +41,7 @@ class _Connection {
   Elm327? get live => _live ? _elm : null;
 
   void asked(AdapterConnection adapter) => _adapter = adapter;
-  void opened(Elm327 elm) => _elm = elm;
+  void attach(Elm327 elm) => _elm = elm;
   void connected() => _live = true;
 
   /// Closes it at whatever stage: a connect still under way stops, and a
@@ -140,7 +140,7 @@ class SessionController extends Notifier<SessionState> {
     // Closed meanwhile, so the disconnect closed the adapter connection.
     if (!_isCurrent(connection)) return abandoned;
     final elm = Elm327(transport, log: log.exchange);
-    connection.opened(elm);
+    connection.attach(elm);
     try {
       final version = await elm.initialize();
       final car = await _askCar(elm);

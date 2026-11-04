@@ -35,8 +35,8 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
   /// Keeps [values], read [at], as sent in the reading numbered [seq], and
   /// the values the reading asked for and didn't get, [missing]. A vehicle
   /// deleted meanwhile, say as its reading came in, keeps none.
-  /// Neither do last values that couldn't be loaded: they're only shown,
-  /// and the file they couldn't be read from isn't written over.
+  /// Neither do last values that couldn't be loaded: nothing of them can
+  /// be shown, and the file they couldn't be read from isn't written over.
   Future<void> record(
     String vehicleId,
     Map<String, num> values,

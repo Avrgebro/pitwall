@@ -52,11 +52,10 @@ class VehicleValues {
   factory VehicleValues.of(Vehicle vehicle, StoredProfile? stored) {
     final year = vehicle.modelYear;
     final profile = switch ((stored, year)) {
-      // Until its adapter is known, as if it could read them all.
-      (LoadedProfile(:final signals), final year?) => signals.summaryFor(
-        year,
-        flowControl: vehicle.adapter?.setsFlowControl ?? true,
-      ),
+      (LoadedProfile(:final signals), final year?) =>
+        signals
+            .forAdapter(flowControl: vehicle.setsFlowControl)
+            .summaryFor(year),
       _ => null,
     };
     final options = valueOptions(profile);
@@ -126,7 +125,7 @@ Future<ValuesRead> readValues(
       case final voltage?:
         values[Metrics.batteryVoltage.key] = voltage;
       case null:
-        unreported[Metrics.batteryVoltage.key] = Unreported.unavailable;
+        unreported[Metrics.batteryVoltage.key] = Unreported.notMeasured;
     }
   }
   for (final definition in standardPids) {
@@ -141,12 +140,14 @@ Future<ValuesRead> readValues(
     switch (await elm.requestPid(definition.pid)) {
       case null:
         unanswered[key] = CanId.broadcast;
-      case final data when data.length < definition.length:
-        answered.add(CanId.broadcast);
-        unreported[key] = Unreported.notInReply;
       case final data:
         answered.add(CanId.broadcast);
-        values[key] = definition.decode(data);
+        switch (definition.tryDecode(data)) {
+          case final value?:
+            values[key] = value;
+          case null:
+            unreported[key] = Unreported.notInReply;
+        }
     }
   }
   if (profile != null && modelYear != null) {

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'can_id.dart';
 import 'obd_transport.dart';
-import 'pids.dart';
 
 enum ElmError {
   /// The car didn't answer this request, usually because it doesn't support it.
@@ -169,13 +168,6 @@ class Elm327 {
   }) async {
     final replies = await _mode01(pid, timeout: timeout);
     return replies.isEmpty ? null : replies.first;
-  }
-
-  /// Reads and decodes one value, or returns null if the car didn't answer.
-  Future<double?> read(PidDefinition definition) async {
-    final data = await requestPid(definition.pid);
-    if (data == null || data.length < definition.length) return null;
-    return definition.decode(data);
   }
 
   /// Asks for the supported standard values (PID 00), which every OBD-II

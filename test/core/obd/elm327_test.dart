@@ -76,9 +76,9 @@ void main() {
   test('reads a value with spaces and a SEARCHING line', () async {
     final elm = Elm327(FakeTransport({'012F': 'SEARCHING...\r41 2F 76'}));
 
-    final fuel = await elm.read(standardPidsById[0x2F]!);
+    final data = await elm.requestPid(0x2F);
 
-    expect(fuel, closeTo(46.27, 0.01));
+    expect(standardPidsById[0x2F]!.tryDecode(data!), closeTo(46.27, 0.01));
   });
 
   test('reads a value without spaces', () async {
@@ -96,7 +96,7 @@ void main() {
   test('NO DATA means the value is missing', () async {
     final elm = Elm327(FakeTransport({'01A6': 'NO DATA'}));
 
-    expect(await elm.read(standardPidsById[0xA6]!), isNull);
+    expect(await elm.requestPid(0xA6), isNull);
   });
 
   test('UNABLE TO CONNECT is an error', () async {

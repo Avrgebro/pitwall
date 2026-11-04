@@ -16,6 +16,10 @@ enum Unreported {
   /// The car marked it as unavailable, or it was outside its valid range.
   unavailable('The car marked it unavailable'),
 
+  /// A value the adapter measures itself, such as the battery voltage,
+  /// that it didn't.
+  notMeasured('The adapter didn\'t measure it'),
+
   /// It's only in requests that need flow control, which this adapter
   /// can't set.
   adapterCannot('This adapter can\'t read it');

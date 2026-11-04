@@ -1,6 +1,10 @@
-// The messages between Dart and Android. Run
-// `dart run pigeon --input pigeons/messages.dart` after changing them; both
-// sides' code is generated from this file.
+// The messages between Dart and Android. After changing them, run
+//
+//   dart run pigeon --input pigeons/messages.dart &&
+//     dart format lib/core/platform/messages.g.dart
+//
+// Both sides' code is generated from this file. The Dart side is kept as
+// `dart format` leaves it, so formatting the project never changes it.
 import 'package:pigeon/pigeon.dart';
 
 @ConfigurePigeon(

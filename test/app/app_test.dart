@@ -70,6 +70,8 @@ void main() {
 
     expect(find.textContaining('couldn\'t read its settings'), findsOneWidget);
     expect(find.text('Step 1 of 5'), findsNothing);
+    // Reported, each time it's tried.
+    expect(tester.takeException(), isA<FileSystemException>());
 
     // Readable again: the app starts as it was.
     store.loadError = null;

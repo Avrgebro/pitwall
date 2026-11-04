@@ -41,7 +41,9 @@ final class IdleControls extends ManualControls {
 
   final Vehicle vehicle;
 
-  /// The vehicle's adapter, which it has to have to connect.
+  /// The vehicle's adapter. The same as [vehicle]'s, carried apart so the
+  /// type says it's there: idle controls only exist for a vehicle that has
+  /// one.
   final VehicleAdapter adapter;
 
   /// Why the last connection ended, if it failed or was lost.

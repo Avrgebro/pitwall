@@ -33,7 +33,9 @@ Future<ValuesRead> readProfile(
     }
   }
 
-  final reads = signalSet.readsFor(modelYear, flowControl: elm.setsFlowControl);
+  final reads = signalSet
+      .forAdapter(flowControl: elm.setsFlowControl)
+      .readsFor(modelYear);
   // Chosen, but only readable with flow control this adapter hasn't got.
   if (!elm.setsFlowControl) {
     final readable = {

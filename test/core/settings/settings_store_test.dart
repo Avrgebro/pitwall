@@ -11,6 +11,7 @@ import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/types.dart';
 
 import '../../helpers/temporary_app_files.dart';
 import '../profiles/test_profile.dart';
@@ -50,7 +51,11 @@ void main() {
       expect(await preferences.getString('settings'), isNull);
       await store.save(const AppSettings(setupDone: true));
 
-      expect(await preferences.getString('settings.unreadable'), saved);
+      final keys = await preferences.getKeys();
+      final aside = keys.singleWhere(
+        (k) => k.startsWith('settings.unreadable.'),
+      );
+      expect(await preferences.getString(aside), saved);
     });
   }
 
@@ -94,6 +99,23 @@ void main() {
       const WebhookTarget('https://example.com/x'),
     );
   });
+
+  test(
+    'settings whose move can\'t finish are left, and loading fails',
+    () async {
+      SharedPreferencesAsyncPlatform.instance = _RemoveFails();
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString('settings', '{"version": 99}');
+
+      await expectLater(
+        SettingsStore(preferences: preferences).load(),
+        throwsA(isA<StateError>()),
+      );
+      // Still there, for the next start to try again: nothing saves over it,
+      // as the app shows it couldn't read its settings.
+      expect(await preferences.getString('settings'), '{"version": 99}');
+    },
+  );
 
   test('saving no webhook removes it', () async {
     FlutterSecureStorage.setMockInitialValues({});
@@ -149,7 +171,13 @@ void main() {
       await store.load();
 
       expect(await secrets.read(key: 'webhook'), isNull);
-      expect(await secrets.read(key: 'webhook.unreadable'), broken);
+      final all = await secrets.readAll();
+      expect(
+        all.entries
+            .singleWhere((e) => e.key.startsWith('webhook.unreadable.'))
+            .value,
+        broken,
+      );
       expect(await store.loadWebhook(), WebhookTarget.none);
     });
   });
@@ -229,4 +257,15 @@ void main() {
       );
     });
   });
+}
+
+/// Preferences that can be written but not removed from.
+base class _RemoveFails extends InMemorySharedPreferencesAsync {
+  _RemoveFails() : super.empty();
+
+  @override
+  Future<bool> clear(
+    ClearPreferencesParameters parameters,
+    SharedPreferencesOptions options,
+  ) async => throw StateError('storage busy');
 }

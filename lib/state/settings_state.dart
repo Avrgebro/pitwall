@@ -13,15 +13,34 @@ import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 
 /// The user's settings and vehicles. Every change is saved right away.
+///
+/// Not retried on its own when they can't be read: the app says so and
+/// offers Try again, so each try is the user's, and reported once.
 final appSettingsProvider =
     AsyncNotifierProvider<AppSettingsNotifier, AppSettings>(
       AppSettingsNotifier.new,
+      retry: (_, _) => null,
     );
 
 class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
+  /// Settings that can't be read are reported, each time they're tried,
+  /// and the app shows that it couldn't; see `SettingsErrorScreen`.
   @override
-  Future<AppSettings> build() async =>
-      _newest = _onDisk = await ref.read(settingsStoreProvider).load();
+  Future<AppSettings> build() async {
+    try {
+      return _newest = _onDisk = await ref.read(settingsStoreProvider).load();
+    } on Object catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'settings',
+          context: ErrorDescription('while reading the settings'),
+        ),
+      );
+      rethrow;
+    }
+  }
 
   AppSettings get _current => state.requireValue;
 
@@ -350,14 +369,12 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
             _reported('deleting a profile file no longer named', () async {
               String? named(AppSettings settings) =>
                   switch (settings.vehicleById(vehicleId)?.profile) {
-                    final ref? => SettingsStore.profileFileName(vehicleId, ref),
+                    final ref? => ProfileFiles.fileName(vehicleId, ref),
                     null => null,
                   };
               final kept = {named(_onDisk), named(_newest)};
               for (final ref in refs) {
-                if (!kept.contains(
-                  SettingsStore.profileFileName(vehicleId, ref),
-                )) {
+                if (!kept.contains(ProfileFiles.fileName(vehicleId, ref))) {
                   await store.deleteProfile(vehicleId, ref);
                 }
               }

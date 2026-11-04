@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +8,10 @@ import '../profiles/stored_profile.dart';
 import '../storage/app_files.dart';
 import '../vehicles/vehicle.dart';
 import '../webhook/webhook_target.dart';
+import 'profile_files.dart';
 import 'settings.dart';
+
+export 'profile_files.dart';
 
 /// A saved webhook that was read but can't be understood.
 class UnreadableWebhookException implements Exception {
@@ -46,68 +47,16 @@ class SettingsStore {
   ///
   /// As the store loads, once: a saved webhook that can't be understood is
   /// set aside, and, with settings that were read, profile files are put
-  /// in order; see [_tidyProfileFiles]. Neither can fail loading: what
+  /// in order; see [ProfileFiles.tidy]. Neither can fail loading: what
   /// they couldn't do is reported, and left as it was.
   Future<AppSettings> load() async {
     final settings = await _loadSettings();
     await _reported('setting aside the saved webhook', _setAsideWebhook);
     // New settings name no files: none can be told unused.
-    if (settings != null) await _tidyProfileFiles(settings);
+    if (settings != null) {
+      await _profiles.tidy(settings, report: _reported);
+    }
     return settings ?? const AppSettings();
-  }
-
-  /// Puts each vehicle's profile files in order, one vehicle at a time:
-  /// a profile kept in its vehicle's one file, from before each import had
-  /// its own, moves to the name its settings now give it ([profileFileName]);
-  /// files they don't name, as left by a crash or a delete that failed, go.
-  /// One vehicle's trouble leaves its files as they are, and its profile
-  /// then reads as unreadable, not every vehicle's.
-  Future<void> _tidyProfileFiles(AppSettings settings) async {
-    for (final vehicle in settings.vehicles) {
-      await _reported(
-        'putting the profile files of ${vehicle.id} in order',
-        () => _tidyProfileFilesOf(vehicle),
-      );
-    }
-    // A vehicle that's gone keeps nothing, as when its delete failed.
-    await _reported(
-      'removing the profiles of vehicles that are gone',
-      () async {
-        final profiles = Directory((await appFile('profiles')).path);
-        if (!await profiles.exists()) return;
-        final ids = {for (final vehicle in settings.vehicles) vehicle.id};
-        await for (final entry in profiles.list()) {
-          final name = entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
-          if (!ids.contains(name.replaceAll(RegExp(r'\.json$'), ''))) {
-            await entry.delete(recursive: true);
-          }
-        }
-      },
-    );
-  }
-
-  Future<void> _tidyProfileFilesOf(Vehicle vehicle) async {
-    final ref = vehicle.profile;
-    final legacy = await appFile('profiles/${vehicle.id}.json');
-    final folder = Directory((await appFile('profiles/${vehicle.id}')).path);
-    final named = ref == null
-        ? null
-        : await appFile(profileFileName(vehicle.id, ref));
-    if (named != null && named.path != legacy.path && await legacy.exists()) {
-      if (await named.exists()) {
-        await legacy.delete();
-      } else {
-        await named.parent.create(recursive: true);
-        await legacy.rename(named.path);
-      }
-    }
-    if (named?.path != legacy.path && await legacy.exists()) {
-      await legacy.delete();
-    }
-    if (!await folder.exists()) return;
-    await for (final entry in folder.list()) {
-      if (entry is File && entry.path != named?.path) await entry.delete();
-    }
   }
 
   /// Runs [action], reporting a failure rather than throwing it.
@@ -208,61 +157,30 @@ class SettingsStore {
     if (source == null) return null;
     final value = decodeVersioned(source, readers);
     if (value == null) {
-      await setAside('$key.unreadable', source);
+      // Under the time, so a copy set aside before is kept too.
+      await setAside(
+        '$key.unreadable.${DateTime.now().millisecondsSinceEpoch}',
+        source,
+      );
       await remove(key);
     }
     return value;
   }
 
-  /// The vehicle's imported profile, as found on the phone. A file that's
-  /// gone, can't be read, or no longer parses is an [UnreadableProfile].
-  Future<StoredProfile> loadProfile(Vehicle vehicle) async {
-    final ref = vehicle.profile;
-    if (ref == null) return const NoProfile();
-    try {
-      final file = await appFile(profileFileName(vehicle.id, ref));
-      return LoadedProfile(ref, SignalSet.parse(await file.readAsString()));
-    } on FileSystemException {
-      return UnreadableProfile(ref);
-    } on FormatException {
-      return UnreadableProfile(ref);
-    }
-  }
+  /// The vehicles' profile files; see [ProfileFiles].
+  static const _profiles = ProfileFiles();
 
-  /// Saves [profile] as the file [ref] names for the vehicle. Only a
-  /// parsed profile can be saved, so the file always holds one.
+  Future<StoredProfile> loadProfile(Vehicle vehicle) => _profiles.load(vehicle);
+
   Future<void> saveProfile(
     String vehicleId,
     ProfileRef ref,
     SignalSet profile,
-  ) async {
-    final file = await appFile(profileFileName(vehicleId, ref));
-    await file.parent.create(recursive: true);
-    await writeAtomically(file, profile.source);
-  }
+  ) => _profiles.save(vehicleId, ref, profile);
 
-  /// Deletes the file [ref] names for the vehicle, if it's there.
-  Future<void> deleteProfile(String vehicleId, ProfileRef ref) async {
-    final file = await appFile(profileFileName(vehicleId, ref));
-    if (await file.exists()) await file.delete();
-  }
+  Future<void> deleteProfile(String vehicleId, ProfileRef ref) =>
+      _profiles.delete(vehicleId, ref);
 
-  /// Deletes every profile file the vehicle has.
-  Future<void> deleteProfiles(String vehicleId) async {
-    final legacy = await appFile('profiles/$vehicleId.json');
-    if (await legacy.exists()) await legacy.delete();
-    final folder = Directory((await appFile('profiles/$vehicleId')).path);
-    if (await folder.exists()) await folder.delete(recursive: true);
-  }
-
-  /// Where the profile [ref] names is kept: a file per import, so the
-  /// settings always name exactly the file they mean, and the one they
-  /// named before is still there until they're saved. A profile from
-  /// before import times were kept has the vehicle's one file.
-  static String profileFileName(String vehicleId, ProfileRef ref) =>
-      switch (ref.importedAt) {
-        final at? =>
-          'profiles/$vehicleId/${at.toUtc().microsecondsSinceEpoch}.json',
-        null => 'profiles/$vehicleId.json',
-      };
+  Future<void> deleteProfiles(String vehicleId) =>
+      _profiles.deleteAll(vehicleId);
 }

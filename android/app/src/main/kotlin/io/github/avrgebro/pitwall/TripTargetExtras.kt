@@ -26,23 +26,28 @@ object TripTargetExtras {
         intent?.getStringExtra(KEY_TARGET)?.let(::decode)
 
     fun encode(target: TripTargetMessage): String {
-        val (kind, names) = when (target) {
+        val (kind, value) = when (target) {
             is HeadUnitMessage -> Kind.HEAD_UNIT to target.address
             is AppRequestMessage -> when (val request = target.target) {
                 is VehicleMessage -> Kind.VEHICLE to request.id
                 is AnyVehicleMessage -> Kind.ANY_VEHICLE to ""
             }
         }
-        return "${kind.name}:$names"
+        return "${kind.name}:$value"
     }
 
-    /** What [encode] wrote, or null if it's no kind this version knows. */
+    /**
+     * What [encode] wrote, or null if it isn't: no kind this version knows,
+     * or a kind without the value it needs.
+     */
     fun decode(text: String): TripTargetMessage? {
+        if (!text.contains(':')) return null
         val kind = Kind.entries.find { it.name == text.substringBefore(':') } ?: return null
-        val names = text.substringAfter(':')
+        val value = text.substringAfter(':')
         return when (kind) {
-            Kind.HEAD_UNIT -> HeadUnitMessage(names)
-            Kind.VEHICLE -> AppRequestMessage(VehicleMessage(names))
+            Kind.HEAD_UNIT -> value.takeIf { it.isNotEmpty() }?.let(::HeadUnitMessage)
+            Kind.VEHICLE ->
+                value.takeIf { it.isNotEmpty() }?.let { AppRequestMessage(VehicleMessage(it)) }
             Kind.ANY_VEHICLE -> AppRequestMessage(AnyVehicleMessage())
         }
     }

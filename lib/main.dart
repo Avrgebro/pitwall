@@ -13,15 +13,8 @@ Future<void> main() async {
   // starts anyway and says so; see PitwallApp.
   try {
     await container.read(appSettingsProvider.future);
-  } on Object catch (error, stack) {
-    FlutterError.reportError(
-      FlutterErrorDetails(
-        exception: error,
-        stack: stack,
-        library: 'settings',
-        context: ErrorDescription('while reading the settings at startup'),
-      ),
-    );
+  } on Object {
+    // Reported where they're read, and shown by the app.
   }
   // Queued readings resume right away. Never throws; see init.
   await container.read(webhookSenderProvider).init();

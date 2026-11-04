@@ -57,7 +57,10 @@ void standardTests() {
   });
 
   test('reads decode to the values shown on screen', () async {
-    Future<double?> read(int pid) => elm.read(standardPidsById[pid]!);
+    Future<double?> read(int pid) async => switch (await elm.requestPid(pid)) {
+      final data? => standardPidsById[pid]!.tryDecode(data),
+      null => null,
+    };
 
     expect(await elm.readBatteryVoltage(), 13.6);
     expect(await read(0x05), 57);

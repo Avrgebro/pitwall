@@ -160,6 +160,11 @@ class Vehicle {
   /// When the vehicle's adapter last connected.
   final DateTime? lastSeen;
 
+  /// Whether its adapter can set flow control, as found the last time it
+  /// was connected to. Until then, as if it could: what it can read is
+  /// only narrowed once it's known.
+  bool get setsFlowControl => adapter?.setsFlowControl ?? true;
+
   /// A copy with the given fields changed. What can be cleared has its own
   /// method: [withProfile] and [withSelectedKeys].
   Vehicle copyWith({

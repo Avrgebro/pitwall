@@ -13,16 +13,16 @@ class FakeSettingsStore implements SettingsStore {
   AppSettings settings;
   WebhookTarget webhook = WebhookTarget.none;
 
-  /// Profile files, by the name [SettingsStore.profileFileName] gives.
+  /// Profile files, by the name [ProfileFiles.fileName] gives.
   final Map<String, String> files = {};
 
   void putProfile(String vehicleId, ProfileRef ref, String source) =>
-      files[SettingsStore.profileFileName(vehicleId, ref)] = source;
+      files[ProfileFiles.fileName(vehicleId, ref)] = source;
 
   /// The profile file the saved settings name for the vehicle, if any.
   String? profileOf(String vehicleId) =>
       switch (settings.vehicleById(vehicleId)?.profile) {
-        final ref? => files[SettingsStore.profileFileName(vehicleId, ref)],
+        final ref? => files[ProfileFiles.fileName(vehicleId, ref)],
         null => null,
       };
 
@@ -76,7 +76,7 @@ class FakeSettingsStore implements SettingsStore {
   Future<StoredProfile> loadProfile(Vehicle vehicle) async {
     final ref = vehicle.profile;
     if (ref == null) return const NoProfile();
-    final source = files[SettingsStore.profileFileName(vehicle.id, ref)];
+    final source = files[ProfileFiles.fileName(vehicle.id, ref)];
     if (source == null) return UnreadableProfile(ref);
     try {
       return LoadedProfile(ref, SignalSet.parse(source));
@@ -101,7 +101,7 @@ class FakeSettingsStore implements SettingsStore {
   @override
   Future<void> deleteProfile(String vehicleId, ProfileRef ref) async {
     if (deleteError case final error?) throw error;
-    files.remove(SettingsStore.profileFileName(vehicleId, ref));
+    files.remove(ProfileFiles.fileName(vehicleId, ref));
   }
 
   @override
