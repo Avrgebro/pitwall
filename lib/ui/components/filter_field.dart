@@ -9,7 +9,10 @@ import 'info_note.dart';
 /// A search field that narrows a list, with a note under it when a search
 /// leaves nothing. It sits on the same frosted glass as the cards around
 /// it, and its outline turns to the accent colour while typing.
-class FilterField extends StatelessWidget {
+///
+/// It shows [query], whatever it held before: a field built again, as when
+/// its list comes back after an error, still shows what's filtering.
+class FilterField extends StatefulWidget {
   const FilterField({
     super.key,
     required this.hintText,
@@ -33,7 +36,36 @@ class FilterField extends StatelessWidget {
   final bool autoFocus;
 
   @override
+  State<FilterField> createState() => _FilterFieldState();
+}
+
+class _FilterFieldState extends State<FilterField> {
+  late final _text = TextEditingController(text: widget.query.text);
+
+  @override
+  void didUpdateWidget(FilterField old) {
+    super.didUpdateWidget(old);
+    // Typing changes the query to match; only a change from outside
+    // changes the text.
+    if (TextQuery(_text.text) != widget.query) _text.text = widget.query.text;
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final FilterField(
+      :hintText,
+      :autoFocus,
+      :onChanged,
+      :query,
+      :matches,
+      :noun,
+    ) = widget;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Column(
@@ -43,6 +75,7 @@ class FilterField extends StatelessWidget {
         GlassSurface(
           borderRadius: Corners.heroRadius,
           child: SearchBar(
+            controller: _text,
             hintText: hintText,
             leading: const Icon(Symbols.search_rounded),
             autoFocus: autoFocus,

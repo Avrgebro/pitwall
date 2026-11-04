@@ -119,6 +119,11 @@ class VehicleDetailScreen extends ConsumerWidget {
           text: 'OBDb profile: choose the model year',
           problem: false,
         ),
+        // Still being read: it has one, but what it adds isn't known yet.
+        (null, _) when values.vehicle.profile != null => (
+          text: 'OBDb profile',
+          problem: false,
+        ),
         (NoProfile() || null, _) => (
           text: 'Standard values only',
           problem: false,

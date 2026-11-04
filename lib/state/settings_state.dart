@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/bluetooth/bluetooth_gateway.dart';
@@ -20,7 +21,7 @@ final appSettingsProvider =
 class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   @override
   Future<AppSettings> build() async =>
-      _newest = await ref.read(settingsStoreProvider).load();
+      _newest = _onDisk = await ref.read(settingsStoreProvider).load();
 
   AppSettings get _current => state.requireValue;
 
@@ -28,6 +29,9 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// a change then saves that change too, and can't put back what it
   /// replaced.
   late AppSettings _newest;
+
+  /// The settings last written, or loaded.
+  late AppSettings _onDisk;
 
   /// Everything that writes to the store, settings and profile files,
   /// one after another.
@@ -51,7 +55,37 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// Makes [settings] current, then writes them.
   Future<void> _save(AppSettings settings) {
     _apply(settings);
-    return _queued((store) => store.save(_newest));
+    return _queuedWrite(_writeNewest);
+  }
+
+  /// Queued work that may write the settings, counting the one running.
+  int _writesToCome = 0;
+
+  /// Queues [write], which may write the settings through [_writeNewest].
+  Future<void> _queuedWrite(Future<void> Function(SettingsStore) write) {
+    _writesToCome++;
+    return _queued((store) async {
+      try {
+        await write(store);
+      } finally {
+        _writesToCome--;
+      }
+    });
+  }
+
+  /// Writes the newest settings. If that fails and it was the last write
+  /// to come, the settings shown go back to the ones on disk, so they never
+  /// show what isn't saved. Otherwise a later write still tries, and it
+  /// saves the newest settings too.
+  Future<void> _writeNewest(SettingsStore store) async {
+    final settings = _newest;
+    try {
+      await store.save(settings);
+      _onDisk = settings;
+    } on Object {
+      if (_writesToCome == 1 && ref.mounted) _apply(_onDisk);
+      rethrow;
+    }
   }
 
   /// Applies [change] to the vehicle as it is now, if it still exists.
@@ -125,10 +159,22 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   /// Called by a listener as a connection is made, which can be before
-  /// the settings have loaded.
+  /// the settings have loaded. Nothing awaits it, so it never throws: a
+  /// failure is reported here.
   Future<void> markSeen(String id, DateTime time) async {
-    await future;
-    await _modifyVehicle(id, (v) => v.copyWith(lastSeen: time));
+    try {
+      await future;
+      await _modifyVehicle(id, (v) => v.copyWith(lastSeen: time));
+    } on Object catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'settings',
+          context: ErrorDescription('while noting when a vehicle was seen'),
+        ),
+      );
+    }
   }
 
   Future<void> setInterval(Duration interval) =>
@@ -222,7 +268,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     LoadedProfile? profile, {
     required int? Function(Vehicle vehicle) modelYear,
     bool Function(Vehicle vehicle)? when,
-  }) => _queued((store) async {
+  }) => _queuedWrite((store) async {
     final vehicle = _newest.vehicleById(vehicleId);
     if (vehicle == null || !(when?.call(vehicle) ?? true)) return;
     if (profile != null) {
@@ -237,7 +283,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
         changed.withProfile(profile?.ref, modelYear: modelYear(changed)),
       ),
     );
-    await store.save(_newest);
+    await _writeNewest(store);
     if (profile == null) await store.deleteProfile(vehicleId);
   });
 }

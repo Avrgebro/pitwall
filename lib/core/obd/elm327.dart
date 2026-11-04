@@ -93,6 +93,10 @@ class Elm327 {
   /// Whether the connection to the adapter has closed.
   bool get isClosed => _closed;
 
+  /// Whether the adapter takes the flow-control commands [setTarget] sends.
+  /// Assumed until one is refused.
+  bool get setsFlowControl => _flowControlSupported;
+
   /// Resets the adapter and configures it for compact, header-free replies
   /// with automatic protocol detection. Returns the adapter's banner, such as
   /// `ELM327 v1.5`.

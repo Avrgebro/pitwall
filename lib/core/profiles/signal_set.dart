@@ -157,13 +157,11 @@ class SignalSet {
     if (entry['eax'] != null) {
       throw const _Unsupported(SkipReason.extendedAddress);
     }
-    // OBDb's `fcm1` asks for flow-control mode 1 aimed at the module, so a
-    // long reply comes back whole. `Elm327.setTarget` sets that up for
-    // every module a request is sent to, so it needs nothing more here.
     if (signals.isEmpty) throw const _Unsupported(SkipReason.noUsableSignals);
     return ProfileCommand(
       header: header,
       receive: receive,
+      needsFlowControl: entry['fcm1'] == true,
       service: service,
       id: [
         for (var i = 0; i < idHex.length; i += 2)
@@ -202,6 +200,7 @@ final class ProfileCommand extends ProfileRequest {
   const ProfileCommand({
     required this.header,
     required this.receive,
+    this.needsFlowControl = false,
     required this.service,
     required this.id,
     required super.filter,
@@ -213,6 +212,11 @@ final class ProfileCommand extends ProfileRequest {
 
   /// CAN id the reply comes from, e.g. `7CE`, if the profile names one.
   final CanId? receive;
+
+  /// OBDb's `fcm1`: the reply comes back whole only with flow control
+  /// aimed at the module, which `Elm327.setTarget` sets up where the
+  /// adapter can.
+  final bool needsFlowControl;
 
   final int service;
   final List<int> id;

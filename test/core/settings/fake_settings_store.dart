@@ -20,6 +20,9 @@ class FakeSettingsStore implements SettingsStore {
   /// Holds the next settings write until it completes.
   Future<void>? nextSave;
 
+  /// Makes every settings write fail with this.
+  Object? saveError;
+
   @override
   Future<AppSettings> load() async => settings;
 
@@ -28,6 +31,7 @@ class FakeSettingsStore implements SettingsStore {
     final hold = nextSave;
     nextSave = null;
     if (hold != null) await hold;
+    if (saveError case final error?) throw error;
     this.settings = settings;
   }
 

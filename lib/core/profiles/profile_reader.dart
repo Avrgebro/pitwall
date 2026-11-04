@@ -7,6 +7,9 @@ import 'signal_set.dart';
 /// several requests carry is read through the first; see
 /// [SignalSet.readsFor].
 ///
+/// Requests that need flow control are skipped on adapters that can't set
+/// it.
+///
 /// Always switches the adapter back to the default broadcast address, so
 /// standard reads keep working afterwards.
 Future<Map<String, double>> readProfile(
@@ -22,6 +25,9 @@ Future<Map<String, double>> readProfile(
       final read = signals.where(wanted).toList();
       if (read.isEmpty) continue;
       await elm.setTarget(command.header, receive: command.receive);
+      // Without flow control its reply comes back cut short, so asking
+      // would only take time.
+      if (command.needsFlowControl && !elm.setsFlowControl) continue;
       final List<List<int>> replies;
       try {
         replies = await elm.request(command.service, command.id);

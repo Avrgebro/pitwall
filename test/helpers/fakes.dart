@@ -98,9 +98,8 @@ class FakeTripServiceGateway implements TripServiceGateway {
   /// Makes taking the held request fail, like a channel error.
   Object? takeError;
 
-  /// A start whose target couldn't be read.
-  void sendUnreadable() =>
-      _starts.addError(const FormatException('Not a trip target'));
+  /// Makes the next [configure] fail, like a channel error.
+  bool failConfigure = false;
 
   /// Makes updating the notification fail on [text], like a channel error.
   String? failNotification;
@@ -117,8 +116,13 @@ class FakeTripServiceGateway implements TripServiceGateway {
   }
 
   @override
-  Future<void> configure({required Set<String> headUnitAddresses}) async =>
-      this.headUnitAddresses = headUnitAddresses;
+  Future<void> configure({required Set<String> headUnitAddresses}) async {
+    if (failConfigure) {
+      failConfigure = false;
+      throw PlatformException(code: 'channel-error');
+    }
+    this.headUnitAddresses = headUnitAddresses;
+  }
 
   /// Like Android: the start comes back as the target it names.
   @override

@@ -170,6 +170,23 @@ void main() {
     expect(service.headUnitAddresses, {_tucsonStereo, _mazdaStereo});
   });
 
+  test('head units Android didn\'t take are sent again', () async {
+    final c = container(vehicles: const [_tucson, _mazda]);
+    service.failConfigure = true;
+    c.read(tripProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(service.headUnitAddresses, isNull);
+    expect(
+      c.read(adapterLogProvider).entries.value.map((e) => e.text),
+      contains(startsWith('Telling Android which head units start trips')),
+    );
+
+    // Any change to the settings tries again.
+    await c.read(appSettingsProvider.notifier).renameVehicle('mazda', 'CX-5');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(service.headUnitAddresses, {_tucsonStereo, _mazdaStereo});
+  });
+
   test('a trip reads, sends, and closes with connected: false', () async {
     final c = container(adapter: (_) => _Adapter());
     c.read(tripProvider);
@@ -551,16 +568,6 @@ void main() {
       );
     },
   );
-
-  test('a start that can\'t be read stops the service', () async {
-    final c = container(adapter: (_) => _Adapter());
-    c.read(tripProvider);
-
-    service.sendUnreadable();
-    await until(() => service.calls.contains('stopService'), 'stopService');
-
-    expect(c.read(tripProvider), isA<TripIdle>());
-  });
 
   test('a held request that can\'t be fetched stops the service', () async {
     final c = container(adapter: (_) => _Adapter());

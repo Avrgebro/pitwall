@@ -172,10 +172,7 @@ class TripController extends Notifier<TripState> {
   @override
   TripState build() {
     final gateway = ref.watch(tripServiceGatewayProvider);
-    final starts = gateway.starts.listen(
-      (target) => unawaited(_run(target)),
-      onError: _refuse,
-    );
+    final starts = gateway.starts.listen((target) => unawaited(_run(target)));
     ref.onDispose(starts.cancel);
     // Android needs to know which head units start a trip, even while the
     // app isn't running.
@@ -183,8 +180,13 @@ class TripController extends Notifier<TripState> {
     ref.listen(appSettingsProvider, (_, settings) {
       final headUnits = settings.value?.startingHeadUnits;
       if (headUnits == null || setEquals(headUnits, configured)) return;
-      configured = headUnits;
-      gateway.configure(headUnitAddresses: headUnits);
+      unawaited(
+        _guarded('Telling Android which head units start trips', () async {
+          await gateway.configure(headUnitAddresses: headUnits);
+          // Only once Android has them; otherwise the next change tries again.
+          configured = headUnits;
+        }),
+      );
     }, fireImmediately: true);
     // Android may have started the service before Dart was listening.
     Future.microtask(() async {
@@ -192,8 +194,6 @@ class TripController extends Notifier<TripState> {
         if (await gateway.takeTripRequest() case final target?) {
           unawaited(_run(target));
         }
-      } on FormatException catch (error, stack) {
-        _refuse(error, stack);
       } on PlatformException catch (error, stack) {
         _refuse(error, stack);
       }
@@ -371,11 +371,11 @@ class TripController extends Notifier<TripState> {
     }
   }
 
-  /// Android started the service for a trip whose target can't be read,
-  /// or can't be fetched. No trip will run on it, so it's stopped, unless
-  /// a trip already is.
+  /// Android started the service for a trip whose target couldn't be
+  /// fetched. No trip will run on it, so it's stopped, unless a trip
+  /// already is.
   void _refuse(Object error, StackTrace stack) {
-    _report('Trip start not understood', error, stack);
+    _report('Fetching the trip start failed', error, stack);
     if (_current == null) {
       unawaited(_guarded('Stopping the trip service', _gateway.stopService));
     }

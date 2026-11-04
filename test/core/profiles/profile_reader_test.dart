@@ -58,6 +58,17 @@ void main() {
     },
   );
 
+  test('without flow control, requests that need it aren\'t sent', () async {
+    final transport = FakeTransport({...replies, 'ATFCSH7A0': '?'});
+
+    final values = await readProfile(Elm327(transport), signalSet, 2023);
+
+    expect(values, isNot(contains('test_fcm1')));
+    expect(transport.sent, isNot(contains('220100')));
+    // The rest is still read; the long reply from 7A0 just comes back short.
+    expect(transport.sent, contains('221234'));
+  });
+
   test('older model years include their extra commands', () async {
     final transport = FakeTransport(replies);
 

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -447,5 +450,75 @@ void main() {
     await (first, second).wait;
 
     expect(store.settings.vehicleById('tucson')!.name, 'C');
+  });
+
+  group('a failed write', () {
+    Future<(ProviderContainer, FakeSettingsStore)> start() async {
+      final store = FakeSettingsStore(
+        settings: const AppSettings(
+          vehicles: [Vehicle(id: 'tucson', name: 'A')],
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: testOverrides(store: store),
+      );
+      addTearDown(container.dispose);
+      await container.read(appSettingsProvider.future);
+      return (container, store);
+    }
+
+    String name(ProviderContainer c) => c.read(vehicleProvider('tucson'))!.name;
+
+    test('puts back the settings on disk', () async {
+      final (container, store) = await start();
+      final failing = Completer<void>();
+      store.nextSave = failing.future;
+
+      final renaming = container
+          .read(appSettingsProvider.notifier)
+          .renameVehicle('tucson', 'B');
+      expect(name(container), 'B');
+      failing.completeError(const FileSystemException('disk full'));
+
+      await expectLater(renaming, throwsA(isA<FileSystemException>()));
+      expect(name(container), 'A');
+    });
+
+    test('keeps a change whose own write is still to come', () async {
+      final (container, store) = await start();
+      final notifier = container.read(appSettingsProvider.notifier);
+      final failing = Completer<void>();
+      store.nextSave = failing.future;
+
+      final first = notifier.renameVehicle('tucson', 'B');
+      final second = notifier.renameVehicle('tucson', 'C');
+      failing.completeError(const FileSystemException('disk full'));
+
+      await expectLater(first, throwsA(isA<FileSystemException>()));
+      await second;
+      expect(name(container), 'C');
+      expect(store.settings.vehicleById('tucson')!.name, 'C');
+    });
+  });
+
+  test('noting when a vehicle was seen never throws', () async {
+    final store = FakeSettingsStore(
+      settings: const AppSettings(
+        vehicles: [Vehicle(id: 'tucson', name: 'A')],
+      ),
+    )..saveError = const FileSystemException('disk full');
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    final reported = <FlutterErrorDetails>[];
+    final previous = FlutterError.onError;
+    FlutterError.onError = reported.add;
+    addTearDown(() => FlutterError.onError = previous);
+
+    await container
+        .read(appSettingsProvider.notifier)
+        .markSeen('tucson', DateTime(2026, 11, 3));
+
+    expect(reported.single.library, 'settings');
+    expect(container.read(vehicleProvider('tucson'))!.lastSeen, isNull);
   });
 }
