@@ -33,11 +33,8 @@ void main() {
     () async {
       final transport = FakeTransport(replies);
 
-      final (:values, unreported: _) = await readProfile(
-        Elm327(transport),
-        signalSet,
-        2023,
-      );
+      final (:values, unreported: _, unanswered: _, answered: _) =
+          await readProfile(Elm327(transport), signalSet, 2023);
 
       // Raw ids and the profile's own units: miles stay miles.
       expect(values['test_fuel_vol'], 52);
@@ -72,15 +69,17 @@ void main() {
       'ATS0': 'OK',
       'ATH0': 'OK',
       'ATSP0': 'OK',
-      'ATFCSM0': '?',
+      'ATFCSH7E0': '?',
     });
     final elm = Elm327(transport);
     await elm.initialize();
     transport.sent.clear();
 
-    final (:values, unreported: _) = await readProfile(elm, signalSet, 2023);
+    final (:values, :unreported, unanswered: _, answered: _) =
+        await readProfile(elm, signalSet, 2023);
 
     expect(values, isNot(contains('test_fcm1')));
+    expect(unreported['test_fcm1'], Unreported.adapterCannot);
     // Not even addressed: known before reading, not found out while.
     expect(transport.sent, isNot(contains('220100')));
     expect(transport.sent, isNot(contains('ATSH7E0')));
@@ -92,11 +91,8 @@ void main() {
   test('older model years include their extra commands', () async {
     final transport = FakeTransport(replies);
 
-    final (:values, unreported: _) = await readProfile(
-      Elm327(transport),
-      signalSet,
-      2018,
-    );
+    final (:values, unreported: _, unanswered: _, answered: _) =
+        await readProfile(Elm327(transport), signalSet, 2018);
 
     expect(values['test_old_only'], 0x2A);
     expect(transport.sent, containsAllInOrder(['ATSH7E0', '220042']));
@@ -105,26 +101,21 @@ void main() {
   test('a refused request gives no values', () async {
     final transport = FakeTransport({...replies, '221234': '7F2231'});
 
-    final (:values, :unreported) = await readProfile(
-      Elm327(transport),
-      signalSet,
-      2023,
-    );
+    final (:values, :unreported, unanswered: _, answered: _) =
+        await readProfile(Elm327(transport), signalSet, 2023);
 
     expect(values, isNot(contains('test_fuel_vol')));
     expect(values, isNot(contains('test_odo_mi')));
-    expect(unreported['test_fuel_vol'], Unreported.noAnswer);
+    // Whether that says something depends on the module; see readCar.
+    expect(unreported, isNot(contains('test_fuel_vol')));
   });
 
   test('a value its reply is too short for is said to be missing', () async {
     // The odometer's bytes are cut off; the fuel's are there.
     final transport = FakeTransport({...replies, '221234': '6212340068'});
 
-    final (:values, :unreported) = await readProfile(
-      Elm327(transport),
-      signalSet,
-      2023,
-    );
+    final (:values, :unreported, unanswered: _, answered: _) =
+        await readProfile(Elm327(transport), signalSet, 2023);
 
     expect(values['test_fuel_vol'], 52);
     expect(unreported, {'test_odo_mi': Unreported.notInReply});
@@ -137,11 +128,8 @@ void main() {
     ''');
     final transport = FakeTransport({...replies, '220001': '620001FF'});
 
-    final (:values, :unreported) = await readProfile(
-      Elm327(transport),
-      profile,
-      2023,
-    );
+    final (:values, :unreported, unanswered: _, answered: _) =
+        await readProfile(Elm327(transport), profile, 2023);
 
     expect(values, isEmpty);
     expect(unreported, {'soc': Unreported.unavailable});
@@ -164,11 +152,8 @@ void main() {
       '220002': '6200020907',
     });
 
-    final (:values, unreported: _) = await readProfile(
-      Elm327(transport),
-      profile,
-      2023,
-    );
+    final (:values, unreported: _, unanswered: _, answered: _) =
+        await readProfile(Elm327(transport), profile, 2023);
 
     // Only ever from the first request, whose name and unit the profile's
     // summary shows: the second request's value, in its own terms, isn't

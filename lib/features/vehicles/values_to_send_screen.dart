@@ -11,7 +11,6 @@ import '../../state/infrastructure.dart';
 import '../../state/last_values_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
-import '../common/value_text.dart';
 import 'values_view.dart';
 import 'widgets/vehicle_page.dart';
 

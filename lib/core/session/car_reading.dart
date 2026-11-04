@@ -49,7 +49,7 @@ Future<CarReading> readCar(
   required Set<int> supportedPids,
 }) async {
   try {
-    final (:values, :unreported) = await readValues(
+    final (:values, :unreported, :unanswered, :answered) = await readValues(
       elm,
       keys: keys,
       supportedPids: supportedPids,
@@ -68,17 +68,15 @@ Future<CarReading> readCar(
       ...values,
       Metrics.batteryVoltage.key: ?voltage,
     });
-    // A car that reported nothing of its own, as for a while after it's
-    // switched off, says nothing about any one value by not answering.
-    // Only a reply it did send can be short of one, or mark it unavailable.
-    final fromCar = values.keys.any((key) => key != Metrics.batteryVoltage.key);
-    final missing = fromCar
-        ? unreported
-        : {
-            for (final MapEntry(:key, value: why) in unreported.entries)
-              if (why == Unreported.notInReply || why == Unreported.unavailable)
-                key: why,
-          };
+    // A request nothing answered says something only if the module asked
+    // is awake: it answered something else, or the engine runs. Otherwise
+    // it may only be asleep, as for a while after the car is switched off.
+    final missing = {
+      ...unreported,
+      for (final MapEntry(:key, value: module) in unanswered.entries)
+        if (carState == CarState.engineRunning || answered.contains(module))
+          key: Unreported.noAnswer,
+    };
     return values.isEmpty
         ? CarAwake(carState, unreported: missing)
         : CarAnswered(values, carState, unreported: missing);

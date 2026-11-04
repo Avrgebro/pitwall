@@ -91,7 +91,7 @@ class Elm327 {
   bool get isClosed => _closed;
 
   /// Whether the adapter takes the flow-control commands [setTarget] sends,
-  /// as [initialize] found.
+  /// as [initialize] found, once and for all.
   bool get setsFlowControl => _flowControlSupported;
 
   /// Resets the adapter and configures it for compact, header-free replies
@@ -106,16 +106,24 @@ class Elm327 {
     for (final command in ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATSP0']) {
       await send(command);
     }
-    // Automatic flow control, which it starts in anyway: only whether it
-    // knows the command matters.
-    try {
-      await send('ATFCSM0');
-      _flowControlSupported = true;
-    } on ElmException catch (e) {
-      if (e.error != ElmError.unknownCommand) rethrow;
-      _flowControlSupported = false;
-    }
+    _flowControlSupported = await _probeFlowControl();
     return banner.split('\n').last;
+  }
+
+  /// Whether the adapter takes every flow-control command [setTarget]
+  /// sends. Each is sent once, ending in automatic mode, which it starts in
+  /// anyway, so the probe leaves nothing changed. Any answer but OK, a
+  /// timeout too, means it can't: only a dropped connection is an error.
+  Future<bool> _probeFlowControl() async {
+    try {
+      for (final command in ['ATFCSH7E0', 'ATFCSD300000', 'ATFCSM0']) {
+        await send(command);
+      }
+      return true;
+    } on ElmException catch (e) {
+      if (e.error == ElmError.disconnected) rethrow;
+      return false;
+    }
   }
 
   /// Sends [command] and returns the reply without the echo, the prompt,
@@ -215,25 +223,22 @@ class Elm327 {
   /// module it's told explicitly: send to [target], all frames, no pauses.
   /// Back on the broadcast address it returns to automatic.
   ///
-  /// Adapters that don't know these commands keep working; only long
-  /// replies from modules outside 7E0-7E7 stay cut off.
+  /// Adapters that can't, as [initialize] found, are never asked; only
+  /// long replies from modules outside 7E0-7E7 stay cut off. That answer
+  /// is final: one of these refused later is an adapter error like any
+  /// other.
   Future<void> _setFlowControl(CanId target) async {
     if (!_flowControlSupported) return;
-    try {
-      if (target == CanId.broadcast) {
-        if (_manualFlowControl) await send('ATFCSM0');
-        _manualFlowControl = false;
-      } else {
-        await send('ATFCSH${target.hex}');
-        if (!_manualFlowControl) {
-          await send('ATFCSD300000');
-          await send('ATFCSM1');
-        }
-        _manualFlowControl = true;
+    if (target == CanId.broadcast) {
+      if (_manualFlowControl) await send('ATFCSM0');
+      _manualFlowControl = false;
+    } else {
+      await send('ATFCSH${target.hex}');
+      if (!_manualFlowControl) {
+        await send('ATFCSD300000');
+        await send('ATFCSM1');
       }
-    } on ElmException catch (e) {
-      if (e.error != ElmError.unknownCommand) rethrow;
-      _flowControlSupported = false;
+      _manualFlowControl = true;
     }
   }
 

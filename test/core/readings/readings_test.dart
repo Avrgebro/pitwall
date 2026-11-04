@@ -95,7 +95,7 @@ void main() {
       'ATCRA': 'OK',
     });
 
-    final (:values, :unreported) = await readValues(
+    final (:values, :unreported, unanswered: _, answered: _) = await readValues(
       Elm327(transport),
       keys: {'rpm', 'test_fuel_vol', 'coolant_temp_c'},
       supportedPids: {0x0C, 0x0D, 0x2F},

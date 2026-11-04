@@ -24,6 +24,8 @@ class _Adapter extends FakeTransport implements ClosableAdapter {
         'ATS0': 'OK',
         'ATH0': 'OK',
         'ATSP0': 'OK',
+        'ATFCSH7E0': 'OK',
+        'ATFCSD300000': 'OK',
         'ATFCSM0': 'OK',
         '0100': '410000000000',
         'ATRV': '13.6V',
@@ -254,10 +256,13 @@ void main() {
     await session.read();
 
     final notes = c.read(adapterLogProvider).entries.value.map((e) => e.text);
-    expect(notes, contains('speed_kmh not sent: its request got no answer'));
     expect(
       notes,
-      contains('coolant_temp_c not sent: the car doesn\'t list it'),
+      contains('speed_kmh not sent. The car didn\'t answer its request.'),
+    );
+    expect(
+      notes,
+      contains('coolant_temp_c not sent. The car doesn\'t list this value.'),
     );
   });
 

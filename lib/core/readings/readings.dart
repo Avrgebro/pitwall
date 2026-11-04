@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../obd/can_id.dart';
 import '../obd/elm327.dart';
 import '../obd/pids.dart';
 import '../profiles/profile_reader.dart';
@@ -118,6 +119,8 @@ Future<ValuesRead> readValues(
 }) async {
   final values = <String, double>{};
   final unreported = <String, Unreported>{};
+  final unanswered = <String, CanId>{};
+  final answered = <CanId>{};
   if (keys.contains(Metrics.batteryVoltage.key)) {
     switch (await elm.readBatteryVoltage()) {
       case final voltage?:
@@ -134,12 +137,15 @@ Future<ValuesRead> readValues(
       if (supportedPids.isNotEmpty) unreported[key] = Unreported.unsupported;
       continue;
     }
+    // Standard values go to every module; the engine's answers.
     switch (await elm.requestPid(definition.pid)) {
       case null:
-        unreported[key] = Unreported.noAnswer;
+        unanswered[key] = CanId.broadcast;
       case final data when data.length < definition.length:
+        answered.add(CanId.broadcast);
         unreported[key] = Unreported.notInReply;
       case final data:
+        answered.add(CanId.broadcast);
         values[key] = definition.decode(data);
     }
   }
@@ -147,6 +153,13 @@ Future<ValuesRead> readValues(
     final fromProfile = await readProfile(elm, profile, modelYear, keys: keys);
     values.addAll(fromProfile.values);
     unreported.addAll(fromProfile.unreported);
+    unanswered.addAll(fromProfile.unanswered);
+    answered.addAll(fromProfile.answered);
   }
-  return (values: values, unreported: unreported);
+  return (
+    values: values,
+    unreported: unreported,
+    unanswered: unanswered,
+    answered: answered,
+  );
 }

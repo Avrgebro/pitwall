@@ -14,6 +14,8 @@ const recordedReplies = {
   'ATS0': 'OK',
   'ATH0': 'OK',
   'ATSP0': 'OK',
+  'ATFCSH7E0': 'OK',
+  'ATFCSD300000': 'OK',
   'ATFCSM0': 'OK',
   '0100': 'SEARCHING...\r4100BE3EA813\r410098188013',
   '0120': '41208007F001\r412080018001',

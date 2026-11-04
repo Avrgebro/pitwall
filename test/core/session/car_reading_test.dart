@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/elm327.dart';
+import 'package:pitwall/core/profiles/signal_set.dart';
 import 'package:pitwall/core/readings/unreported.dart';
 import 'package:pitwall/core/session/car_reading.dart';
 import 'package:pitwall/core/session/car_state.dart';
 
 import '../obd/fake_transport.dart';
+import '../profiles/test_profile.dart';
 
 void main() {
   Future<CarReading> read(
@@ -99,4 +101,62 @@ void main() {
       isA<CarAnswered>().having((r) => r.unreported, 'unreported', isEmpty),
     );
   });
+
+  group('a profile module that doesn\'t answer', () {
+    final profile = SignalSet.parse(testProfileJson);
+    // The fuel request goes to module 7A0; it answers nothing.
+    const silent = {
+      'ATSH7A0': 'OK',
+      'ATFCSH7A0': 'OK',
+      'ATFCSD300000': 'OK',
+      'ATFCSM1': 'OK',
+      'ATCRA7A8': 'OK',
+      '221234': 'NO DATA',
+      'ATSH7DF': 'OK',
+      'ATFCSM0': 'OK',
+      'ATCRA': 'OK',
+      '0100': 'NO DATA',
+    };
+
+    Future<CarReading> readFuel(String voltage) => readCar(
+      Elm327(FakeTransport({...silent, 'ATRV': voltage})),
+      keys: {'test_fuel_vol'},
+      profile: profile,
+      modelYear: 2023,
+      supportedPids: {0x0C},
+    );
+
+    test('is said, with the engine running', () async {
+      expect(
+        await readFuel('13.9V'),
+        isA<CarAwake>().having((r) => r.unreported, 'unreported', {
+          'test_fuel_vol': Unreported.noAnswer,
+        }),
+      );
+    });
+
+    test('may only be asleep, with the engine off', () async {
+      expect(
+        await readFuel('12.1V'),
+        isA<CarAwake>().having((r) => r.unreported, 'unreported', isEmpty),
+      );
+    });
+  });
+
+  test(
+    'a value the car doesn\'t list is said, even with nothing else',
+    () async {
+      final reading = await read(
+        {'ATRV': '12.4V', '0100': '4100BE3EB811'},
+        {'coolant_temp_c'},
+      );
+
+      expect(
+        reading,
+        isA<CarAwake>().having((r) => r.unreported, 'unreported', {
+          'coolant_temp_c': Unreported.unsupported,
+        }),
+      );
+    },
+  );
 }

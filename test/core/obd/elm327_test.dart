@@ -15,6 +15,8 @@ void main() {
       'ATS0': 'OK',
       'ATH0': 'OK',
       'ATSP0': 'OK',
+      'ATFCSH7E0': 'OK',
+      'ATFCSD300000': 'OK',
       'ATFCSM0': 'OK',
     });
     final elm = Elm327(transport);
@@ -27,6 +29,8 @@ void main() {
       'ATS0',
       'ATH0',
       'ATSP0',
+      'ATFCSH7E0',
+      'ATFCSD300000',
       'ATFCSM0',
     ]);
     expect(elm.setsFlowControl, isTrue);
@@ -41,12 +45,31 @@ void main() {
         'ATS0': 'OK',
         'ATH0': 'OK',
         'ATSP0': 'OK',
-        'ATFCSM0': '?',
+        'ATFCSH7E0': 'OK',
+        'ATFCSD300000': '?',
       }),
     );
 
     await elm.initialize();
 
+    expect(elm.setsFlowControl, isFalse);
+  });
+
+  test('a flow-control probe left unanswered means it can\'t', () async {
+    final elm = Elm327(
+      FakeTransport({
+        'ATZ': 'ELM327 v2.1',
+        'ATE0': 'OK',
+        'ATL0': 'OK',
+        'ATS0': 'OK',
+        'ATH0': 'OK',
+        'ATSP0': 'OK',
+        // ATFCSH7E0 gets no answer at all, and times out.
+      }),
+    );
+
+    // Connecting still works.
+    expect(await elm.initialize(), 'ELM327 v2.1');
     expect(elm.setsFlowControl, isFalse);
   });
 
@@ -216,19 +239,27 @@ void main() {
     ]);
   });
 
-  test('adapters without flow-control commands still work', () async {
+  test('an adapter found without flow control is never asked for it', () async {
     final transport = FakeTransport({
+      'ATZ': 'ELM327 v2.1',
+      'ATE0': 'OK',
+      'ATL0': 'OK',
+      'ATS0': 'OK',
+      'ATH0': 'OK',
+      'ATSP0': 'OK',
+      'ATFCSH7E0': '?',
       'ATSH7C6': 'OK',
-      'ATFCSH7C6': '?',
       'ATCRA7CE': 'OK',
       'ATSH7E0': 'OK',
     });
     final elm = Elm327(transport);
+    await elm.initialize();
+    transport.sent.clear();
 
     await elm.setTarget(_id('7C6'), receive: _id('7CE'));
     await elm.setTarget(_id('7E0'), receive: _id('7CE'));
 
-    expect(transport.sent, ['ATSH7C6', 'ATFCSH7C6', 'ATCRA7CE', 'ATSH7E0']);
+    expect(transport.sent, ['ATSH7C6', 'ATCRA7CE', 'ATSH7E0']);
   });
 
   test('a multi-frame reply with missing frames is dropped', () async {

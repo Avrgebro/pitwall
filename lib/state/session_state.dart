@@ -235,15 +235,7 @@ class SessionController extends Notifier<SessionState> {
   void _noteUnreported(Map<String, Unreported> unreported) {
     final log = ref.read(adapterLogProvider);
     for (final MapEntry(:key, value: why) in unreported.entries) {
-      log.note(
-        '$key not sent: ${switch (why) {
-          Unreported.unsupported => 'the car doesn\'t list it',
-          Unreported.noAnswer => 'its request got no answer',
-          Unreported.notInReply => 'not in the car\'s reply',
-          Unreported.unavailable => 'the car marked it unavailable',
-        }}',
-        warning: true,
-      );
+      log.note('$key not sent. ${why.label}.', warning: true);
     }
   }
 
