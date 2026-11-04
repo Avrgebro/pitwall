@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../storage/app_files.dart';
 import 'queued_reading.dart';
 
@@ -21,9 +19,6 @@ class DeliveryState {
         deliveredThrough: now.millisecondsSinceEpoch,
       );
 
-  /// The format [toJson] writes; see `FileDeliveryStorage.load`.
-  static const version = 2;
-
   final List<QueuedReading> queue;
   final int seq;
 
@@ -31,7 +26,6 @@ class DeliveryState {
   final int deliveredThrough;
 
   Map<String, Object?> toJson() => {
-    'version': version,
     'seq': seq,
     'deliveredThrough': deliveredThrough,
     'queue': [for (final reading in queue) reading.toJson()],
@@ -71,29 +65,50 @@ abstract interface class DeliveryStorage {
 class FileDeliveryStorage implements DeliveryStorage {
   static const _fileName = 'delivery.json';
 
-  /// A file that's gone, can't be read or doesn't parse is a lost state:
-  /// numbering resumes above anything before, which a first start needs no
-  /// less. Earlier formats are brought up to date here, and only here.
-  @override
-  Future<DeliveryState> load() async =>
-      decode(await readJsonFile(_fileName), now: DateTime.now());
-
-  /// What the file's JSON, or its absence, means; see [load].
-  static DeliveryState decode(Object? json, {required DateTime now}) =>
-      switch (json) {
-        final Map<String, Object?> json => switch (json['version']) {
-          DeliveryState.version => DeliveryState.fromJson(json),
-          null => DeliveryState._read(json, _readingFromPayload),
-          _ => DeliveryState.afterLoss(now),
-        },
-        _ => DeliveryState.afterLoss(now),
-      };
+  /// The format [save] writes.
+  static const _version = 3;
 
   @override
-  Future<void> save(DeliveryState state) async =>
-      writeAtomically(await appFile(_fileName), jsonEncode(state.toJson()));
+  Future<DeliveryState> load() async => _from(
+    await readVersionedFile(_fileName, readers: _readers, before: _before),
+    now: DateTime.now(),
+  );
 
-  /// Version 1 kept each reading as its webhook payload.
+  /// What [source], the file's contents, or null without one, means; see
+  /// [_from].
+  static DeliveryState decode(String? source, {required DateTime now}) => _from(
+    readVersioned(source, readers: _readers, before: _before),
+    now: now,
+  );
+
+  /// No state, saved or readable, is a lost state: numbering resumes above
+  /// anything before, which a first start needs no less.
+  static DeliveryState _from(
+    Saved<DeliveryState> saved, {
+    required DateTime now,
+  }) => switch (saved) {
+    SavedData(:final value) => value,
+    NothingSaved() || UnreadableData() => DeliveryState.afterLoss(now),
+  };
+
+  static final _readers = <int, DeliveryState? Function(Object?)>{
+    _version: (data) => switch (data) {
+      final Map<String, Object?> json => DeliveryState.fromJson(json),
+      _ => null,
+    },
+  };
+
+  static final _before = <int, DeliveryState? Function(Map<String, Object?>)>{
+    // Before versions, each reading was kept as its webhook payload.
+    0: (json) => DeliveryState._read(json, _readingFromPayload),
+    2: DeliveryState.fromJson,
+  };
+
+  @override
+  Future<void> save(DeliveryState state) =>
+      writeVersionedFile(_fileName, _version, state.toJson());
+
+  /// A reading kept as its webhook payload.
   static QueuedReading? _readingFromPayload(Map<String, Object?> json) {
     if (json case {
       'seq': final int seq,

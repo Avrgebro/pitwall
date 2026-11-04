@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 
 import '../storage/app_files.dart';
@@ -121,23 +119,29 @@ class FileLastValuesStorage implements LastValuesStorage {
   static const _fileName = 'last_values.json';
 
   /// The format [save] writes.
-  static const _version = 1;
+  static const _version = 2;
 
-  /// A file that's missing or doesn't parse holds no values. Earlier
-  /// formats are brought up to date here, and only here.
+  /// No values saved, or none readable, is no values.
   @override
-  Future<LastValues> load() async => switch (await readJsonFile(_fileName)) {
-    {'version': _version, 'vehicles': final Map<String, Object?> vehicles} =>
-      LastValues.fromJson(vehicles),
-    // Before versions, the file was the vehicles alone.
-    final Map<String, Object?> json when !json.containsKey('version') =>
-      LastValues.fromJson(json),
-    _ => const LastValues(),
+  Future<LastValues> load() async => switch (await readVersionedFile(
+    _fileName,
+    readers: {_version: _vehicles},
+    before: {
+      // Before versions, the file was the vehicles alone.
+      0: LastValues.fromJson,
+      1: (json) => _vehicles(json['vehicles']),
+    },
+  )) {
+    SavedData(:final value) => value,
+    NothingSaved() || UnreadableData() => const LastValues(),
+  };
+
+  static LastValues? _vehicles(Object? json) => switch (json) {
+    final Map<String, Object?> vehicles => LastValues.fromJson(vehicles),
+    _ => null,
   };
 
   @override
-  Future<void> save(LastValues values) async => writeAtomically(
-    await appFile(_fileName),
-    jsonEncode({'version': _version, 'vehicles': values.toJson()}),
-  );
+  Future<void> save(LastValues values) =>
+      writeVersionedFile(_fileName, _version, values.toJson());
 }

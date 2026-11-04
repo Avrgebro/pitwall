@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -25,62 +24,77 @@ class SettingsStore {
   static const _settingsKey = 'settings';
   static const _webhookKey = 'webhook';
 
-  /// Where settings [load] couldn't read are kept.
-  static const _setAsideKey = 'settings.setAside';
-
-  /// The format [save] writes. Earlier formats are brought up to date in
-  /// [load], and only there; none needs it yet.
-  static const _version = 1;
+  /// The formats [save] and [saveWebhook] write.
+  static const _settingsVersion = 2;
+  static const _webhookVersion = 1;
 
   final SharedPreferencesAsync _preferences;
   final FlutterSecureStorage _secrets;
 
-  /// The saved settings, or new ones if there are none.
-  ///
-  /// Settings it can't read, such as ones a newer version saved, are set
-  /// aside first, so the first save doesn't destroy them. The newer
-  /// version's vehicles and profile files are then still on the phone.
-  Future<AppSettings> load() async {
-    final saved = await _preferences.getString(_settingsKey);
-    if (saved == null) return const AppSettings();
-    switch (_decode(saved)) {
-      // Before versions, settings were saved in this same shape.
-      case final Map<String, Object?> json
-          when (json['version'] ?? _version) == _version:
-        return AppSettings.fromJson(json);
-      default:
-        await _preferences.setString(_setAsideKey, saved);
-        return const AppSettings();
-    }
-  }
+  /// The saved settings, or new ones if there are none, or none readable.
+  Future<AppSettings> load() async => switch (await _read(
+    _settingsKey,
+    from: _preferences.getString,
+    setAside: _preferences.setString,
+    readers: {_settingsVersion: _settings},
+    // Version 1 kept the fields next to the version, and before versions
+    // they were alone; both read the same.
+    before: {0: AppSettings.fromJson, 1: AppSettings.fromJson},
+  )) {
+    SavedData(:final value) => value,
+    NothingSaved() || UnreadableData() => const AppSettings(),
+  };
+
+  static AppSettings? _settings(Object? data) => switch (data) {
+    final Map<String, Object?> json => AppSettings.fromJson(json),
+    _ => null,
+  };
 
   Future<void> save(AppSettings settings) => _preferences.setString(
     _settingsKey,
-    jsonEncode({'version': _version, ...settings.toJson()}),
+    encodeVersioned(_settingsVersion, settings.toJson()),
   );
 
-  /// The webhook URL and credentials; [WebhookTarget.none] if not set.
-  Future<WebhookTarget> loadWebhook() async {
-    final saved = await _secrets.read(key: _webhookKey);
-    if (saved == null) return WebhookTarget.none;
-    return switch (_decode(saved)) {
-      final Map<String, Object?> json => WebhookTarget.fromJson(json),
-      _ => WebhookTarget.none,
-    };
-  }
+  /// The webhook URL and credentials; [WebhookTarget.none] if not set, or
+  /// not readable.
+  Future<WebhookTarget> loadWebhook() async => switch (await _read(
+    _webhookKey,
+    from: (key) => _secrets.read(key: key),
+    setAside: (key, value) => _secrets.write(key: key, value: value),
+    readers: {_webhookVersion: _webhook},
+    before: {0: WebhookTarget.fromJson},
+  )) {
+    SavedData(:final value) => value,
+    NothingSaved() || UnreadableData() => WebhookTarget.none,
+  };
+
+  static WebhookTarget? _webhook(Object? data) => switch (data) {
+    final Map<String, Object?> json => WebhookTarget.fromJson(json),
+    _ => null,
+  };
 
   Future<void> saveWebhook(WebhookTarget target) => target == WebhookTarget.none
       ? _secrets.delete(key: _webhookKey)
-      : _secrets.write(key: _webhookKey, value: jsonEncode(target.toJson()));
+      : _secrets.write(
+          key: _webhookKey,
+          value: encodeVersioned(_webhookVersion, target.toJson()),
+        );
 
-  /// [source] as JSON, or null if there's none or it doesn't parse.
-  static Object? _decode(String? source) {
-    if (source == null) return null;
-    try {
-      return jsonDecode(source);
-    } on FormatException {
-      return null;
+  /// What's saved under [key], read by [readVersioned]. What it can't read
+  /// is set aside under its own key first, as [UnreadableData] says.
+  static Future<Saved<T>> _read<T>(
+    String key, {
+    required Future<String?> Function(String key) from,
+    required Future<void> Function(String key, String value) setAside,
+    required Map<int, T? Function(Object? data)> readers,
+    required Map<int, T? Function(Map<String, Object?> json)> before,
+  }) async {
+    final source = await from(key);
+    final saved = readVersioned(source, readers: readers, before: before);
+    if ((saved, source) case (UnreadableData(), final source?)) {
+      await setAside('$key.unreadable', source);
     }
+    return saved;
   }
 
   /// The vehicle's imported profile, as found on the phone. A file that's

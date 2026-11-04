@@ -63,11 +63,14 @@ void main() {
     final now = DateTime.utc(2026, 11, 2);
 
     test('saved before versions, with payloads, is brought up to date', () {
-      final state = FileDeliveryStorage.decode({
-        'seq': 7,
-        'deliveredThrough': 6,
-        'queue': [reading.toPayload()],
-      }, now: now);
+      final state = FileDeliveryStorage.decode(
+        jsonEncode({
+          'seq': 7,
+          'deliveredThrough': 6,
+          'queue': [reading.toPayload()],
+        }),
+        now: now,
+      );
 
       expect(state.seq, 7);
       expect(state.deliveredThrough, 6);
@@ -78,16 +81,30 @@ void main() {
       expect(state.queue.single.engineRunning, isTrue);
     });
 
-    test('missing, or from a newer version, is a lost state', () {
-      for (final json in <Object?>[
+    test('version 2, with the fields beside the version, still loads', () {
+      final state = FileDeliveryStorage.decode(
+        jsonEncode({
+          ...DeliveryState(queue: [reading], seq: 7).toJson(),
+          'version': 2,
+        }),
+        now: now,
+      );
+
+      expect(state.seq, 7);
+      expect(state.queue.single.toJson(), reading.toJson());
+    });
+
+    test('missing, broken, or from a newer version, is a lost state', () {
+      for (final source in [
         null,
         'garbage',
-        {'version': 99},
+        '{"version": 99, "data": {"seq": 7}}',
+        '{"version": 3, "data": "not a state"}',
       ]) {
         expect(
-          FileDeliveryStorage.decode(json, now: now).seq,
+          FileDeliveryStorage.decode(source, now: now).seq,
           now.millisecondsSinceEpoch,
-          reason: '$json',
+          reason: source,
         );
       }
     });
