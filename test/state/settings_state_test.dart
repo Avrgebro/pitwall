@@ -243,6 +243,44 @@ void main() {
       },
     );
 
+    test(
+      'an import whose settings never land fails, with a change during it',
+      () async {
+        const older =
+            '{"commands": [{"hdr": "7E0", "rax": "7E8", '
+            '"cmd": {"22": "0001"}, "signals": [{"id": "OLD", '
+            '"fmt": {"len": 8}}]}]}';
+        final (container, store) = await start(
+          profile: const ProfileRef('default.json'),
+        );
+        store.putProfile('tucson', const ProfileRef('default.json'), older);
+        final notifier = container.read(appSettingsProvider.notifier);
+        final failing = Completer<void>();
+        store.nextSave = failing.future;
+
+        final importing = notifier.importProfile(
+          'tucson',
+          const PickedFile(name: 'newer.json', contents: testProfileJson),
+        );
+        // The import's settings write is under way; a rename comes during it.
+        while (store.saves == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        final renaming = notifier.renameVehicle('tucson', 'Hyundai Tucson');
+        store.saveError = const FileSystemException('disk full');
+        failing.complete();
+
+        await [
+          expectLater(importing, throwsA(isA<FileSystemException>())),
+          expectLater(renaming, throwsA(isA<FileSystemException>())),
+        ].wait;
+        final vehicle = container.read(vehicleProvider('tucson'))!;
+        expect(vehicle.profile?.name, 'default.json');
+        expect(store.profileOf('tucson'), older);
+        expect(store.files, hasLength(1));
+      },
+    );
+
     test('importing saves the file and the vehicle together', () async {
       final (container, store) = await start();
 
@@ -615,6 +653,27 @@ void main() {
 
       await expectLater(first, throwsA(isA<FileSystemException>()));
       await expectLater(second, throwsA(isA<FileSystemException>()));
+      expect(name(container), 'A');
+      expect(store.settings.vehicleById('tucson')!.name, 'A');
+    });
+
+    test('if the next write fails too, both changes fail', () async {
+      final (container, store) = await start();
+      final notifier = container.read(appSettingsProvider.notifier);
+      final failing = Completer<void>();
+      store.nextSave = failing.future;
+
+      final first = notifier.renameVehicle('tucson', 'B');
+      // The write of B is under way; C comes during it.
+      await Future<void>.delayed(Duration.zero);
+      final second = notifier.renameVehicle('tucson', 'C');
+      store.saveError = const FileSystemException('disk full');
+      failing.complete();
+
+      await [
+        expectLater(first, throwsA(isA<FileSystemException>())),
+        expectLater(second, throwsA(isA<FileSystemException>())),
+      ].wait;
       expect(name(container), 'A');
       expect(store.settings.vehicleById('tucson')!.name, 'A');
     });

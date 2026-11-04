@@ -62,28 +62,38 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   /// Writes the newest settings, once for however many changes came
   /// since the last write. Completes when a write that holds every change
-  /// made so far is on disk, or fails with the one that didn't make it.
-  Future<void> _flush() =>
-      _pendingFlush ??= _queued(_writeNewest)
-          .then((next) => next ?? Future<void>.value());
+  /// made so far is on disk, or fails with the last one that didn't make
+  /// it.
+  Future<void> _flush() => _pendingFlush ??= () async {
+    Future<void>? answeredBy;
+    await _queued(
+      (store) => _writeNewest(store, handOver: (next) => answeredBy = next),
+    );
+    // Awaited here, outside the queue it's waiting in.
+    if (answeredBy case final next?) await next;
+  }();
 
   /// Writes the newest settings. If that fails, and nothing changed
   /// meanwhile, the settings shown go back to the ones on disk, so they
   /// never show what isn't saved, and the failure stands. A change made
   /// meanwhile has a flush of its own to come, which writes this one too:
-  /// that flush is returned, to be awaited outside the queue, and its
-  /// outcome is this one's.
-  Future<({Future<void> next})?> _writeNewest(SettingsStore store) async {
+  /// it's handed over, and its outcome is this one's.
+  Future<void> _writeNewest(
+    SettingsStore store, {
+    required void Function(Future<void> next) handOver,
+  }) async {
     // Changes from now on need another flush.
     _pendingFlush = null;
     final settings = _newest;
     try {
       await store.save(settings);
       _onDisk = settings;
-      return null;
     } on Object {
       if (!identical(settings, _newest)) {
-        if (_pendingFlush case final next?) return (next: next);
+        if (_pendingFlush case final next?) {
+          handOver(next);
+          return;
+        }
       }
       if (ref.mounted) _apply(_onDisk);
       rethrow;
