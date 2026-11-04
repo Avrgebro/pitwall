@@ -1,8 +1,7 @@
-import '../../../core/format/formatters.dart';
-
-import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
+import '../../../core/format/formatters.dart';
 import '../../../core/profiles/profile_ref.dart';
 import '../../../core/profiles/stored_profile.dart';
 import '../../../core/vehicles/vehicle.dart';

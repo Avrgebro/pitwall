@@ -59,5 +59,12 @@ abstract final class Sizes {
   static const double floatingControl = 64;
 }
 
-/// How faint a disabled control is: Material's 38%.
-const double disabledOpacity = 0.38;
+/// How faint things are drawn, as opacities.
+abstract final class Opacities {
+  /// A disabled control: Material's 38%.
+  static const double disabled = 0.38;
+
+  /// Secondary text and icons on a tinted surface, against its strong
+  /// colour, as `onSurfaceVariant` is against `onSurface`.
+  static const double secondary = 0.75;
+}

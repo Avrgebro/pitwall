@@ -1,5 +1,5 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../core/format/text_query.dart';
 import '../theme/tokens.dart';

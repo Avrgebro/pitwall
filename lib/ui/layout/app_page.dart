@@ -1,9 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../components/loading_indicator.dart';
 import '../theme/glass_colors.dart';
 import '../theme/glass_filters.dart';
 import '../theme/tokens.dart';
-import '../components/loading_indicator.dart';
 import 'page_frame.dart';
 
 /// The frame of every screen: a title (with a back button on sub-screens),

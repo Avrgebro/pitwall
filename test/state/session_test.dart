@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
-import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/infrastructure.dart';
 import 'package:pitwall/state/session_state.dart';
@@ -67,12 +67,18 @@ void main() {
   /// Makes the adapters handed out next fail every write.
   var writesFail = false;
 
+  /// Makes the adapters handed out next leave the reset unanswered, so a
+  /// connection waits in it with its transport open.
+  var answersReset = true;
+
   Future<ProviderContainer> start() async {
     adapters = [];
     writesFail = false;
+    answersReset = true;
     bluetooth = FakeBluetoothGateway(
       adapter: (_) {
         final adapter = _Adapter()..writesFail = writesFail;
+        if (!answersReset) adapter.replies.remove('ATZ');
         adapters.add(adapter);
         return adapter;
       },
@@ -108,6 +114,26 @@ void main() {
     await session.disconnect();
 
     expect(await connecting, isA<StepFailed<SessionConnected>>());
+    expect(c.read(sessionProvider), isA<SessionIdle>());
+  });
+
+  test('disconnecting once the transport is open closes it at once', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    answersReset = false;
+
+    final connecting = session.connect(_tucson);
+    while (adapters.isEmpty || adapters.single.sent.isEmpty) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    await session.disconnect();
+
+    // Not after the reset's timeout: closing fails what it waits for.
+    expect(
+      await connecting.timeout(const Duration(seconds: 1)),
+      isA<StepFailed<SessionConnected>>(),
+    );
+    expect(adapters.single.closed, isTrue);
     expect(c.read(sessionProvider), isA<SessionIdle>());
   });
 

@@ -1,11 +1,10 @@
-import '../../core/format/formatters.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
+import '../../core/format/formatters.dart';
 import '../../state/infrastructure.dart';
 import '../../state/permissions_state.dart';
 import '../../state/settings_state.dart';

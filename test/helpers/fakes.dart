@@ -1,20 +1,17 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
-
-import 'dart:async';
-
-import 'package:flutter/services.dart';
-
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/readings/last_values.dart';
-import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/settings/settings.dart';
+import 'package:pitwall/core/trips/trip_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/state/infrastructure.dart';
@@ -150,11 +147,17 @@ class FakeLastValuesStorage implements LastValuesStorage {
   /// Makes saving fail, like a full disk.
   bool failing = false;
 
+  /// Holds the next write until it completes.
+  Future<void>? nextSave;
+
   @override
   Future<LastValues> load() async => saved;
 
   @override
   Future<void> save(LastValues values) async {
+    final hold = nextSave;
+    nextSave = null;
+    if (hold != null) await hold;
     if (failing) throw const FileSystemException('No space left on device');
     saved = values;
   }

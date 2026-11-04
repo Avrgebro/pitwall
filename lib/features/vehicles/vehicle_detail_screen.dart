@@ -10,8 +10,8 @@ import '../../core/vehicles/vehicle.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
-import '../common/vehicle_text.dart';
 import '../common/trip_start_text.dart';
+import '../common/vehicle_text.dart';
 import 'widgets/vehicle_page.dart';
 
 /// One vehicle's overview: a row per setting, each opening its own page.

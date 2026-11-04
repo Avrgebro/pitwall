@@ -116,9 +116,10 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     // The last rename comes as a form goes, which can be as the app closes.
     if (!ref.mounted) return;
     final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
     final vehicle = _current.vehicleById(vehicleId);
-    if (vehicle == null || trimmed.isEmpty || trimmed == vehicle.name) return;
-    await _modifyVehicle(vehicleId, (v) => v.copyWith(name: trimmed));
+    if (vehicle == null || trimmed == vehicle.name) return;
+    await _save(_current.withVehicle(vehicle.copyWith(name: trimmed)));
   }
 
   /// Changes the vehicle's name and adapter together, as setup does when
@@ -138,15 +139,8 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setAdapter(String vehicleId, BondedDevice adapter) =>
       _modifyVehicle(vehicleId, (v) => _withAdapter(v, adapter));
 
-  /// The one place a device becomes a vehicle's adapter.
   static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
-      vehicle.copyWith(
-        adapter: VehicleAdapter(
-          address: adapter.address,
-          name: adapter.name,
-          type: adapter.type,
-        ),
-      );
+      vehicle.copyWith(adapter: VehicleAdapter.of(adapter));
 
   /// Removes the vehicle and its profile file; its last values follow.
   /// The settings go first: a profile file left behind does no harm, but

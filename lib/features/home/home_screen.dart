@@ -1,11 +1,11 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
+import '../../core/readings/last_values.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
-import '../../core/readings/last_values.dart';
 import '../../state/last_values_state.dart';
 import '../../state/live_activity_state.dart';
 import '../../state/permissions_state.dart';

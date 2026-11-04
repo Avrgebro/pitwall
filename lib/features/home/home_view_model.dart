@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/format/formatters.dart';
 import '../../core/readings/last_values.dart';
 import '../../core/readings/readings.dart';
 import '../../core/session/car_state.dart';
@@ -8,7 +9,6 @@ import '../../core/vehicles/vehicle.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../state/live_activity_state.dart';
 import '../../ui/components/value_tile_data.dart';
-import '../../core/format/formatters.dart';
 import '../../ui/theme/status_tone.dart';
 import '../common/delivery_text.dart';
 import 'value_display.dart';
@@ -20,7 +20,9 @@ enum HeroStatKind {
   adapterMissing,
   car,
   carOff,
-  trip,
+
+  /// How long the trip, or a connection made by hand, has run.
+  elapsed,
   lastConnected,
   lastReading,
 }
@@ -190,7 +192,7 @@ class HomeViewModel {
             value: _carState(carState),
           ),
           (
-            kind: HeroStatKind.trip,
+            kind: HeroStatKind.elapsed,
             // A connection made by hand, from Developer tools, isn't a trip.
             label: inTrip ? 'Trip' : 'Connected',
             value: Formatters.duration(now.difference(since)),

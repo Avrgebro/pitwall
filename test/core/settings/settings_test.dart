@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
-import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 
 void main() {

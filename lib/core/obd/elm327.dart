@@ -1,8 +1,7 @@
-import 'can_id.dart';
-
 import 'dart:async';
 import 'dart:convert';
 
+import 'can_id.dart';
 import 'obd_transport.dart';
 import 'pids.dart';
 
@@ -75,8 +74,6 @@ class Elm327 {
   static final _voltage = RegExp(r'(\d+(?:\.\d+)?)\s*V');
   static final _byteCount = RegExp(r'^[0-9A-F]{3}$');
   static final _frameLine = RegExp(r'^[0-9A-F]:');
-
-  /// Functional address: every emissions-related module listens to it.
 
   final ObdTransport _transport;
   late final StreamSubscription<List<int>> _subscription;

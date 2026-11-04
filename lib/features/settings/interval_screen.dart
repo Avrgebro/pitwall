@@ -1,8 +1,7 @@
-import '../../core/format/formatters.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/format/formatters.dart';
 import '../../core/settings/settings.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';

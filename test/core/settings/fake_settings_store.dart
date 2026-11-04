@@ -23,8 +23,14 @@ class FakeSettingsStore implements SettingsStore {
   /// Makes every settings write fail with this.
   Object? saveError;
 
+  /// Makes loading fail with this.
+  Object? loadError;
+
   @override
-  Future<AppSettings> load() async => settings;
+  Future<AppSettings> load() async {
+    if (loadError case final error?) throw error;
+    return settings;
+  }
 
   @override
   Future<void> save(AppSettings settings) async {

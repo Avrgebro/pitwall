@@ -1,5 +1,5 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../ui/ui.dart';
 import '../home_view_model.dart';
@@ -111,7 +111,7 @@ class _HeroContent extends StatelessWidget {
     HeroStatKind.adapterMissing => Symbols.bluetooth_disabled_rounded,
     HeroStatKind.car => Symbols.directions_car_rounded,
     HeroStatKind.carOff => Symbols.power_settings_new_rounded,
-    HeroStatKind.trip => Symbols.timer_rounded,
+    HeroStatKind.elapsed => Symbols.timer_rounded,
     HeroStatKind.lastConnected => Symbols.history_rounded,
     HeroStatKind.lastReading => Symbols.cloud_upload_rounded,
   };

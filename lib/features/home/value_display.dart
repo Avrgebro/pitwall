@@ -1,7 +1,7 @@
+import '../../core/format/formatters.dart';
 import '../../core/readings/metric.dart';
 import '../../core/readings/readings.dart';
 import '../../ui/components/value_tile_data.dart';
-import '../../core/format/formatters.dart';
 
 /// How readings are shown: in their metrics' order, with their labels,
 /// and as many decimals as read well.

@@ -48,7 +48,7 @@ class GlassButton extends StatelessWidget {
       foregroundColor: _tinted ? active.onContainer : scheme.onSurface,
       disabledBackgroundColor: glass.barFill,
       disabledForegroundColor: scheme.onSurface.withValues(
-        alpha: disabledOpacity,
+        alpha: Opacities.disabled,
       ),
       side: BorderSide(color: glass.edge),
     );

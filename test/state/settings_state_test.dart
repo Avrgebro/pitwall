@@ -2,16 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/file_gateway.dart';
-import 'package:pitwall/core/settings/settings.dart';
-import 'package:pitwall/core/readings/last_values.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/profiles/stored_profile.dart';
+import 'package:pitwall/core/readings/last_values.dart';
+import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/state/last_values_state.dart';
 import 'package:pitwall/state/settings_state.dart';
@@ -428,6 +427,42 @@ void main() {
         .record('tucson', {'rpm': 800}, DateTime(2026, 11, 2), seq: 3);
 
     expect(storage.saved.of('tucson'), isEmpty);
+  });
+
+  test('last values land on disk in the order they were read', () async {
+    final storage = FakeLastValuesStorage();
+    final container = ProviderContainer(
+      overrides: testOverrides(
+        settings: const AppSettings(
+          vehicles: [Vehicle(id: 'tucson', name: 'Tucson')],
+        ),
+        lastValues: storage,
+      ),
+    );
+    addTearDown(container.dispose);
+    await container.read(lastValuesProvider.future);
+    final notifier = container.read(lastValuesProvider.notifier);
+    // The first write is slow; the second must not land before it.
+    final slow = Completer<void>();
+    storage.nextSave = slow.future;
+
+    final first = notifier.record(
+      'tucson',
+      {'rpm': 800},
+      DateTime(2026, 11, 3, 10),
+      seq: 1,
+    );
+    await Future<void>.delayed(Duration.zero);
+    final second = notifier.record(
+      'tucson',
+      {'rpm': 900},
+      DateTime(2026, 11, 3, 10, 1),
+      seq: 2,
+    );
+    slow.complete();
+    await (first, second).wait;
+
+    expect(storage.saved.byVehicle['tucson']!['rpm']!.value, 900);
   });
 
   test('settings land on disk in the order they were made', () async {

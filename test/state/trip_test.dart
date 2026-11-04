@@ -7,16 +7,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:pitwall/core/profiles/profile_ref.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/trips/trip_notification_text.dart';
 import 'package:pitwall/core/trips/trip_target.dart';
-import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
-import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/state/infrastructure.dart';
 import 'package:pitwall/state/reading_keeper.dart';
 import 'package:pitwall/state/session_state.dart';
@@ -93,6 +93,7 @@ void main() {
     FakePermissionGateway? permissions,
     FakeBluetoothGateway? bluetooth,
     Future<http.Response>? Function()? answer,
+    TripTiming timing = _fast,
   }) {
     service = FakeTripServiceGateway(pendingRequest: pendingRequest);
     received = [];
@@ -125,7 +126,7 @@ void main() {
           bluetooth ?? FakeBluetoothGateway(adapter: adapter),
         ),
         tripServiceGatewayProvider.overrideWithValue(service),
-        tripTimingProvider.overrideWithValue(_fast),
+        tripTimingProvider.overrideWithValue(timing),
       ],
     );
     addTearDown(c.dispose);
@@ -314,6 +315,34 @@ void main() {
     // Nothing was sent, so there's nothing to close: a stereo waking with
     // the car parked leaves no trace at the receiver.
     expect(received, isEmpty);
+  });
+
+  test('a car that answers again starts a new quiet window', () async {
+    const off = 'SEARCHING...\rUNABLE TO CONNECT';
+    final adapter = _Adapter(carOn: false);
+    final c = container(
+      adapter: (_) => adapter,
+      timing: const TripTiming(
+        retryDelay: Duration(milliseconds: 5),
+        connectWindow: Duration(milliseconds: 40),
+        carOffWindow: Duration(milliseconds: 200),
+        finalDeliveryWait: Duration(seconds: 1),
+      ),
+    );
+    c.read(tripProvider);
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    await running(c);
+
+    // Off for most of a window, then on, then off again.
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    adapter.replies['0100'] = '410000000000';
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    adapter.replies['0100'] = off;
+
+    // Past where the first window would have ended, the trip still runs.
+    await Future<void>.delayed(const Duration(milliseconds: 110));
+    expect(c.read(tripProvider), isNot(isA<TripIdle>()));
+    expect((await ended(c)).lastEnd, TripEnd.carOff);
   });
 
   test('without a vehicle there is nothing to start', () async {

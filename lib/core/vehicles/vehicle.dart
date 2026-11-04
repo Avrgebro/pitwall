@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../bluetooth/adapter_type.dart';
+import '../bluetooth/bluetooth_gateway.dart';
 import '../profiles/profile_ref.dart';
 import 'device_id.dart';
 
@@ -40,6 +41,10 @@ class VehicleAdapter {
     required this.name,
     required this.type,
   });
+
+  /// [device], chosen as the adapter.
+  VehicleAdapter.of(BondedDevice device)
+    : this(address: device.address, name: device.name, type: device.type);
 
   final String address;
   final String name;

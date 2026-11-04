@@ -75,7 +75,7 @@ class ButtonGroup extends StatelessWidget {
     final enabled = button.onPressed != null;
     final color =
         (tone == null ? theme.colorScheme.onSurface : context.tone(tone).accent)
-            .withValues(alpha: enabled ? 1 : disabledOpacity);
+            .withValues(alpha: enabled ? 1 : Opacities.disabled);
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.horizontal(
         left: first ? _outer : _inner,

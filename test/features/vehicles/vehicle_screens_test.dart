@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/features/vehicles/values_to_send_screen.dart';
 import 'package:pitwall/features/vehicles/vehicle_adapter_screen.dart';
 import 'package:pitwall/features/vehicles/vehicle_detail_screen.dart';
@@ -40,6 +40,24 @@ void main() {
       expect(find.text('This vehicle was removed.'), findsOneWidget);
     });
   }
+
+  testWidgets('a vehicle page says when the settings can\'t be read', (
+    tester,
+  ) async {
+    final store = FakeSettingsStore()..loadError = StateError('broken');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(store: store),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const VehicleDetailScreen(vehicleId: 'tucson'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Couldn\'t read the settings.'), findsOneWidget);
+  });
 
   group('with a profile', () {
     Future<void> pump(WidgetTester tester, Widget screen) async {

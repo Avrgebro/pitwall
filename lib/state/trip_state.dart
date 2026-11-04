@@ -296,9 +296,9 @@ class TripController extends Notifier<TripState> {
             return end;
           case _Found(:final session):
             lost = false;
-            // A car that answers again starts a new quiet window.
-            if (session.carState != CarState.off) quietSince = null;
             silent = session.carState == CarState.off;
+            // A car that answers again starts a new quiet window.
+            if (!silent) quietSince = null;
         }
       }
       if (silent) {

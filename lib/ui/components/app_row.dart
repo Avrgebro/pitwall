@@ -110,6 +110,6 @@ class AppRow extends StatelessWidget {
     final row = onTap == null || !enabled
         ? content
         : InkWell(onTap: onTap, child: content);
-    return enabled ? row : Opacity(opacity: disabledOpacity, child: row);
+    return enabled ? row : Opacity(opacity: Opacities.disabled, child: row);
   }
 }

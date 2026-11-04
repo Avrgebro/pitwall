@@ -1,11 +1,11 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 
+import '../../../core/platform/permission_gateway.dart';
 import '../../../core/session/car_state.dart';
 import '../../../core/trips/trip_target.dart';
 import '../../../core/vehicles/vehicle.dart';
-import '../../../core/platform/permission_gateway.dart';
 import '../../../state/manual_controls.dart';
 import '../../../state/permissions_state.dart';
 import '../../../state/reading_keeper.dart';

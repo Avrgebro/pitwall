@@ -1,7 +1,6 @@
-import '../../../core/format/formatters.dart';
-
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/format/formatters.dart';
 import '../../../core/vehicles/vehicle.dart';
 import '../../../ui/ui.dart';
 import '../../common/vehicle_text.dart';

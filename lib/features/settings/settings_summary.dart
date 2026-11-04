@@ -1,6 +1,6 @@
+import '../../core/format/formatters.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../core/webhook/webhook_target.dart';
-import '../../core/format/formatters.dart';
 import '../common/delivery_text.dart';
 
 /// The one-line state shown under each row of the Settings overview.

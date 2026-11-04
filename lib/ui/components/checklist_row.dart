@@ -2,9 +2,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
 import '../theme/text_styles.dart';
+import 'app_row.dart';
 import 'expandable_row.dart';
 import 'row_group.dart';
-import 'app_row.dart';
 
 /// An item that's either done or needs fixing, with a fix action.
 class ChecklistRow extends StatelessWidget {

@@ -96,6 +96,22 @@ void main() {
     expect(find.text('vLinker MC+'), findsNothing);
   });
 
+  testWidgets('a filter stays in view while it filters', (tester) async {
+    final devices = [_adapter, for (var i = 0; i < 5; i++) _audio(i)];
+    await _pump(tester, devices);
+    await tester.enterText(find.byType(SearchBar), 'earbuds 3');
+    await tester.pumpAndSettle();
+
+    // Fewer devices than need a filter, as after unpairing some.
+    devices.removeRange(2, devices.length);
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SearchBar), findsOneWidget);
+    expect(find.text('earbuds 3'), findsOneWidget);
+    expect(find.text('No devices match "earbuds 3".'), findsOneWidget);
+  });
+
   testWidgets('a device another vehicle uses is shown but not offered', (
     tester,
   ) async {
