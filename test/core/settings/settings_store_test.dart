@@ -38,6 +38,9 @@ void main() {
       final store = SettingsStore(preferences: preferences);
 
       expect((await store.load()).setupDone, isFalse);
+      // Moved, not copied, as a file is renamed: the next start doesn't
+      // set it aside again.
+      expect(await preferences.getString('settings'), isNull);
       await store.save(const AppSettings(setupDone: true));
 
       expect(await preferences.getString('settings.unreadable'), saved);

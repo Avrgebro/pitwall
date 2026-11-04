@@ -53,4 +53,15 @@ void main() {
     expect(values.byVehicle['tucson']?['rpm']?.seq, 1);
     expect(file('last_values.json.unreadable').existsSync(), isFalse);
   });
+
+  test('a file that can\'t be read is left as it is', () async {
+    // A directory where the file should be: there, but not readable.
+    Directory('${directory.path}/last_values.json').createSync();
+
+    await expectLater(
+      FileLastValuesStorage().load(),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(file('last_values.json.unreadable').existsSync(), isFalse);
+  });
 }

@@ -74,6 +74,21 @@ enum RejectionReason {
   serverTrouble,
 }
 
+/// The saved webhook couldn't be read, as when Android's secure storage
+/// fails, so nothing was sent. Entering it again replaces it.
+final class UnreadableWebhook extends DeliveryError {
+  const UnreadableWebhook();
+
+  @override
+  DeliveryFix get fix => DeliveryFix.settings;
+
+  @override
+  bool operator ==(Object other) => other is UnreadableWebhook;
+
+  @override
+  int get hashCode => (UnreadableWebhook).hashCode;
+}
+
 /// The server answered with an error status.
 final class Rejected extends DeliveryError {
   const Rejected(this.statusCode);

@@ -44,10 +44,26 @@ final webhookProvider = AsyncNotifierProvider<WebhookNotifier, WebhookSettings>(
 );
 
 class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
+  /// A saved webhook that can't be read starts the form empty, so it can
+  /// be entered again: only saving replaces it, and only the user saves.
   @override
-  Future<WebhookSettings> build() async => WebhookSettings(
-    saved: await ref.read(settingsStoreProvider).loadWebhook(),
-  );
+  Future<WebhookSettings> build() async {
+    try {
+      return WebhookSettings(
+        saved: await ref.read(settingsStoreProvider).loadWebhook(),
+      );
+    } on Object catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'settings',
+          context: ErrorDescription('while reading the saved webhook'),
+        ),
+      );
+      return const WebhookSettings(saved: WebhookTarget.none);
+    }
+  }
 
   /// Only read after the saved webhook has loaded (every edit awaits
   /// [future] first), so an early edit can't start from nothing and save

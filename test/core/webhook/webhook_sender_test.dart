@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -55,6 +58,45 @@ void main() {
     storage = FakeDeliveryStorage();
     received = [];
     failNext = 0;
+  });
+
+  test('a queue that can\'t be loaded is never saved over', () async {
+    storage.loadError = const FileSystemException('I/O error');
+    final reported = <FlutterErrorDetails>[];
+    final previous = FlutterError.onError;
+    FlutterError.onError = reported.add;
+    addTearDown(() => FlutterError.onError = previous);
+    final pitwall = sender();
+
+    await pitwall.init();
+    await sendFuel(pitwall, 40);
+
+    // Still delivered, numbered above anything before.
+    expect(
+      received.single['seq'],
+      greaterThan(DateTime.utc(2026, 10, 31).millisecondsSinceEpoch),
+    );
+    expect(storage.saves, 0);
+    expect(reported.single.library, 'delivery');
+    pitwall.dispose();
+  });
+
+  test('a webhook that can\'t be read waits for the user', () async {
+    final pitwall = WebhookSender(
+      storage: storage,
+      webhookTarget: () async => throw PlatformException(code: 'keystore'),
+      client: server(),
+      clock: () => DateTime.utc(2026, 10, 31, 19, 40),
+      backoff: (_) => const Duration(milliseconds: 10),
+    );
+    await pitwall.init();
+
+    await sendFuel(pitwall, 40);
+
+    expect(pitwall.status.value.outcome.lastError, const UnreadableWebhook());
+    expect(pitwall.status.value.queued, 1);
+    expect(received, isEmpty);
+    pitwall.dispose();
   });
 
   test('delivers readings with increasing sequence numbers', () async {

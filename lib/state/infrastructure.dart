@@ -73,7 +73,7 @@ void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
   final result = switch (attempt.result) {
     Accepted(:final statusCode) ||
     Rejected(:final statusCode) => '← $statusCode',
-    UnusableWebhook() => '✕ webhook not usable',
+    UnusableWebhook() || UnreadableWebhook() => '✕ webhook not usable',
     TimedOut() => '✕ timeout',
     Unreachable() => '✕ unreachable',
   };

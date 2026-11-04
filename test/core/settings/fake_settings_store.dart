@@ -42,7 +42,13 @@ class FakeSettingsStore implements SettingsStore {
   }
 
   @override
-  Future<WebhookTarget> loadWebhook() async => webhook;
+  Future<WebhookTarget> loadWebhook() async {
+    if (webhookError case final error?) throw error;
+    return webhook;
+  }
+
+  /// Makes loading the webhook fail with this.
+  Object? webhookError;
 
   @override
   Future<void> saveWebhook(WebhookTarget target) async => webhook = target;

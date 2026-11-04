@@ -11,8 +11,12 @@ Future<File> appFile(String name) async =>
     File('${(await getApplicationSupportDirectory()).path}/$name');
 
 /// The app file [name], read by [readVersioned] with [readers] and
-/// [before]. A file it can't read is set aside first, as
-/// [UnreadableData] says.
+/// [before]. A file that was read but can't be understood is set aside
+/// first, as [UnreadableData] says.
+///
+/// Throws [FileSystemException] if the file is there but couldn't be read,
+/// or couldn't be set aside: neither says anything about what it holds, so
+/// it's left as it is. Whoever loads it then mustn't save over it.
 Future<Saved<T>> readVersionedFile<T>(
   String name, {
   required Map<int, T? Function(Object? data)> readers,
@@ -24,9 +28,6 @@ Future<Saved<T>> readVersionedFile<T>(
     source = await file.readAsString();
   } on PathNotFoundException {
     return const NothingSaved();
-  } on FileSystemException {
-    await _setAside(file);
-    return const UnreadableData();
   }
   final saved = readVersioned(source, readers: readers, before: before);
   if (saved is UnreadableData<T>) await _setAside(file);

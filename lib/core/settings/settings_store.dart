@@ -32,10 +32,12 @@ class SettingsStore {
   final FlutterSecureStorage _secrets;
 
   /// The saved settings, or new ones if there are none, or none readable.
+  /// Throws if they can't be read at all; see [_read].
   Future<AppSettings> load() async => switch (await _read(
     _settingsKey,
     from: _preferences.getString,
     setAside: _preferences.setString,
+    remove: _preferences.remove,
     readers: {_settingsVersion: _settings},
     // Version 1 kept the fields next to the version, and before versions
     // they were alone; both read the same.
@@ -56,11 +58,12 @@ class SettingsStore {
   );
 
   /// The webhook URL and credentials; [WebhookTarget.none] if not set, or
-  /// not readable.
+  /// not readable. Throws if they can't be read at all; see [_read].
   Future<WebhookTarget> loadWebhook() async => switch (await _read(
     _webhookKey,
     from: (key) => _secrets.read(key: key),
     setAside: (key, value) => _secrets.write(key: key, value: value),
+    remove: (key) => _secrets.delete(key: key),
     readers: {_webhookVersion: _webhook},
     before: {0: WebhookTarget.fromJson},
   )) {
@@ -80,12 +83,17 @@ class SettingsStore {
           value: encodeVersioned(_webhookVersion, target.toJson()),
         );
 
-  /// What's saved under [key], read by [readVersioned]. What it can't read
-  /// is set aside under its own key first, as [UnreadableData] says.
+  /// What's saved under [key], read by [readVersioned]. What was read but
+  /// can't be understood is moved to its own key first, as
+  /// [UnreadableData] says, the same as a file is renamed.
+  ///
+  /// Throws if it can't be read, or can't be moved: then it's left as it
+  /// is, and whoever loads it mustn't save over it.
   static Future<Saved<T>> _read<T>(
     String key, {
     required Future<String?> Function(String key) from,
     required Future<void> Function(String key, String value) setAside,
+    required Future<void> Function(String key) remove,
     required Map<int, T? Function(Object? data)> readers,
     required Map<int, T? Function(Map<String, Object?> json)> before,
   }) async {
@@ -93,6 +101,7 @@ class SettingsStore {
     final saved = readVersioned(source, readers: readers, before: before);
     if ((saved, source) case (UnreadableData(), final source?)) {
       await setAside('$key.unreadable', source);
+      await remove(key);
     }
     return saved;
   }

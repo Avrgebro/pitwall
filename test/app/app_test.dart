@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +14,7 @@ import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/features/home/widgets/vehicle_hero_card.dart';
 import 'package:pitwall/ui/ui.dart';
 
+import '../core/settings/fake_settings_store.dart';
 import '../helpers/fakes.dart';
 
 const _tucson = Vehicle(
@@ -51,6 +54,31 @@ bool _badge(WidgetTester tester, String label) => tester
     .showBadge;
 
 void main() {
+  testWidgets('settings that can\'t be read stop the app, not set it up', (
+    tester,
+  ) async {
+    final store = FakeSettingsStore(
+      settings: const AppSettings(vehicles: [_tucson], setupDone: true),
+    )..loadError = const FileSystemException('I/O error');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(store: store),
+        child: const PitwallApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('couldn\'t read its settings'), findsOneWidget);
+    expect(find.text('Step 1 of 5'), findsNothing);
+
+    // Readable again: the app starts as it was.
+    store.loadError = null;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tucson'), findsWidgets);
+    expect(store.settings.vehicles.single.id, 'tucson');
+  });
+
   testWidgets('before setup, the app opens on the welcome step', (
     tester,
   ) async {

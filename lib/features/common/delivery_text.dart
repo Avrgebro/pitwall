@@ -15,6 +15,12 @@ abstract final class DeliveryText {
               'Readings stay on this phone until you add a webhook URL in '
               'Settings.',
         ),
+        UnreadableWebhook() => (
+          title: 'The webhook can\'t be read',
+          message:
+              'This phone couldn\'t read the saved webhook. Enter it again in '
+              'Settings; readings stay on this phone until then.',
+        ),
         UnusableWebhook(problem: IncompleteWebhookAuth(:final problem)) => (
           title: 'Authentication isn\'t finished',
           message: authProblem(problem),

@@ -65,9 +65,33 @@ class WebhookSender {
   bool _disposed = false;
   Timer? _retry;
 
-  /// Loads what was left from earlier runs and starts delivering it.
+  /// Whether the delivery state may be saved: not when it couldn't be
+  /// loaded, so a file that's there but unreadable isn't written over.
+  bool _saves = true;
+
+  /// Loads what was left from earlier runs and starts delivering it. Never
+  /// throws: if the saved state can't be read, readings are numbered above
+  /// anything before and kept in memory only, and the failure is reported.
   Future<void> init() async {
-    final state = await _storage.load();
+    final DeliveryState state;
+    try {
+      state = await _storage.load();
+    } on Object catch (error, stack) {
+      _saves = false;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'delivery',
+          context: ErrorDescription('while loading the delivery queue'),
+        ),
+      );
+      return _start(DeliveryState.afterLoss(_clock()));
+    }
+    _start(state);
+  }
+
+  void _start(DeliveryState state) {
     _queue = [...state.queue];
     _seq = state.seq;
     _deliveredThrough = state.deliveredThrough;
@@ -113,7 +137,15 @@ class WebhookSender {
   Future<void> _deliver() async {
     _retry?.cancel();
     while (_queue.isNotEmpty) {
-      final target = await _webhookTarget();
+      final WebhookTarget target;
+      try {
+        target = await _webhookTarget();
+      } on Object {
+        // Only the user can fix it, by entering the webhook again.
+        if (_disposed) return;
+        _failed(const UnreadableWebhook());
+        return;
+      }
       if (_disposed) return;
       if (_unusable(target) case final error?) {
         _failed(error);
@@ -236,11 +268,14 @@ class WebhookSender {
     );
   }
 
-  Future<void> _persist() => _storage.save(
-    DeliveryState(
-      queue: List.of(_queue),
-      seq: _seq,
-      deliveredThrough: _deliveredThrough,
-    ),
-  );
+  Future<void> _persist() async {
+    if (!_saves) return;
+    await _storage.save(
+      DeliveryState(
+        queue: List.of(_queue),
+        seq: _seq,
+        deliveredThrough: _deliveredThrough,
+      ),
+    );
+  }
 }

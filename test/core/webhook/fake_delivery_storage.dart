@@ -4,9 +4,19 @@ import 'package:pitwall/core/webhook/delivery_storage.dart';
 class FakeDeliveryStorage implements DeliveryStorage {
   DeliveryState state = const DeliveryState();
 
-  @override
-  Future<DeliveryState> load() async => state;
+  /// Makes loading fail with this, like a file that can't be read.
+  Object? loadError;
+  int saves = 0;
 
   @override
-  Future<void> save(DeliveryState state) async => this.state = state;
+  Future<DeliveryState> load() async {
+    if (loadError case final error?) throw error;
+    return state;
+  }
+
+  @override
+  Future<void> save(DeliveryState state) async {
+    saves++;
+    this.state = state;
+  }
 }

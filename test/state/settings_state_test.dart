@@ -12,8 +12,10 @@ import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
+import 'package:pitwall/core/webhook/webhook_target.dart';
 import 'package:pitwall/state/last_values_state.dart';
 import 'package:pitwall/state/settings_state.dart';
+import 'package:pitwall/state/webhook_state.dart';
 
 import '../core/profiles/test_profile.dart';
 import '../core/settings/fake_settings_store.dart';
@@ -534,6 +536,42 @@ void main() {
       expect(name(container), 'C');
       expect(store.settings.vehicleById('tucson')!.name, 'C');
     });
+  });
+
+  test('a webhook that can\'t be read can be entered again', () async {
+    final store = FakeSettingsStore()..webhookError = StateError('keystore');
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    final previous = FlutterError.onError;
+    FlutterError.onError = (_) {};
+    addTearDown(() => FlutterError.onError = previous);
+
+    final settings = await container.read(webhookProvider.future);
+    expect(settings.saved, WebhookTarget.none);
+
+    final notifier = container.read(webhookProvider.notifier);
+    await notifier.editUrl('https://example.com/api/webhook/x');
+    await notifier.save();
+    expect(store.webhook.url, 'https://example.com/api/webhook/x');
+  });
+
+  test('last values that couldn\'t be loaded keep nothing', () async {
+    final storage = FakeLastValuesStorage()..loadError = StateError('broken');
+    final container = ProviderContainer(
+      overrides: testOverrides(
+        settings: const AppSettings(
+          vehicles: [Vehicle(id: 'tucson', name: 'A')],
+        ),
+        lastValues: storage,
+      ),
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(lastValuesProvider.notifier)
+        .record('tucson', {'rpm': 800}, DateTime(2026, 11, 3), seq: 1);
+
+    expect(storage.saves, 0);
   });
 
   test('noting when a vehicle was seen never throws', () async {

@@ -33,6 +33,8 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
 
   /// Keeps [values], read [at], as sent in the reading numbered [seq].
   /// A vehicle deleted meanwhile, say as its reading came in, keeps none.
+  /// Neither do last values that couldn't be loaded: they're only shown,
+  /// and the file they couldn't be read from isn't written over.
   Future<void> record(
     String vehicleId,
     Map<String, num> values,
@@ -40,7 +42,11 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     required int seq,
   }) async {
     if (values.isEmpty) return;
-    await (future, ref.read(appSettingsProvider.future)).wait;
+    try {
+      await (future, ref.read(appSettingsProvider.future)).wait;
+    } on ParallelWaitError {
+      return;
+    }
     // Nothing is awaited from here to the change, so a delete can't fall
     // in between and be undone.
     final settings = ref.read(appSettingsProvider).requireValue;
@@ -49,7 +55,12 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
   }
 
   Future<void> _keepOnly(Set<String> vehicleIds) async {
-    await future;
+    try {
+      await future;
+    } on Object {
+      // Couldn't be loaded: nothing to keep, and nothing to write over.
+      return;
+    }
     final current = state.requireValue;
     final kept = current.only(vehicleIds);
     if (kept.byVehicle.length != current.byVehicle.length) await _save(kept);

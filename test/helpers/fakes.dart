@@ -185,8 +185,15 @@ class FakeLastValuesStorage implements LastValuesStorage {
   /// Holds the next write until it completes.
   Future<void>? nextSave;
 
+  /// Makes loading fail with this.
+  Object? loadError;
+  int saves = 0;
+
   @override
-  Future<LastValues> load() async => saved;
+  Future<LastValues> load() async {
+    if (loadError case final error?) throw error;
+    return saved;
+  }
 
   @override
   Future<void> save(LastValues values) async {
@@ -194,6 +201,7 @@ class FakeLastValuesStorage implements LastValuesStorage {
     nextSave = null;
     if (hold != null) await hold;
     if (failing) throw const FileSystemException('No space left on device');
+    saves++;
     saved = values;
   }
 }
