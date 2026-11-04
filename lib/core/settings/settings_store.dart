@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../profiles/profile_ref.dart';
 import '../profiles/signal_set.dart';
 import '../profiles/stored_profile.dart';
 import '../storage/app_files.dart';
@@ -33,7 +34,28 @@ class SettingsStore {
 
   /// The saved settings, or new ones if there are none, or none readable.
   /// Throws if they can't be read at all; see [_read].
-  Future<AppSettings> load() async => switch (await _read(
+  Future<AppSettings> load() async {
+    final settings = await _loadSettings();
+    await _moveProfileFiles(settings);
+    return settings;
+  }
+
+  /// Before each import had a file of its own, a vehicle's profile was in
+  /// one file named after it. Each moves, once, to the name its settings
+  /// now give it; see [profileFileName].
+  Future<void> _moveProfileFiles(AppSettings settings) async {
+    for (final vehicle in settings.vehicles) {
+      final ref = vehicle.profile;
+      if (ref == null || ref.importedAt == null) continue;
+      final legacy = await appFile('profiles/${vehicle.id}.json');
+      final named = await appFile(profileFileName(vehicle.id, ref));
+      if (!await legacy.exists() || await named.exists()) continue;
+      await named.parent.create(recursive: true);
+      await legacy.rename(named.path);
+    }
+  }
+
+  Future<AppSettings> _loadSettings() async => switch (await _read(
     _settingsKey,
     from: _preferences.getString,
     setAside: _preferences.setString,
@@ -112,7 +134,7 @@ class SettingsStore {
     final ref = vehicle.profile;
     if (ref == null) return const NoProfile();
     try {
-      final file = await _profileFile(vehicle.id);
+      final file = await appFile(profileFileName(vehicle.id, ref));
       return LoadedProfile(ref, SignalSet.parse(await file.readAsString()));
     } on FileSystemException {
       return UnreadableProfile(ref);
@@ -121,19 +143,40 @@ class SettingsStore {
     }
   }
 
-  /// Saves [profile] as the vehicle's profile file. Only a parsed profile
-  /// can be saved, so the file always holds one.
-  Future<void> saveProfile(String vehicleId, SignalSet profile) async {
-    final file = await _profileFile(vehicleId);
+  /// Saves [profile] as the file [ref] names for the vehicle. Only a
+  /// parsed profile can be saved, so the file always holds one.
+  Future<void> saveProfile(
+    String vehicleId,
+    ProfileRef ref,
+    SignalSet profile,
+  ) async {
+    final file = await appFile(profileFileName(vehicleId, ref));
     await file.parent.create(recursive: true);
     await writeAtomically(file, profile.source);
   }
 
-  Future<void> deleteProfile(String vehicleId) async {
-    final file = await _profileFile(vehicleId);
+  /// Deletes the file [ref] names for the vehicle, if it's there.
+  Future<void> deleteProfile(String vehicleId, ProfileRef ref) async {
+    final file = await appFile(profileFileName(vehicleId, ref));
     if (await file.exists()) await file.delete();
   }
 
-  Future<File> _profileFile(String vehicleId) =>
-      appFile('profiles/$vehicleId.json');
+  /// Deletes every profile file the vehicle has.
+  Future<void> deleteProfiles(String vehicleId) async {
+    final legacy = await appFile('profiles/$vehicleId.json');
+    if (await legacy.exists()) await legacy.delete();
+    final folder = Directory((await appFile('profiles/$vehicleId')).path);
+    if (await folder.exists()) await folder.delete(recursive: true);
+  }
+
+  /// Where the profile [ref] names is kept: a file per import, so the
+  /// settings always name exactly the file they mean, and the one they
+  /// named before is still there until they're saved. A profile from
+  /// before import times were kept has the vehicle's one file.
+  static String profileFileName(String vehicleId, ProfileRef ref) =>
+      switch (ref.importedAt) {
+        final at? =>
+          'profiles/$vehicleId/${at.toUtc().microsecondsSinceEpoch}.json',
+        null => 'profiles/$vehicleId.json',
+      };
 }

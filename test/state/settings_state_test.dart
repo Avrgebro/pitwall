@@ -182,6 +182,67 @@ void main() {
       return (container, store);
     }
 
+    test(
+      'importing replaces the old file once the settings are saved',
+      () async {
+        final (container, store) = await start(
+          profile: const ProfileRef('default.json'),
+        );
+        store.putProfile(
+          'tucson',
+          const ProfileRef('default.json'),
+          testProfileJson,
+        );
+
+        await container
+            .read(appSettingsProvider.notifier)
+            .importProfile(
+              'tucson',
+              const PickedFile(name: 'newer.json', contents: testProfileJson),
+            );
+
+        expect(store.files, hasLength(1));
+        expect(store.profileOf('tucson'), testProfileJson);
+        expect(
+          store.settings.vehicleById('tucson')!.profile?.name,
+          'newer.json',
+        );
+      },
+    );
+
+    test(
+      'an import whose settings can\'t be saved leaves the old one whole',
+      () async {
+        const older =
+            '{"commands": [{"hdr": "7E0", "rax": "7E8", '
+            '"cmd": {"22": "0001"}, "signals": [{"id": "OLD", '
+            '"fmt": {"len": 8}}]}]}';
+        final (container, store) = await start(
+          profile: const ProfileRef('default.json'),
+        );
+        store
+          ..putProfile('tucson', const ProfileRef('default.json'), older)
+          ..saveError = const FileSystemException('disk full');
+
+        await expectLater(
+          container
+              .read(appSettingsProvider.notifier)
+              .importProfile(
+                'tucson',
+                const PickedFile(name: 'newer.json', contents: testProfileJson),
+              ),
+          throwsA(isA<FileSystemException>()),
+        );
+
+        // The old name still goes with the old signals, and nothing else is
+        // left behind.
+        final vehicle = container.read(vehicleProvider('tucson'))!;
+        expect(vehicle.profile?.name, 'default.json');
+        expect(store.profileOf('tucson'), older);
+        expect(store.files, hasLength(1));
+      },
+    );
+
     test('importing saves the file and the vehicle together', () async {
       final (container, store) = await start();
 
@@ -192,7 +253,7 @@ void main() {
             const PickedFile(name: 'default.json', contents: testProfileJson),
           );
 
-      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.profileOf('tucson'), testProfileJson);
       final vehicle = container.read(vehicleProvider('tucson'))!;
       expect(vehicle.profile?.name, 'default.json');
       expect(vehicle.profile?.importedAt, isNotNull);
@@ -214,7 +275,7 @@ void main() {
             ),
         throwsFormatException,
       );
-      expect(store.profiles, isEmpty);
+      expect(store.files, isEmpty);
       expect(container.read(vehicleProvider('tucson'))!.profile, isNull);
     });
 
@@ -237,13 +298,17 @@ void main() {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
       );
-      store.profiles['tucson'] = testProfileJson;
+      store.putProfile(
+        'tucson',
+        const ProfileRef('default.json'),
+        testProfileJson,
+      );
 
       await container
           .read(appSettingsProvider.notifier)
           .removeProfile('tucson');
 
-      expect(store.profiles, isEmpty);
+      expect(store.files, isEmpty);
       final vehicle = container.read(vehicleProvider('tucson'))!;
       expect(vehicle.profile, isNull);
       // It only chose which of the profile's requests apply.
@@ -254,7 +319,11 @@ void main() {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
       );
-      store.profiles['tucson'] = testProfileJson;
+      store.putProfile(
+        'tucson',
+        const ProfileRef('default.json'),
+        testProfileJson,
+      );
       final notifier = container.read(appSettingsProvider.notifier);
       final profile = await container.read(
         vehicleProfileProvider('tucson').future,
@@ -263,7 +332,7 @@ void main() {
       await notifier.removeProfile('tucson');
       await notifier.restoreProfile('tucson', profile, modelYear: 2023);
 
-      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.profileOf('tucson'), testProfileJson);
       final vehicle = container.read(vehicleProvider('tucson'))!;
       expect(vehicle.profile?.name, 'default.json');
       expect(vehicle.modelYear, 2023);
@@ -306,14 +375,18 @@ void main() {
       await (importing, deleting).wait;
 
       expect(store.settings.vehicles, isEmpty);
-      expect(store.profiles, isEmpty);
+      expect(store.files, isEmpty);
     });
 
     test('an import during a removal keeps its file', () async {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
       );
-      store.profiles['tucson'] = testProfileJson;
+      store.putProfile(
+        'tucson',
+        const ProfileRef('default.json'),
+        testProfileJson,
+      );
       final notifier = container.read(appSettingsProvider.notifier);
       final write = Completer<void>();
       store.nextSave = write.future;
@@ -328,7 +401,7 @@ void main() {
       write.complete();
       await (removing, importing).wait;
 
-      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.profileOf('tucson'), testProfileJson);
       expect(store.settings.vehicleById('tucson')!.profile?.name, 'newer.json');
     });
 
@@ -336,7 +409,11 @@ void main() {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
       );
-      store.profiles['tucson'] = testProfileJson;
+      store.putProfile(
+        'tucson',
+        const ProfileRef('default.json'),
+        testProfileJson,
+      );
       final notifier = container.read(appSettingsProvider.notifier);
       final profile = await container.read(
         vehicleProfileProvider('tucson').future,
@@ -365,7 +442,11 @@ void main() {
       final (container, store) = await start(
         profile: const ProfileRef('default.json'),
       );
-      store.profiles['tucson'] = testProfileJson;
+      store.putProfile(
+        'tucson',
+        const ProfileRef('default.json'),
+        testProfileJson,
+      );
       final notifier = container.read(appSettingsProvider.notifier);
       final profile = await container.read(
         vehicleProfileProvider('tucson').future,
@@ -521,20 +602,40 @@ void main() {
       expect(name(container), 'A');
     });
 
-    test('keeps a change whose own write is still to come', () async {
+    test('fails every change it held, and puts them all back', () async {
+      final (container, store) = await start();
+      final notifier = container.read(appSettingsProvider.notifier);
+      final failing = Completer<void>();
+      store.nextSave = failing.future;
+
+      // Both before the write starts: one write holds them.
+      final first = notifier.renameVehicle('tucson', 'B');
+      final second = notifier.renameVehicle('tucson', 'C');
+      failing.completeError(const FileSystemException('disk full'));
+
+      await expectLater(first, throwsA(isA<FileSystemException>()));
+      await expectLater(second, throwsA(isA<FileSystemException>()));
+      expect(name(container), 'A');
+      expect(store.settings.vehicleById('tucson')!.name, 'A');
+    });
+
+    test('a change during it is written next, for both', () async {
       final (container, store) = await start();
       final notifier = container.read(appSettingsProvider.notifier);
       final failing = Completer<void>();
       store.nextSave = failing.future;
 
       final first = notifier.renameVehicle('tucson', 'B');
+      // The write of B is under way.
+      await Future<void>.delayed(Duration.zero);
       final second = notifier.renameVehicle('tucson', 'C');
       failing.completeError(const FileSystemException('disk full'));
 
-      await expectLater(first, throwsA(isA<FileSystemException>()));
-      await second;
+      // The next write holds B too, and it lands: so did B.
+      await (first, second).wait;
       expect(name(container), 'C');
       expect(store.settings.vehicleById('tucson')!.name, 'C');
+      expect(store.saves, 2);
     });
   });
 

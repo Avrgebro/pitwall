@@ -61,18 +61,23 @@ void main() {
 
   group('with a profile', () {
     Future<void> pump(WidgetTester tester, Widget screen) async {
-      final store = FakeSettingsStore(
-        settings: const AppSettings(
-          vehicles: [
-            Vehicle(
-              id: 'tucson',
-              name: 'Tucson',
-              modelYear: 2023,
-              profile: ProfileRef('default.json'),
+      final store =
+          FakeSettingsStore(
+            settings: const AppSettings(
+              vehicles: [
+                Vehicle(
+                  id: 'tucson',
+                  name: 'Tucson',
+                  modelYear: 2023,
+                  profile: ProfileRef('default.json'),
+                ),
+              ],
             ),
-          ],
-        ),
-      )..profiles['tucson'] = testProfileJson;
+          )..putProfile(
+            'tucson',
+            const ProfileRef('default.json'),
+            testProfileJson,
+          );
       await tester.pumpWidget(
         ProviderScope(
           overrides: testOverrides(store: store),
@@ -117,18 +122,23 @@ void main() {
 
   group('saving', () {
     Future<FakeSettingsStore> pump(WidgetTester tester, Widget screen) async {
-      final store = FakeSettingsStore(
-        settings: const AppSettings(
-          vehicles: [
-            Vehicle(
-              id: 'tucson',
-              name: 'Tucson',
-              modelYear: 2023,
-              profile: ProfileRef('default.json'),
+      final store =
+          FakeSettingsStore(
+            settings: const AppSettings(
+              vehicles: [
+                Vehicle(
+                  id: 'tucson',
+                  name: 'Tucson',
+                  modelYear: 2023,
+                  profile: ProfileRef('default.json'),
+                ),
+              ],
             ),
-          ],
-        ),
-      )..profiles['tucson'] = testProfileJson;
+          )..putProfile(
+            'tucson',
+            const ProfileRef('default.json'),
+            testProfileJson,
+          );
       await tester.pumpWidget(
         ProviderScope(
           overrides: testOverrides(store: store),
@@ -204,12 +214,12 @@ void main() {
 
       await tester.tap(find.byTooltip('Remove profile'));
       await tester.pumpAndSettle();
-      expect(store.profiles, isEmpty);
+      expect(store.files, isEmpty);
       expect(find.text('Profile removed'), findsOneWidget);
 
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
-      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.profileOf('tucson'), testProfileJson);
       expect(store.settings.vehicles.single.modelYear, 2023);
     });
   });

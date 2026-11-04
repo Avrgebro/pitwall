@@ -1,3 +1,4 @@
+import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
 import 'package:pitwall/core/profiles/stored_profile.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -11,7 +12,19 @@ class FakeSettingsStore implements SettingsStore {
 
   AppSettings settings;
   WebhookTarget webhook = WebhookTarget.none;
-  final Map<String, String> profiles = {};
+
+  /// Profile files, by the name [SettingsStore.profileFileName] gives.
+  final Map<String, String> files = {};
+
+  void putProfile(String vehicleId, ProfileRef ref, String source) =>
+      files[SettingsStore.profileFileName(vehicleId, ref)] = source;
+
+  /// The profile file the saved settings name for the vehicle, if any.
+  String? profileOf(String vehicleId) =>
+      switch (settings.vehicleById(vehicleId)?.profile) {
+        final ref? => files[SettingsStore.profileFileName(vehicleId, ref)],
+        null => null,
+      };
 
   /// Holds profile writes until it completes, to test what happens while
   /// one is under way.
@@ -22,6 +35,9 @@ class FakeSettingsStore implements SettingsStore {
 
   /// Makes every settings write fail with this.
   Object? saveError;
+
+  /// Settings writes tried, failed or not.
+  int saves = 0;
 
   /// Makes loading fail with this.
   Object? loadError;
@@ -34,6 +50,7 @@ class FakeSettingsStore implements SettingsStore {
 
   @override
   Future<void> save(AppSettings settings) async {
+    saves++;
     final hold = nextSave;
     nextSave = null;
     if (hold != null) await hold;
@@ -59,7 +76,7 @@ class FakeSettingsStore implements SettingsStore {
   Future<StoredProfile> loadProfile(Vehicle vehicle) async {
     final ref = vehicle.profile;
     if (ref == null) return const NoProfile();
-    final source = profiles[vehicle.id];
+    final source = files[SettingsStore.profileFileName(vehicle.id, ref)];
     if (source == null) return UnreadableProfile(ref);
     try {
       return LoadedProfile(ref, SignalSet.parse(source));
@@ -69,12 +86,23 @@ class FakeSettingsStore implements SettingsStore {
   }
 
   @override
-  Future<void> saveProfile(String vehicleId, SignalSet profile) async {
+  Future<void> saveProfile(
+    String vehicleId,
+    ProfileRef ref,
+    SignalSet profile,
+  ) async {
     if (profileWrite case final hold?) await hold;
-    profiles[vehicleId] = profile.source;
+    putProfile(vehicleId, ref, profile.source);
   }
 
   @override
-  Future<void> deleteProfile(String vehicleId) async =>
-      profiles.remove(vehicleId);
+  Future<void> deleteProfile(String vehicleId, ProfileRef ref) async =>
+      files.remove(SettingsStore.profileFileName(vehicleId, ref));
+
+  @override
+  Future<void> deleteProfiles(String vehicleId) async => files.removeWhere(
+    (name, _) =>
+        name == 'profiles/$vehicleId.json' ||
+        name.startsWith('profiles/$vehicleId/'),
+  );
 }

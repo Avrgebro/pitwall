@@ -25,9 +25,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   AppSettings get _current => state.requireValue;
 
-  /// The newest settings, which every write saves. A write queued before
-  /// a change then saves that change too, and can't put back what it
-  /// replaced.
+  /// The newest settings: what's shown, and what the next flush writes.
   late AppSettings _newest;
 
   /// The settings last written, or loaded.
@@ -39,7 +37,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   /// Runs [write] once the writes before it are done. Each caller awaits
   /// its own; a failed one doesn't stop the ones after it.
-  Future<void> _queued(Future<void> Function(SettingsStore store) write) {
+  Future<T> _queued<T>(Future<T> Function(SettingsStore store) write) {
     final store = ref.read(settingsStoreProvider);
     final run = _writes.then((_) => write(store));
     _writes = run.then((_) {}, onError: (_) {});
@@ -55,35 +53,39 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// Makes [settings] current, then writes them.
   Future<void> _save(AppSettings settings) {
     _apply(settings);
-    return _queuedWrite(_writeNewest);
+    return _flush();
   }
 
-  /// Queued work that may write the settings, counting the one running.
-  int _writesToCome = 0;
+  /// The flush queued and not yet started, which every change made until
+  /// it starts joins.
+  Future<void>? _pendingFlush;
 
-  /// Queues [write], which may write the settings through [_writeNewest].
-  Future<void> _queuedWrite(Future<void> Function(SettingsStore) write) {
-    _writesToCome++;
-    return _queued((store) async {
-      try {
-        await write(store);
-      } finally {
-        _writesToCome--;
-      }
-    });
-  }
+  /// Writes the newest settings, once for however many changes came
+  /// since the last write. Completes when a write that holds every change
+  /// made so far is on disk, or fails with the one that didn't make it.
+  Future<void> _flush() =>
+      _pendingFlush ??= _queued(_writeNewest)
+          .then((next) => next ?? Future<void>.value());
 
-  /// Writes the newest settings. If that fails and it was the last write
-  /// to come, the settings shown go back to the ones on disk, so they never
-  /// show what isn't saved. Otherwise a later write still tries, and it
-  /// saves the newest settings too.
-  Future<void> _writeNewest(SettingsStore store) async {
+  /// Writes the newest settings. If that fails, and nothing changed
+  /// meanwhile, the settings shown go back to the ones on disk, so they
+  /// never show what isn't saved, and the failure stands. A change made
+  /// meanwhile has a flush of its own to come, which writes this one too:
+  /// that flush is returned, to be awaited outside the queue, and its
+  /// outcome is this one's.
+  Future<({Future<void> next})?> _writeNewest(SettingsStore store) async {
+    // Changes from now on need another flush.
+    _pendingFlush = null;
     final settings = _newest;
     try {
       await store.save(settings);
       _onDisk = settings;
+      return null;
     } on Object {
-      if (_writesToCome == 1 && ref.mounted) _apply(_onDisk);
+      if (!identical(settings, _newest)) {
+        if (_pendingFlush case final next?) return (next: next);
+      }
+      if (ref.mounted) _apply(_onDisk);
       rethrow;
     }
   }
@@ -142,14 +144,17 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
       vehicle.copyWith(adapter: VehicleAdapter.of(adapter));
 
-  /// Removes the vehicle and its profile file; its last values follow.
+  /// Removes the vehicle and its profile files; its last values follow.
   /// The settings go first: a profile file left behind does no harm, but
   /// a vehicle whose file is gone would.
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await _save(_current.withoutVehicle(id));
-    await _queued((store) => store.deleteProfile(id));
+    await _queued((store) async {
+      // Unless it was added back meanwhile, as by Undo.
+      if (_newest.vehicleById(id) == null) await store.deleteProfiles(id);
+    });
   }
 
   /// Notes that the vehicle was connected to at [time], and what its
@@ -260,37 +265,64 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await _setProfile(vehicleId, null, modelYear: (_) => null);
   }
 
-  /// The one way a vehicle's profile changes: the file and the settings,
-  /// in the order that never leaves the settings naming a file that isn't
-  /// there. A file left behind does no harm.
+  /// The one way a vehicle's profile changes. Each profile has a file of
+  /// its own, so the settings always name exactly the file they mean:
   ///
-  /// It all runs in the write queue, deciding from the vehicle as it is
-  /// then: a file another change wrote or deleted meanwhile can't be
-  /// undone by this one. Nothing happens unless the vehicle exists and
-  /// [when] holds for it.
+  /// 1. In the write queue, deciding from the vehicle as it is then, the
+  ///    new file is written and the change made current. Nothing happens
+  ///    unless the vehicle exists and [when] holds for it.
+  /// 2. The settings are written.
+  /// 3. Whichever of the old and new files the settings no longer name is
+  ///    deleted: the old one once the change is saved, or the new one if
+  ///    it couldn't be and the settings went back.
   Future<void> _setProfile(
     String vehicleId,
     LoadedProfile? profile, {
     required int? Function(Vehicle vehicle) modelYear,
     bool Function(Vehicle vehicle)? when,
-  }) => _queuedWrite((store) async {
-    final vehicle = _newest.vehicleById(vehicleId);
-    if (vehicle == null || !(when?.call(vehicle) ?? true)) return;
-    if (profile != null) {
-      await store.saveProfile(vehicleId, profile.signals);
+  }) async {
+    final (:changed, :old) = await _queued((store) async {
+      const unchanged = (changed: false, old: null);
+      final vehicle = _newest.vehicleById(vehicleId);
+      if (vehicle == null || !(when?.call(vehicle) ?? true)) return unchanged;
+      if (profile != null) {
+        await store.saveProfile(vehicleId, profile.ref, profile.signals);
+      }
       // Deleted while the file was written: its own delete, queued after
       // this, takes the file.
-      if (_newest.vehicleById(vehicleId) == null) return;
+      final current = _newest.vehicleById(vehicleId);
+      if (current == null) return unchanged;
+      _apply(
+        _newest.withVehicle(
+          current.withProfile(profile?.ref, modelYear: modelYear(current)),
+        ),
+      );
+      return (changed: true, old: current.profile);
+    });
+    if (!changed) return;
+    try {
+      await _flush();
+    } finally {
+      await _deleteUnnamed(vehicleId, [?old, ?profile?.ref]);
     }
-    final changed = _newest.vehicleById(vehicleId)!;
-    _apply(
-      _newest.withVehicle(
-        changed.withProfile(profile?.ref, modelYear: modelYear(changed)),
-      ),
-    );
-    await _writeNewest(store);
-    if (profile == null) await store.deleteProfile(vehicleId);
-  });
+  }
+
+  /// Deletes the files of [refs] that the vehicle's settings, as written,
+  /// don't name.
+  Future<void> _deleteUnnamed(String vehicleId, List<ProfileRef> refs) =>
+      _queued((store) async {
+        String? named(AppSettings settings) =>
+            switch (settings.vehicleById(vehicleId)?.profile) {
+              final ref? => SettingsStore.profileFileName(vehicleId, ref),
+              null => null,
+            };
+        final kept = {named(_onDisk), named(_newest)};
+        for (final ref in refs) {
+          if (!kept.contains(SettingsStore.profileFileName(vehicleId, ref))) {
+            await store.deleteProfile(vehicleId, ref);
+          }
+        }
+      });
 }
 
 /// One vehicle by id, or null if it doesn't exist (anymore).
