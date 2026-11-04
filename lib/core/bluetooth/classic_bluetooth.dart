@@ -36,7 +36,7 @@ class ClassicBluetoothGateway implements BluetoothGateway {
       ),
   ];
 
-  /// Connection numbers, never reused, even after Dart restarts while
+  /// Connection numbers, which only go up, even after Dart restarts while
   /// Android carries on: they start from the time the gateway is made.
   int _lastConnection = DateTime.now().microsecondsSinceEpoch;
 
@@ -50,7 +50,9 @@ class ClassicBluetoothGateway implements BluetoothGateway {
 
 class _ClassicConnection implements AdapterConnection {
   _ClassicConnection(this._gateway, this._number, String address) {
-    opened = _open(address);
+    // Started at once, so its number is in use from now. Its failure goes
+    // to whoever awaits it; closed without awaiting, nobody needs to hear.
+    opened = _open(address)..ignore();
   }
 
   final ClassicBluetoothGateway _gateway;

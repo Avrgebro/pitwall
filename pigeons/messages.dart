@@ -87,15 +87,17 @@ class BondedDeviceMessage {
 /// or `write_failed`.
 ///
 /// There's one serial connection at a time, each with a number Dart gives
-/// it, never reused: writing to or closing a connection that's no longer
-/// the current one does nothing to the one that is, and Dart can close a
-/// connection while it's still connecting.
+/// it. The numbers only go up, so closing one closes every earlier one too:
+/// writing to or closing a connection that's no longer the current one does
+/// nothing to the one that is, and Dart can close a connection while it's
+/// still connecting, or before it has started.
 @HostApi()
 abstract class ClassicBluetoothApi {
   List<BondedDeviceMessage> bondedDevices();
 
-  /// Opens serial connection [connection], closing any other. Fails with
-  /// `connect_failed` if it can't, or if it was closed before it opened.
+  /// Opens serial connection [connection], closing any other, even if it
+  /// then fails. Fails with `unavailable`, `permission` or
+  /// `connect_failed`, also when it was closed before it opened.
   @async
   void connect(int connection, String address);
 

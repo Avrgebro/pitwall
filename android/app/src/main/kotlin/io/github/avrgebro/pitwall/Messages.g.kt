@@ -749,17 +749,19 @@ class TripStartApi(private val binaryMessenger: BinaryMessenger, private val mes
  * or `write_failed`.
  *
  * There's one serial connection at a time, each with a number Dart gives
- * it, never reused: writing to or closing a connection that's no longer
- * the current one does nothing to the one that is, and Dart can close a
- * connection while it's still connecting.
+ * it. The numbers only go up, so closing one closes every earlier one too:
+ * writing to or closing a connection that's no longer the current one does
+ * nothing to the one that is, and Dart can close a connection while it's
+ * still connecting, or before it has started.
  *
  * Generated interface from Pigeon that represents a handler of messages from Flutter.
  */
 interface ClassicBluetoothApi {
   fun bondedDevices(): List<BondedDeviceMessage>
   /**
-   * Opens serial connection [connection], closing any other. Fails with
-   * `connect_failed` if it can't, or if it was closed before it opened.
+   * Opens serial connection [connection], closing any other, even if it
+   * then fails. Fails with `unavailable`, `permission` or
+   * `connect_failed`, also when it was closed before it opened.
    */
   suspend fun connect(connection: Long, address: String)
   suspend fun write(connection: Long, bytes: ByteArray)

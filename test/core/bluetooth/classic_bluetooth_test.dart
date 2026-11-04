@@ -36,10 +36,14 @@ void main() {
     connecting = null;
     events = StreamController<AdapterEvent>.broadcast();
     answer('connect', (args) async {
-      numbers.add(args[0]! as int);
-      calls.add('connect ${args[0]}');
+      final number = args[0]! as int;
+      numbers.add(number);
+      calls.add('connect $number');
       await connecting?.future;
-      return [null];
+      // Like Android: closed before it opened, it doesn't open.
+      return calls.contains('disconnect $number')
+          ? ['connect_failed', 'Disconnected while connecting', null]
+          : [null];
     });
     answer('write', (args) {
       calls.add('write ${args[0]}');
@@ -96,8 +100,22 @@ void main() {
       'disconnect ${numbers.single}',
     ]);
     connecting!.complete();
-    await connection.opened;
+    await expectLater(connection.opened, throwsA(isA<PlatformException>()));
   });
+
+  test(
+    'closed without being awaited, a failed connect is nobody\'s error',
+    () async {
+      connecting = Completer<void>();
+      final connection = ClassicBluetoothGateway().connect('AA');
+      await Future<void>.delayed(Duration.zero);
+
+      await connection.close();
+      connecting!.complete();
+      // An unhandled error here would fail the test.
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
 
   test(
     'each connection hears only its own bytes, and ends when it drops',

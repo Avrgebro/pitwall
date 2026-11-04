@@ -89,14 +89,18 @@ class FakeBluetoothGateway implements BluetoothGateway {
 
 /// Like Android's: closing it before it opens makes it fail to open.
 class _FakeConnection implements AdapterConnection {
-  _FakeConnection(this._adapter, this._opening);
+  _FakeConnection(this._adapter, this._opening) {
+    // Starts opening now, not when first awaited.
+    opened;
+  }
 
   final ClosableAdapter? _adapter;
   final Future<void>? _opening;
   bool _closed = false;
 
+  /// Started at once, as Android's is.
   @override
-  late final Future<ObdTransport> opened = _open();
+  late final Future<ObdTransport> opened = _open()..ignore();
 
   Future<ObdTransport> _open() async {
     // A platform call answers later, never at once.

@@ -11,8 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CancellationException
 
 /**
  * Serial (RFCOMM) connections to a classic Bluetooth OBD adapter, for Dart's
@@ -21,29 +20,12 @@ import java.util.concurrent.atomic.AtomicReference
  * and Dart can close one while it's still connecting. Its bytes, and
  * whether it dropped, go out as `adapterEvents`.
  *
- * Which connection is current is decided in one place, [current], changed
- * only atomically: connects and writes run on [io], disconnects on the
- * main thread, and the reader on its own.
+ * Which connection is current is decided in one place, [Connections]:
+ * connects and writes run on [io], disconnects on the main thread, and the
+ * reader on its own.
  */
 class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
     ClassicBluetoothApi, AdapterEventsStreamHandler() {
-
-    /** A connection being made, or made: its number, and its socket once one exists. */
-    private class Connection(val id: Long) {
-        @Volatile
-        var socket: BluetoothSocket? = null
-
-        @Volatile
-        var closed = false
-
-        fun close() {
-            closed = true
-            try {
-                socket?.close()
-            } catch (_: IOException) {
-            }
-        }
-    }
 
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
@@ -54,14 +36,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val io = Dispatchers.IO.limitedParallelism(1)
 
-    private val current = AtomicReference<Connection?>(null)
-
-    /**
-     * The last connection Dart closed. A connect queued behind another
-     * isn't current yet when Dart closes it, so it checks this as it
-     * becomes current; see [connect] and [disconnect].
-     */
-    private val closedByDart = AtomicLong(NONE)
+    private val connections = Connections()
 
     private var events: PigeonEventSink<AdapterEvent>? = null
 
@@ -96,15 +71,14 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
     }
 
     override suspend fun connect(connection: Long, address: String): Unit = withContext(io) {
+        // Connecting replaces any other connection, even when it fails at once.
+        connections.replace()
         val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             throw FlutterError("connect_failed", "Not a Bluetooth address")
         }
         val opening = Connection(connection)
-        current.getAndSet(opening)?.close()
-        // After becoming current: either this sees Dart's disconnect, or
-        // the disconnect sees this connection and closes it.
-        if (closedByDart.get() == connection) opening.close()
+        connections.begin(opening)
         try {
             val device = adapter.getRemoteDevice(address)
             val socket = try {
@@ -115,12 +89,15 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
                 open(opening) { device.createInsecureRfcommSocketToServiceRecord(SERIAL_PORT) }
             }
             startReading(opening, socket)
-        } catch (e: IOException) {
-            current.compareAndSet(opening, null)
-            throw FlutterError("connect_failed", e.message)
-        } catch (e: SecurityException) {
-            current.compareAndSet(opening, null)
-            throw FlutterError("permission", e.message)
+        } catch (e: Exception) {
+            // However it failed, it's no longer current, and nothing of it stays open.
+            connections.ended(opening)
+            opening.close()
+            if (e is CancellationException) throw e
+            throw when (e) {
+                is SecurityException -> FlutterError("permission", e.message)
+                else -> FlutterError("connect_failed", e.message)
+            }
         }
     }
 
@@ -148,7 +125,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
 
     override suspend fun write(connection: Long, bytes: ByteArray): Unit = withContext(io) {
         try {
-            val socket = current.get()?.takeIf { it.id == connection && !it.closed }?.socket
+            val socket = connections.live(connection)?.socket
                 ?: throw IOException("Not connected")
             val out = socket.outputStream
             out.write(bytes)
@@ -158,12 +135,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         }
     }
 
-    override fun disconnect(connection: Long) {
-        closedByDart.set(connection)
-        val closing = current.get()?.takeIf { it.id == connection } ?: return
-        current.compareAndSet(closing, null)
-        closing.close()
-    }
+    override fun disconnect(connection: Long) = connections.closedByDart(connection)
 
     private fun startReading(connection: Connection, socket: BluetoothSocket) = Thread {
         val buffer = ByteArray(1024)
@@ -181,7 +153,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         // Only report links that dropped, not ones closed on purpose, by Dart
         // or by a newer connect.
         if (!connection.closed) {
-            current.compareAndSet(connection, null)
+            connections.ended(connection)
             connection.close()
             main.post { events?.success(AdapterDropped(connection.id)) }
         }
@@ -191,6 +163,5 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         // Standard Serial Port Profile UUID, used by ELM327 adapters.
         private val SERIAL_PORT: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-        private const val NONE = Long.MIN_VALUE
     }
 }
