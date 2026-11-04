@@ -25,6 +25,9 @@ class SettingsStore {
   static const _settingsKey = 'settings';
   static const _webhookKey = 'webhook';
 
+  /// Where settings [load] couldn't read are kept.
+  static const _setAsideKey = 'settings.setAside';
+
   /// The format [save] writes. Earlier formats are brought up to date in
   /// [load], and only there; none needs it yet.
   static const _version = 1;
@@ -32,17 +35,23 @@ class SettingsStore {
   final SharedPreferencesAsync _preferences;
   final FlutterSecureStorage _secrets;
 
+  /// The saved settings, or new ones if there are none.
+  ///
+  /// Settings it can't read, such as ones a newer version saved, are set
+  /// aside first, so the first save doesn't destroy them. The newer
+  /// version's vehicles and profile files are then still on the phone.
   Future<AppSettings> load() async {
     final saved = await _preferences.getString(_settingsKey);
     if (saved == null) return const AppSettings();
-    return switch (_decode(saved)) {
+    switch (_decode(saved)) {
       // Before versions, settings were saved in this same shape.
-      final Map<String, Object?> json
-          when (json['version'] ?? _version) == _version =>
-        AppSettings.fromJson(json),
-      // Unreadable settings shouldn't lock the user out; start fresh.
-      _ => const AppSettings(),
-    };
+      case final Map<String, Object?> json
+          when (json['version'] ?? _version) == _version:
+        return AppSettings.fromJson(json);
+      default:
+        await _preferences.setString(_setAsideKey, saved);
+        return const AppSettings();
+    }
   }
 
   Future<void> save(AppSettings settings) => _preferences.setString(

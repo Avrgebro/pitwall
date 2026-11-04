@@ -7,6 +7,7 @@ import '../core/profiles/signal_set.dart';
 import '../core/profiles/stored_profile.dart';
 import '../core/readings/readings.dart';
 import '../core/settings/settings.dart';
+import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
 import 'infrastructure.dart';
 
@@ -18,23 +19,39 @@ final appSettingsProvider =
 
 class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   @override
-  Future<AppSettings> build() => ref.read(settingsStoreProvider).load();
+  Future<AppSettings> build() async =>
+      _newest = await ref.read(settingsStoreProvider).load();
 
   AppSettings get _current => state.requireValue;
 
-  /// Writes to the store, one after another, so the file always ends up
-  /// with the newest settings.
+  /// The newest settings, which every write saves. A write queued before
+  /// a change then saves that change too, and can't put back what it
+  /// replaced.
+  late AppSettings _newest;
+
+  /// Everything that writes to the store, settings and profile files,
+  /// one after another.
   Future<void> _writes = Future.value();
 
-  /// Makes [settings] current, then writes them. Each caller awaits its own
-  /// write; a failed one doesn't stop the ones after it.
-  Future<void> _save(AppSettings settings) {
+  /// Runs [write] once the writes before it are done. Each caller awaits
+  /// its own; a failed one doesn't stop the ones after it.
+  Future<void> _queued(Future<void> Function(SettingsStore store) write) {
+    final store = ref.read(settingsStoreProvider);
+    final run = _writes.then((_) => write(store));
+    _writes = run.then((_) {}, onError: (_) {});
+    return run;
+  }
+
+  /// Makes [settings] current, without writing them.
+  void _apply(AppSettings settings) {
     state = AsyncData(settings);
-    final write = _writes.then(
-      (_) => ref.read(settingsStoreProvider).save(settings),
-    );
-    _writes = write.then((_) {}, onError: (_) {});
-    return write;
+    _newest = settings;
+  }
+
+  /// Makes [settings] current, then writes them.
+  Future<void> _save(AppSettings settings) {
+    _apply(settings);
+    return _queued((store) => store.save(_newest));
   }
 
   /// Applies [change] to the vehicle as it is now, if it still exists.
@@ -104,7 +121,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await _save(_current.withoutVehicle(id));
-    await ref.read(settingsStoreProvider).deleteProfile(id);
+    await _queued((store) => store.deleteProfile(id));
   }
 
   /// Called by a listener as a connection is made, which can be before
@@ -156,7 +173,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await _setProfile(
       vehicle.id,
       LoadedProfile(ProfileRef(file.name, importedAt: DateTime.now()), signals),
-      modelYear: vehicle.modelYear,
+      modelYear: (v) => v.modelYear,
     );
     return signals;
   }
@@ -178,42 +195,51 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     LoadedProfile profile, {
     required int? modelYear,
   }) async {
-    final vehicle = _current.vehicleById(vehicleId);
-    if (vehicle == null || vehicle.profile != null) return;
-    await _setProfile(vehicleId, profile, modelYear: modelYear);
+    await _setProfile(
+      vehicleId,
+      profile,
+      modelYear: (_) => modelYear,
+      when: (v) => v.profile == null,
+    );
   }
 
   /// Removes the profile, and the model year, which only picks which of
   /// its requests apply.
   Future<void> removeProfile(String vehicleId) async {
-    final vehicle = _current.vehicleById(vehicleId);
-    if (vehicle == null) return;
-    await _setProfile(vehicleId, null, modelYear: null);
+    await _setProfile(vehicleId, null, modelYear: (_) => null);
   }
 
   /// The one way a vehicle's profile changes: the file and the settings,
   /// in the order that never leaves the settings naming a file that isn't
   /// there. A file left behind does no harm.
+  ///
+  /// It all runs in the write queue, deciding from the vehicle as it is
+  /// then: a file another change wrote or deleted meanwhile can't be
+  /// undone by this one. Nothing happens unless the vehicle exists and
+  /// [when] holds for it.
   Future<void> _setProfile(
     String vehicleId,
     LoadedProfile? profile, {
-    required int? modelYear,
-  }) async {
-    final store = ref.read(settingsStoreProvider);
+    required int? Function(Vehicle vehicle) modelYear,
+    bool Function(Vehicle vehicle)? when,
+  }) => _queued((store) async {
+    final vehicle = _newest.vehicleById(vehicleId);
+    if (vehicle == null || !(when?.call(vehicle) ?? true)) return;
     if (profile != null) {
       await store.saveProfile(vehicleId, profile.signals);
-      // Deleted while the file was written: the file goes with it.
-      if (_current.vehicleById(vehicleId) == null) {
-        await store.deleteProfile(vehicleId);
-        return;
-      }
+      // Deleted while the file was written: its own delete, queued after
+      // this, takes the file.
+      if (_newest.vehicleById(vehicleId) == null) return;
     }
-    await _modifyVehicle(
-      vehicleId,
-      (v) => v.withProfile(profile?.ref, modelYear: modelYear),
+    final changed = _newest.vehicleById(vehicleId)!;
+    _apply(
+      _newest.withVehicle(
+        changed.withProfile(profile?.ref, modelYear: modelYear(changed)),
+      ),
     );
+    await store.save(_newest);
     if (profile == null) await store.deleteProfile(vehicleId);
-  }
+  });
 }
 
 /// One vehicle by id, or null if it doesn't exist (anymore).

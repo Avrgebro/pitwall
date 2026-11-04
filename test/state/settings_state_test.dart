@@ -276,9 +276,10 @@ void main() {
         const PickedFile(name: 'default.json', contents: testProfileJson),
       );
       await Future<void>.delayed(Duration.zero);
-      await notifier.renameVehicle('tucson', 'Hyundai Tucson');
+      // Its write waits for the import's.
+      final renaming = notifier.renameVehicle('tucson', 'Hyundai Tucson');
       write.complete();
-      await importing;
+      await (importing, renaming).wait;
 
       final vehicle = store.settings.vehicleById('tucson')!;
       expect(vehicle.name, 'Hyundai Tucson');
@@ -296,12 +297,64 @@ void main() {
         const PickedFile(name: 'default.json', contents: testProfileJson),
       );
       await Future<void>.delayed(Duration.zero);
-      await notifier.deleteVehicle('tucson');
+      final deleting = notifier.deleteVehicle('tucson');
       write.complete();
-      await importing;
+      await (importing, deleting).wait;
 
       expect(store.settings.vehicles, isEmpty);
       expect(store.profiles, isEmpty);
+    });
+
+    test('an import during a removal keeps its file', () async {
+      final (container, store) = await start(
+        profile: const ProfileRef('default.json'),
+      );
+      store.profiles['tucson'] = testProfileJson;
+      final notifier = container.read(appSettingsProvider.notifier);
+      final write = Completer<void>();
+      store.nextSave = write.future;
+
+      // The removal's settings write is held; the import comes meanwhile.
+      final removing = notifier.removeProfile('tucson');
+      await Future<void>.delayed(Duration.zero);
+      final importing = notifier.importProfile(
+        'tucson',
+        const PickedFile(name: 'newer.json', contents: testProfileJson),
+      );
+      write.complete();
+      await (removing, importing).wait;
+
+      expect(store.profiles['tucson'], testProfileJson);
+      expect(store.settings.vehicleById('tucson')!.profile?.name, 'newer.json');
+    });
+
+    test('Undo decides once it runs, not as it\'s asked', () async {
+      final (container, store) = await start(
+        profile: const ProfileRef('default.json'),
+      );
+      store.profiles['tucson'] = testProfileJson;
+      final notifier = container.read(appSettingsProvider.notifier);
+      final profile = await container.read(
+        vehicleProfileProvider('tucson').future,
+      ) as LoadedProfile;
+      await notifier.removeProfile('tucson');
+      final write = Completer<void>();
+      store.profileWrite = write.future;
+
+      // Undo is asked while an import is still writing its file.
+      final importing = notifier.importProfile(
+        'tucson',
+        const PickedFile(name: 'newer.json', contents: testProfileJson),
+      );
+      final undoing = notifier.restoreProfile(
+        'tucson',
+        profile,
+        modelYear: 2023,
+      );
+      write.complete();
+      await (importing, undoing).wait;
+
+      expect(store.settings.vehicleById('tucson')!.profile?.name, 'newer.json');
     });
 
     test('Undo doesn\'t replace a profile imported since', () async {

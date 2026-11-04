@@ -1,5 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/settings/settings_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
@@ -26,18 +27,21 @@ void main() {
     expect(settings.setupDone, isTrue);
   });
 
-  test('settings from a newer version start fresh', () async {
-    final preferences = SharedPreferencesAsync();
-    await preferences.setString(
-      'settings',
-      '{"version": 99, "setupDone": true}',
-    );
+  for (final (kind, saved) in [
+    ('from a newer version', '{"version": 99, "setupDone": true}'),
+    ('that aren\'t JSON', '{"setupDone": tru'),
+  ]) {
+    test('settings $kind are set aside before anything is saved', () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString('settings', saved);
+      final store = SettingsStore(preferences: preferences);
 
-    expect(
-      (await SettingsStore(preferences: preferences).load()).setupDone,
-      isFalse,
-    );
-  });
+      expect((await store.load()).setupDone, isFalse);
+      await store.save(const AppSettings(setupDone: true));
+
+      expect(await preferences.getString('settings.setAside'), saved);
+    });
+  }
 
   test('saving no webhook removes it', () async {
     FlutterSecureStorage.setMockInitialValues({});
