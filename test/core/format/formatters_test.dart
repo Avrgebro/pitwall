@@ -2,6 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/format/formatters.dart';
 
 void main() {
+  test('counts say one, or many', () {
+    expect(Formatters.count(1, 'device'), '1 device');
+    expect(Formatters.count(0, 'device'), '0 devices');
+    expect(Formatters.count(1200, 'reading'), '1,200 readings');
+    expect(Formatters.count(2, 'person', 'people'), '2 people');
+  });
+
   test('numbers get thousands separators and lose trailing zeros', () {
     expect(Formatters.number(33999.7, decimals: 0), '34,000');
     expect(Formatters.number(1234567.25), '1,234,567.3');

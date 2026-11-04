@@ -6,15 +6,15 @@ import 'group_tile.dart';
 import 'row_group.dart';
 
 /// The row that shows or hides a longer list under it ("Show 12 devices",
-/// "Hide 12 devices"), with an arrow saying which. Nothing while the list
+/// "Hide 12 devices"), with an arrow saying which. What the list holds,
+/// [contents], is worded by the feature, plural and all. Nothing while the list
 /// is [Disclosure.forced] open. The list itself is the caller's, so it can
 /// be built however suits it, even lazily.
 class DisclosureGroup extends StatelessWidget {
   const DisclosureGroup({
     super.key,
     required this.disclosure,
-    required this.count,
-    required this.noun,
+    required this.contents,
     required this.onToggle,
     this.icon,
     this.subtitle,
@@ -22,9 +22,8 @@ class DisclosureGroup extends StatelessWidget {
 
   final Disclosure disclosure;
 
-  /// How many the list holds, and what they are, like `devices`.
-  final int count;
-  final String noun;
+  /// What the list holds, like `12 devices`.
+  final String contents;
 
   final VoidCallback onToggle;
   final IconData? icon;
@@ -41,7 +40,7 @@ class DisclosureGroup extends StatelessWidget {
         children: [
           GroupTile(
             icon: icon,
-            title: '${open ? 'Hide' : 'Show'} $count $noun',
+            title: '${open ? 'Hide' : 'Show'} $contents',
             subtitle: subtitle,
             trailing: Icon(
               open ? Icons.expand_less : Icons.expand_more,

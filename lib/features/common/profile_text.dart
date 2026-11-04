@@ -1,3 +1,4 @@
+import '../../core/format/formatters.dart';
 import '../../core/profiles/signal_set.dart';
 
 /// Plain-language wording for vehicle profiles.
@@ -35,7 +36,7 @@ abstract final class ProfileText {
       : '$requests requests would change something in the car';
 
   /// "1 value", "271 values".
-  static String values(int count) => count == 1 ? '1 value' : '$count values';
+  static String values(int count) => Formatters.count(count, 'value');
 
   /// "Trips 12, Engine 4", in the order given.
   static String categories(List<SignalGroup> groups) => groups

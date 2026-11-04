@@ -289,7 +289,7 @@ class HomeViewModel {
       if (queued > 0) {
         return DeliveryCardModel(
           kind: DeliveryCardKind.queued,
-          title: queued == 1 ? '1 reading waiting' : '$queued readings waiting',
+          title: '${Formatters.count(queued, 'reading')} waiting',
           message: 'Sending now.',
           stats: stats(),
         );
@@ -303,7 +303,7 @@ class HomeViewModel {
 
     // Retried on its own, so there's nothing to offer.
     if (error.fix == DeliveryFix.retry) {
-      final readings = queued == 1 ? '1 reading' : '$queued readings';
+      final readings = Formatters.count(queued, 'reading');
       return DeliveryCardModel(
         kind: DeliveryCardKind.queued,
         title: switch (error) {

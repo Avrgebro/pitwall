@@ -67,8 +67,14 @@ enum RejectionReason {
   /// 401 or 403: this phone or its credentials are refused.
   notAllowed,
 
-  /// 404: the server doesn't know the webhook.
+  /// 404 or 410: the server doesn't know the webhook, or no longer does.
   unknownWebhook,
+
+  /// 3xx: the webhook moved. A POST isn't followed to its new address.
+  moved,
+
+  /// 400 or 422: the server won't take what was sent, however often.
+  refusedPayload,
 
   /// Anything else, which may pass.
   serverTrouble,
@@ -99,7 +105,9 @@ final class Rejected extends DeliveryError {
   /// follow from it.
   RejectionReason get reason => switch (statusCode) {
     401 || 403 => RejectionReason.notAllowed,
-    404 => RejectionReason.unknownWebhook,
+    404 || 410 => RejectionReason.unknownWebhook,
+    >= 300 && < 400 => RejectionReason.moved,
+    400 || 422 => RejectionReason.refusedPayload,
     _ => RejectionReason.serverTrouble,
   };
 
@@ -108,7 +116,9 @@ final class Rejected extends DeliveryError {
   @override
   DeliveryFix get fix => switch (reason) {
     RejectionReason.notAllowed ||
-    RejectionReason.unknownWebhook => DeliveryFix.server,
+    RejectionReason.unknownWebhook ||
+    RejectionReason.moved ||
+    RejectionReason.refusedPayload => DeliveryFix.server,
     RejectionReason.serverTrouble => DeliveryFix.retry,
   };
 

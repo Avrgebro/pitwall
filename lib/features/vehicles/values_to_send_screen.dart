@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/format/formatters.dart';
 import '../../core/format/text_query.dart';
 import '../../core/readings/metric.dart';
 import '../../core/readings/readings.dart';
@@ -120,8 +121,7 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                 DisclosureGroup(
                   disclosure: view.profileList,
                   icon: Symbols.manage_search_rounded,
-                  count: view.profile.length,
-                  noun: 'signals',
+                  contents: Formatters.count(view.profile.length, 'signal'),
                   subtitle:
                       'Sent under their OBDb names, in the profile\'s units. '
                       'Values from the same request share it, so they cost '

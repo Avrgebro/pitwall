@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
+import '../../core/format/formatters.dart';
 import '../../state/licences_state.dart';
 import '../../ui/ui.dart';
 
@@ -39,8 +40,7 @@ class LicencesScreen extends ConsumerWidget {
     },
   );
 
-  static String _count(int count) =>
-      count == 1 ? '1 licence' : '$count licences';
+  static String _count(int count) => Formatters.count(count, 'licence');
 }
 
 /// One package's licence texts, readable and selectable.

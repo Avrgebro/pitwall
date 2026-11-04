@@ -199,6 +199,11 @@ void main() {
       (401, RejectionReason.notAllowed, DeliveryFix.server),
       (403, RejectionReason.notAllowed, DeliveryFix.server),
       (404, RejectionReason.unknownWebhook, DeliveryFix.server),
+      (410, RejectionReason.unknownWebhook, DeliveryFix.server),
+      (301, RejectionReason.moved, DeliveryFix.server),
+      (308, RejectionReason.moved, DeliveryFix.server),
+      (400, RejectionReason.refusedPayload, DeliveryFix.server),
+      (422, RejectionReason.refusedPayload, DeliveryFix.server),
       (500, RejectionReason.serverTrouble, DeliveryFix.retry),
       (429, RejectionReason.serverTrouble, DeliveryFix.retry),
     ]) {
@@ -216,7 +221,7 @@ void main() {
   });
 
   test('errors only the user can fix are not retried', () async {
-    for (final status in [401, 403, 404]) {
+    for (final status in [301, 400, 401, 403, 404, 410, 422]) {
       storage = FakeDeliveryStorage();
       var requests = 0;
       final pitwall = sender(

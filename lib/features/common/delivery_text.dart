@@ -29,11 +29,24 @@ abstract final class DeliveryText {
           title: 'The webhook URL isn\'t valid',
           message: urlProblem(problem),
         ),
-        Rejected(reason: RejectionReason.unknownWebhook) => (
+        Rejected(reason: RejectionReason.unknownWebhook, :final statusCode) => (
           title: 'The webhook doesn\'t exist',
           message:
-              'The server doesn\'t know this webhook (HTTP 404). Check the '
-              'URL in Settings.',
+              'The server doesn\'t know this webhook (HTTP $statusCode). '
+              'Check the URL in Settings.',
+        ),
+        Rejected(reason: RejectionReason.moved, :final statusCode) => (
+          title: 'The webhook has moved',
+          message:
+              'The server points somewhere else (HTTP $statusCode). Enter the '
+              'new address in Settings; https:// instead of http:// is a '
+              'common cause.',
+        ),
+        Rejected(reason: RejectionReason.refusedPayload, :final statusCode) => (
+          title: 'The server won\'t take the readings',
+          message:
+              'It refused what Pitwall sent (HTTP $statusCode). Check how the '
+              'webhook is set up on the server, then tap Retry.',
         ),
         Rejected(reason: RejectionReason.notAllowed, :final statusCode) => (
           title: 'The webhook is refusing readings',

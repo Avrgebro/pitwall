@@ -1,6 +1,11 @@
 /// Formatting shared by screens and notifications: numbers, durations and
 /// times in the app's plain style. Plain Dart, so state can use it too.
 abstract final class Formatters {
+  /// How many of something: `1 device`, `12 devices`. [many] is for
+  /// plurals that aren't [one] with an s.
+  static String count(int n, String one, [String? many]) =>
+      n == 1 ? '1 $one' : '${number(n)} ${many ?? '${one}s'}';
+
   /// `33999.7` → `33,999.7`; whole numbers lose the decimal (`52`).
   static String number(num value, {int decimals = 1}) {
     final rounded = value.toStringAsFixed(decimals);

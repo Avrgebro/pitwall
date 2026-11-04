@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
+import '../../../core/format/formatters.dart';
 import '../../../core/format/text_query.dart';
 import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
@@ -167,8 +168,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
           DisclosureGroup(
             disclosure: othersList,
             icon: Symbols.devices_other_rounded,
-            count: others.length,
-            noun: 'devices',
+            contents: Formatters.count(others.length, 'device'),
             onToggle: () => setState(() => _showOthers = !_showOthers),
           ),
         ],

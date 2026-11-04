@@ -73,6 +73,12 @@ void main() {
     expect(find.text('Earbuds 1'), findsNothing);
   });
 
+  testWidgets('a single other device is one device', (tester) async {
+    await _pump(tester, [_adapter, _audio(1)]);
+
+    expect(find.text('Show 1 device'), findsOneWidget);
+  });
+
   testWidgets('a chosen device among the others keeps them open', (
     tester,
   ) async {
