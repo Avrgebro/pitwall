@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
+import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
@@ -26,8 +29,25 @@ class _Adapter extends FakeTransport implements ClosableTransport {
         'ATRV': '13.6V',
       });
 
+  bool closed = false;
+
+  /// Makes writing fail, as when the adapter drops.
+  bool writesFail = false;
+
+  /// Holds closing until it completes.
+  Future<void>? closing;
+
   @override
-  Future<void> close() async {}
+  Future<void> write(List<int> bytes) async {
+    if (writesFail || closed) throw const TransportClosed();
+    await super.write(bytes);
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+    if (closing case final hold?) await hold;
+  }
 }
 
 const _tucson = Vehicle(
@@ -44,11 +64,15 @@ void main() {
   late FakeBluetoothGateway bluetooth;
   late List<_Adapter> adapters;
 
+  /// Makes the adapters handed out next fail every write.
+  var writesFail = false;
+
   Future<ProviderContainer> start() async {
     adapters = [];
+    writesFail = false;
     bluetooth = FakeBluetoothGateway(
       adapter: (_) {
-        final adapter = _Adapter();
+        final adapter = _Adapter()..writesFail = writesFail;
         adapters.add(adapter);
         return adapter;
       },
@@ -173,5 +197,77 @@ void main() {
 
     expect(outcome, isA<StepDone<void>>());
     expect(adapters.single.sent, containsAllInOrder(['ATI', '0100']));
+  });
+
+  test('a connect abandoned midway leaves the next connection alone', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    // The first adapter doesn't answer the reset, so that connect waits.
+    final first = session.connect(_tucson);
+    await Future<void>.delayed(Duration.zero);
+    adapters.first.replies.remove('ATZ');
+    await session.disconnect();
+    final second = await session.connect(_tucson);
+    await first;
+
+    expect(second, isA<StepDone<SessionConnected>>());
+    expect(adapters.first.closed, isTrue);
+    expect(adapters.last.closed, isFalse);
+    expect(c.read(sessionProvider), isA<SessionConnected>());
+    expect(await session.read(), isA<StepDone<VehicleReading>>());
+  });
+
+  test('a write that fails while connecting leaves the session idle', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    writesFail = true;
+    final connecting = session.connect(_tucson);
+
+    expect(await connecting, isA<StepFailed<SessionConnected>>());
+    expect(
+      c.read(sessionProvider),
+      isA<SessionIdle>().having(
+        (s) => s.problem,
+        'problem',
+        ConnectionProblem.disconnected,
+      ),
+    );
+    // Not stuck: it connects again.
+    writesFail = false;
+    expect(await session.connect(_tucson), isA<StepDone<SessionConnected>>());
+  });
+
+  test('a write that fails while reading is a dropped adapter', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+    adapters.single.writesFail = true;
+
+    expect(
+      await session.read(),
+      isA<StepFailed<VehicleReading>>().having(
+        (o) => o.problem,
+        'problem',
+        ConnectionProblem.disconnected,
+      ),
+    );
+    expect(c.read(sessionProvider), isA<SessionIdle>());
+    expect(adapters.single.closed, isTrue);
+  });
+
+  test('disconnecting is idle before the connection is closed', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+    final hold = Completer<void>();
+    adapters.single.closing = hold.future;
+
+    final disconnecting = session.disconnect();
+
+    expect(c.read(sessionProvider), isA<SessionIdle>());
+    // Asking for the same vehicle now makes a new connection.
+    expect(session.connect(_tucson), completes);
+    hold.complete();
+    await disconnecting;
   });
 }

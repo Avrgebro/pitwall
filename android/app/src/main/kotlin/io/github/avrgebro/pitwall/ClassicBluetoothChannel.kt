@@ -13,31 +13,52 @@ import java.io.IOException
 import java.util.UUID
 
 /**
- * Serial (RFCOMM) connection to a classic Bluetooth OBD adapter, for Dart's
- * [ClassicBluetoothApi]. Bytes from the adapter go out as `adapterInput`,
- * which ends with a `disconnected` error if the link drops.
+ * Serial (RFCOMM) connections to a classic Bluetooth OBD adapter, for Dart's
+ * [ClassicBluetoothApi]. One connection at a time, each with its own number,
+ * so writing to or closing an old one never touches a newer one. Its bytes,
+ * and whether it dropped, go out as `adapterEvents`.
  */
 class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
-    ClassicBluetoothApi, AdapterInputStreamHandler() {
+    ClassicBluetoothApi, AdapterEventsStreamHandler() {
+
+    /** A connection being made, or made: its number, and its socket once one exists. */
+    private class Connection(val id: Long) {
+        @Volatile
+        var socket: BluetoothSocket? = null
+
+        @Volatile
+        var closed = false
+
+        fun close() {
+            closed = true
+            try {
+                socket?.close()
+            } catch (_: IOException) {
+            }
+        }
+    }
 
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
     private val main = Handler(Looper.getMainLooper())
 
-    // Connects and writes run one at a time, off the main thread.
+    // Connects and writes run one at a time, off the main thread. Closing
+    // doesn't queue: closing a socket interrupts what's blocked on it.
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val io = Dispatchers.IO.limitedParallelism(1)
 
+    private var lastId = 0L
+
     @Volatile
-    private var socket: BluetoothSocket? = null
-    private var events: PigeonEventSink<ByteArray>? = null
+    private var current: Connection? = null
+    private var events: PigeonEventSink<AdapterEvent>? = null
 
     init {
         ClassicBluetoothApi.setUp(messenger, this)
         register(messenger, this)
     }
 
-    override fun onListen(p0: Any?, sink: PigeonEventSink<ByteArray>) {
+    override fun onListen(p0: Any?, sink: PigeonEventSink<AdapterEvent>) {
         events = sink
     }
 
@@ -62,18 +83,25 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         }
     }
 
-    override suspend fun connect(address: String) = withContext(io) {
-        close()
+    override suspend fun connect(address: String): Long = withContext(io) {
+        current?.close()
+        val connection = Connection(++lastId)
+        current = connection
+        val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            throw FlutterError("connect_failed", "Not a Bluetooth address")
+        }
         try {
-            val device = adapter!!.getRemoteDevice(address)
-            val connected = try {
-                device.createRfcommSocketToServiceRecord(SERIAL_PORT).apply { connect() }
+            val device = adapter.getRemoteDevice(address)
+            val socket = try {
+                open(connection) { device.createRfcommSocketToServiceRecord(SERIAL_PORT) }
             } catch (e: IOException) {
                 // Some ELM327 clones only accept unauthenticated connections.
-                device.createInsecureRfcommSocketToServiceRecord(SERIAL_PORT).apply { connect() }
+                if (connection.closed) throw e
+                open(connection) { device.createInsecureRfcommSocketToServiceRecord(SERIAL_PORT) }
             }
-            socket = connected
-            startReading(connected)
+            startReading(connection, socket)
+            connection.id
         } catch (e: IOException) {
             throw FlutterError("connect_failed", e.message)
         } catch (e: SecurityException) {
@@ -81,9 +109,32 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         }
     }
 
-    override suspend fun write(bytes: ByteArray) = withContext(io) {
+    /**
+     * Connects a socket made by [create], kept on [connection] meanwhile so
+     * a disconnect can close it. A socket that doesn't connect is closed.
+     */
+    private fun open(connection: Connection, create: () -> BluetoothSocket): BluetoothSocket {
+        val socket = create()
+        connection.socket = socket
         try {
-            val out = socket?.outputStream ?: throw IOException("Not connected")
+            if (connection.closed) throw IOException("Disconnected while connecting")
+            socket.connect()
+            if (connection.closed) throw IOException("Disconnected while connecting")
+            return socket
+        } catch (e: IOException) {
+            try {
+                socket.close()
+            } catch (_: IOException) {
+            }
+            throw e
+        }
+    }
+
+    override suspend fun write(connection: Long, bytes: ByteArray): Unit = withContext(io) {
+        try {
+            val socket = current?.takeIf { it.id == connection }?.socket
+                ?: throw IOException("Not connected")
+            val out = socket.outputStream
             out.write(bytes)
             out.flush()
         } catch (e: IOException) {
@@ -91,36 +142,32 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         }
     }
 
-    override suspend fun disconnect() = withContext(io) { close() }
+    override fun disconnect(connection: Long) {
+        val closing = current?.takeIf { it.id == connection } ?: return
+        current = null
+        closing.close()
+    }
 
-    private fun startReading(connected: BluetoothSocket) = Thread {
+    private fun startReading(connection: Connection, socket: BluetoothSocket) = Thread {
         val buffer = ByteArray(1024)
         try {
-            val input = connected.inputStream
+            val input = socket.inputStream
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
                 val chunk = buffer.copyOf(count)
-                main.post { events?.success(chunk) }
+                main.post { events?.success(AdapterBytes(connection.id, chunk)) }
             }
         } catch (_: IOException) {
-            // Reading fails when the link drops or close() is called.
+            // Reading fails when the link drops or the connection is closed.
         }
         // Only report links that dropped, not ones closed on purpose.
-        if (socket === connected) {
-            socket = null
-            main.post { events?.error("disconnected", "Adapter disconnected", null) }
+        if (!connection.closed) {
+            if (current === connection) current = null
+            connection.close()
+            main.post { events?.success(AdapterDropped(connection.id)) }
         }
     }.apply { isDaemon = true }.start()
-
-    private fun close() {
-        val current = socket ?: return
-        socket = null
-        try {
-            current.close()
-        } catch (_: IOException) {
-        }
-    }
 
     companion object {
         // Standard Serial Port Profile UUID, used by ELM327 adapters.

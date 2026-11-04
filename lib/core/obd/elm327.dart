@@ -265,7 +265,15 @@ class Elm327 {
     final completer = Completer<String>();
     _pending = completer;
     _pendingCommand = command;
-    await _transport.write(latin1.encode('$command\r'));
+    try {
+      await _transport.write(latin1.encode('$command\r'));
+    } on TransportClosed {
+      // This exchange fails here, not through its reply.
+      _pending = null;
+      _onClosed();
+      log?.call(command, '(disconnected)', ElmError.disconnected);
+      throw ElmException(ElmError.disconnected, command);
+    }
     final String raw;
     try {
       raw = await completer.future.timeout(timeout);

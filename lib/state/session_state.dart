@@ -142,8 +142,22 @@ final class SessionConnected extends SessionState {
   );
 }
 
-/// The open connection: the transport and the adapter on it, always
-/// together.
+/// One connection, from the moment it's asked for until it's closed: the
+/// vehicle it's for, and the link once the transport is open. The session
+/// holds at most one, and only it can close it; a step that finds another
+/// one current, or none, knows the connection it began with is gone.
+class _Connection {
+  _Connection(this.vehicleId);
+
+  final String vehicleId;
+  _Link? link;
+
+  /// Closes the link, if there is one. A command waiting on it fails at
+  /// once, as disconnected.
+  Future<void> close() async => link?.close();
+}
+
+/// The open transport and the adapter on it, always together.
 class _Link {
   const _Link(this.transport, this.elm);
 
@@ -167,12 +181,14 @@ final sessionProvider = NotifierProvider<SessionController, SessionState>(
 /// The connection to an adapter, used by trips and by Developer tools. It
 /// only talks to the car; what's read goes on through `ReadingKeeper`.
 class SessionController extends Notifier<SessionState> {
-  /// Set only once the adapter has initialised.
-  _Link? _link;
+  /// The connection being made, or made; see [_Connection].
+  _Connection? _connection;
+
+  bool _isCurrent(_Connection connection) => identical(_connection, connection);
 
   @override
   SessionState build() {
-    ref.onDispose(_close);
+    ref.onDispose(() => _connection?.close());
     // A connection means the car was seen, however it was made.
     listenSelf((previous, next) {
       if (next is SessionConnected && previous is! SessionConnected) {
@@ -214,10 +230,11 @@ class SessionController extends Notifier<SessionState> {
     }
     final address = vehicle.adapter?.address;
     if (address == null) return const StepRefused(Refusal.noAdapter);
-    final connecting = SessionConnecting(vehicle.id);
-    state = connecting;
-    bool stillConnecting() => identical(state, connecting);
-    // Disconnected while connecting: the disconnect already set the state.
+    final connection = _Connection(vehicle.id);
+    _connection = connection;
+    state = SessionConnecting(vehicle.id);
+    // Disconnected while connecting: the disconnect already set the state,
+    // and closed whatever was open.
     const abandoned = StepFailed<SessionConnected>(
       ConnectionProblem.disconnected,
     );
@@ -225,25 +242,27 @@ class SessionController extends Notifier<SessionState> {
     final granted = await ref
         .read(permissionsProvider.notifier)
         .check(AppPermission.bluetooth);
-    if (!stillConnecting()) return abandoned;
+    if (!_isCurrent(connection)) return abandoned;
     if (!granted) return _lost(ConnectionProblem.permissionDenied);
     final ClosableTransport transport;
     try {
       transport = await ref.read(bluetoothGatewayProvider).connect(address);
     } on PlatformException {
-      if (!stillConnecting()) return abandoned;
+      if (!_isCurrent(connection)) return abandoned;
       log.note('Couldn\'t connect to the adapter', warning: true);
       return _lost(ConnectionProblem.connectFailed);
     }
     final link = _Link(transport, Elm327(transport, log: log.exchange));
+    if (!_isCurrent(connection)) {
+      // It opened after the disconnect, so nothing else will close it.
+      await link.close();
+      return abandoned;
+    }
+    connection.link = link;
     try {
       final version = await link.elm.initialize();
       final car = await _askCar(link.elm);
-      if (!stillConnecting()) {
-        await link.close();
-        return abandoned;
-      }
-      _link = link;
+      if (!_isCurrent(connection)) return abandoned;
       final live = SessionConnected(
         vehicleId: vehicle.id,
         connectedAt: DateTime.now(),
@@ -254,15 +273,14 @@ class SessionController extends Notifier<SessionState> {
       state = live;
       return StepDone(live);
     } on ElmException catch (e) {
-      await link.close();
-      if (!stillConnecting()) return abandoned;
-      return StepFailed(_failed(e));
+      if (!_isCurrent(connection)) return abandoned;
+      return StepFailed(await _failed(connection, e));
     }
   }
 
   /// Asks the car again whether it answers, e.g. after the ignition was off.
   Future<ReadOutcome> checkCar() => _withVehicle(
-    (vehicle) => _exclusive((session, elm) async {
+    (vehicle, connection) => _exclusive(connection, (session, elm) async {
       final car = await _askCar(elm);
       _update(
         (live) => live.copyWith(
@@ -279,13 +297,14 @@ class SessionController extends Notifier<SessionState> {
 
   /// Reads the vehicle's chosen values. The vehicle, the values it sends
   /// and its profile are worked out once, before the adapter is taken.
-  Future<ReadOutcome> read() => _withVehicle((vehicle) async {
+  Future<ReadOutcome> read() => _withVehicle((vehicle, connection) async {
     final log = ref.read(adapterLogProvider);
     final profile = await _profileFor(vehicle.id);
     // With the profile loaded, its values are among the ones on offer.
     final sent = ref.read(vehicleValuesProvider(vehicle.id))?.sent;
     if (sent == null) return const StepRefused(Refusal.vehicleRemoved);
     final outcome = await _exclusive(
+      connection,
       (session, elm) async => VehicleReading(
         vehicle,
         await readCar(
@@ -318,19 +337,20 @@ class SessionController extends Notifier<SessionState> {
     return outcome;
   });
 
-  /// Runs [ask] for the vehicle the session is connected to, or says why
-  /// there's none to ask for.
+  /// Runs [ask] for the vehicle the session is connected to, on that
+  /// connection, or says why there's none to ask for. [ask] hands the
+  /// connection to [_exclusive], which refuses if it's no longer current,
+  /// so a read can't move to a connection made meanwhile.
   Future<ReadOutcome> _withVehicle(
-    Future<ReadOutcome> Function(Vehicle vehicle) ask,
+    Future<ReadOutcome> Function(Vehicle vehicle, _Connection connection) ask,
   ) async {
-    final vehicleId = switch (state) {
-      SessionConnected(:final vehicleId) => vehicleId,
-      SessionIdle() || SessionConnecting() => null,
-    };
-    if (vehicleId == null) return const StepRefused(Refusal.notConnected);
-    final vehicle = ref.read(vehicleProvider(vehicleId));
+    final connection = _connection;
+    if (state is! SessionConnected || connection == null) {
+      return const StepRefused(Refusal.notConnected);
+    }
+    final vehicle = ref.read(vehicleProvider(connection.vehicleId));
     if (vehicle == null) return const StepRefused(Refusal.vehicleRemoved);
-    return ask(vehicle);
+    return ask(vehicle, connection);
   }
 
   /// The vehicle's profile, if it loaded. One that can't be read reads
@@ -354,7 +374,7 @@ class SessionController extends Notifier<SessionState> {
         if (command.isNotEmpty) command.toUpperCase(),
     ];
     if (commands.isEmpty) return const StepDone(null);
-    final outcome = await _exclusive((session, elm) async {
+    final outcome = await _exclusive(_connection, (session, elm) async {
       for (final command in commands) {
         try {
           await elm.send(command);
@@ -377,10 +397,14 @@ class SessionController extends Notifier<SessionState> {
     return outcome;
   }
 
+  /// Leaves the session idle at once, then closes the connection: nothing
+  /// sees a connected session whose link is gone.
   Future<void> disconnect() async {
-    await _close();
-    ref.read(adapterLogProvider).note('Disconnected');
+    final connection = _connection;
+    _connection = null;
     state = const SessionIdle();
+    ref.read(adapterLogProvider).note('Disconnected');
+    await connection?.close();
   }
 
   /// Asks the car which standard values it supports, which also shows
@@ -400,32 +424,38 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
-  /// Runs [operation] on the adapter, one at a time. Busy is cleared
-  /// however it ends.
+  /// Runs [operation] on [connection]'s adapter, one at a time, if it's
+  /// still the current, live connection. Busy is cleared however it ends.
   ///
-  /// Everything after the operation concerns its own link only: if the
+  /// Everything after the operation concerns [connection] only: if the
   /// session was disconnected meanwhile, or another connection made, the
   /// failure is the disconnect's, and nothing about the present session
   /// changes.
   Future<StepOutcome<T>> _exclusive<T>(
+    _Connection? connection,
     Future<T> Function(SessionConnected session, Elm327 elm) operation,
   ) async {
-    final link = _link;
+    final link = connection?.link;
     final session = state;
-    if (link == null || session is! SessionConnected) {
+    if (connection == null ||
+        link == null ||
+        !_isCurrent(connection) ||
+        session is! SessionConnected) {
       return const StepRefused(Refusal.notConnected);
     }
     if (session.busy) return const StepRefused(Refusal.busy);
     state = session.copyWith(busy: true);
-    bool stillOurs() => identical(_link, link);
     try {
       return StepDone(await operation(session, link.elm));
     } on ElmException catch (e) {
-      if (!stillOurs()) return const StepFailed(ConnectionProblem.disconnected);
-      await _close();
-      return StepFailed(_failed(e));
+      if (!_isCurrent(connection)) {
+        return const StepFailed(ConnectionProblem.disconnected);
+      }
+      return StepFailed(await _failed(connection, e));
     } finally {
-      if (stillOurs()) _update((live) => live.copyWith(busy: false));
+      if (_isCurrent(connection)) {
+        _update((live) => live.copyWith(busy: false));
+      }
     }
   }
 
@@ -434,14 +464,20 @@ class SessionController extends Notifier<SessionState> {
     if (state case final SessionConnected live) state = change(live);
   }
 
+  /// The current connection attempt failed before its transport opened.
   StepOutcome<T> _lost<T>(ConnectionProblem problem) {
+    _connection = null;
     state = SessionIdle(problem: problem);
     return StepFailed(problem);
   }
 
-  /// Notes an adapter failure and leaves the session idle. The link is
-  /// closed by then.
-  ConnectionProblem _failed(ElmException error) {
+  /// Notes an adapter failure on the current [connection], leaves the
+  /// session idle, and closes it.
+  Future<ConnectionProblem> _failed(
+    _Connection connection,
+    ElmException error,
+  ) async {
+    _connection = null;
     final dropped = error.error == ElmError.disconnected;
     ref
         .read(adapterLogProvider)
@@ -455,12 +491,7 @@ class SessionController extends Notifier<SessionState> {
         ? ConnectionProblem.disconnected
         : ConnectionProblem.adapterError;
     state = SessionIdle(problem: problem);
+    await connection.close();
     return problem;
-  }
-
-  Future<void> _close() async {
-    final link = _link;
-    _link = null;
-    await link?.close();
   }
 }

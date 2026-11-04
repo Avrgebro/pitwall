@@ -315,6 +315,100 @@ data class BondedDeviceMessage (
     return "BondedDeviceMessage(name=$name, address=$address, deviceClass=$deviceClass)"
   }
 }
+
+/**
+ * Something from an adapter connection.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ * This class should not be extended by any user class outside of the generated file.
+ */
+sealed class AdapterEvent 
+/**
+ * Bytes the adapter sent.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class AdapterBytes (
+  val connection: Long,
+  val bytes: ByteArray
+) : AdapterEvent()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AdapterBytes {
+      val connection = pigeonVar_list[0] as Long
+      val bytes = pigeonVar_list[1] as ByteArray
+      return AdapterBytes(connection, bytes)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      connection,
+      bytes,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as AdapterBytes
+    return MessagesPigeonUtils.deepEquals(this.connection, other.connection) && MessagesPigeonUtils.deepEquals(this.bytes, other.bytes)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.connection)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.bytes)
+    return result
+  }
+  override fun toString(): String {
+    return "AdapterBytes(connection=$connection, bytes=${bytes.contentToString()})"
+  }
+}
+
+/**
+ * The connection dropped; nothing more comes from it. Not sent for a
+ * connection Dart closed.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class AdapterDropped (
+  val connection: Long
+) : AdapterEvent()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AdapterDropped {
+      val connection = pigeonVar_list[0] as Long
+      return AdapterDropped(connection)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      connection,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as AdapterDropped
+    return MessagesPigeonUtils.deepEquals(this.connection, other.connection)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.connection)
+    return result
+  }
+  override fun toString(): String {
+    return "AdapterDropped(connection=$connection)"
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -333,6 +427,16 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           BondedDeviceMessage.fromList(it)
         }
       }
+      132.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdapterBytes.fromList(it)
+        }
+      }
+      133.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdapterDropped.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -348,6 +452,14 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       is BondedDeviceMessage -> {
         stream.write(131)
+        writeValue(stream, value.toList())
+      }
+      is AdapterBytes -> {
+        stream.write(132)
+        writeValue(stream, value.toList())
+      }
+      is AdapterDropped -> {
+        stream.write(133)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -510,14 +622,19 @@ class TripStartApi(private val binaryMessenger: BinaryMessenger, private val mes
  * errors coded `unavailable`, `disabled`, `permission`, `connect_failed`
  * or `write_failed`.
  *
+ * There's one serial connection at a time, and each gets its own number:
+ * writing to or closing a connection that's no longer the current one
+ * does nothing to the one that is.
+ *
  * Generated interface from Pigeon that represents a handler of messages from Flutter.
  */
 interface ClassicBluetoothApi {
   fun bondedDevices(): List<BondedDeviceMessage>
-  /** Opens a serial connection, closing any other. */
-  suspend fun connect(address: String)
-  suspend fun write(bytes: ByteArray)
-  suspend fun disconnect()
+  /** Opens a serial connection, closing any other, and returns its number. */
+  suspend fun connect(address: String): Long
+  suspend fun write(connection: Long, bytes: ByteArray)
+  /** Closes the connection, or the attempt to make it, at once. */
+  fun disconnect(connection: Long)
 
   companion object {
     /** The codec used by ClassicBluetoothApi. */
@@ -551,8 +668,7 @@ interface ClassicBluetoothApi {
             val addressArg = args[0] as String
             CoroutineScope(Dispatchers.Main).launch {
               val wrapped: List<Any?> = try {
-                api.connect(addressArg)
-                listOf(null)
+                listOf(api.connect(addressArg))
               } catch (exception: Throwable) {
                 MessagesPigeonUtils.wrapError(exception)
               }
@@ -568,10 +684,11 @@ interface ClassicBluetoothApi {
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
-            val bytesArg = args[0] as ByteArray
+            val connectionArg = args[0] as Long
+            val bytesArg = args[1] as ByteArray
             CoroutineScope(Dispatchers.Main).launch {
               val wrapped: List<Any?> = try {
-                api.write(bytesArg)
+                api.write(connectionArg, bytesArg)
                 listOf(null)
               } catch (exception: Throwable) {
                 MessagesPigeonUtils.wrapError(exception)
@@ -586,16 +703,16 @@ interface ClassicBluetoothApi {
       run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.ClassicBluetoothApi.disconnect$separatedMessageChannelSuffix", codec)
         if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            CoroutineScope(Dispatchers.Main).launch {
-              val wrapped: List<Any?> = try {
-                api.disconnect()
-                listOf(null)
-              } catch (exception: Throwable) {
-                MessagesPigeonUtils.wrapError(exception)
-              }
-              reply.reply(wrapped)
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val connectionArg = args[0] as Long
+            val wrapped: List<Any?> = try {
+              api.disconnect(connectionArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
             }
+            reply.reply(wrapped)
           }
         } else {
           channel.setMessageHandler(null)
@@ -642,19 +759,19 @@ class PigeonEventSink<T>(private val sink: EventChannel.EventSink) {
 }
       
 /** What Android reports as it happens. */
-abstract class AdapterInputStreamHandler : MessagesPigeonEventChannelWrapper<ByteArray> {
+abstract class AdapterEventsStreamHandler : MessagesPigeonEventChannelWrapper<AdapterEvent> {
   companion object {
-    fun register(messenger: BinaryMessenger, streamHandler: AdapterInputStreamHandler, instanceName: String = "") {
-      var channelName: String = "dev.flutter.pigeon.pitwall.BluetoothEvents.adapterInput"
+    fun register(messenger: BinaryMessenger, streamHandler: AdapterEventsStreamHandler, instanceName: String = "") {
+      var channelName: String = "dev.flutter.pigeon.pitwall.BluetoothEvents.adapterEvents"
       if (instanceName.isNotEmpty()) {
         channelName += ".$instanceName"
       }
-      val internalStreamHandler = MessagesPigeonStreamHandler<ByteArray>(streamHandler)
+      val internalStreamHandler = MessagesPigeonStreamHandler<AdapterEvent>(streamHandler)
       EventChannel(messenger, channelName, MessagesPigeonMethodCodec).setStreamHandler(internalStreamHandler)
     }
   }
 // Implement methods from MessagesPigeonEventChannelWrapper
-override fun onListen(p0: Any?, sink: PigeonEventSink<ByteArray>) {}
+override fun onListen(p0: Any?, sink: PigeonEventSink<AdapterEvent>) {}
 
 override fun onCancel(p0: Any?) {}
 }

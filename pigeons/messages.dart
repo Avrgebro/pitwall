@@ -74,27 +74,49 @@ class BondedDeviceMessage {
 /// Classic Bluetooth serial adapters, called from Dart. Failures arrive as
 /// errors coded `unavailable`, `disabled`, `permission`, `connect_failed`
 /// or `write_failed`.
+///
+/// There's one serial connection at a time, and each gets its own number:
+/// writing to or closing a connection that's no longer the current one
+/// does nothing to the one that is.
 @HostApi()
 abstract class ClassicBluetoothApi {
   List<BondedDeviceMessage> bondedDevices();
 
-  /// Opens a serial connection, closing any other.
+  /// Opens a serial connection, closing any other, and returns its number.
   @async
-  void connect(String address);
+  int connect(String address);
 
   @async
-  void write(Uint8List bytes);
+  void write(int connection, Uint8List bytes);
 
-  @async
-  void disconnect();
+  /// Closes the connection, or the attempt to make it, at once.
+  void disconnect(int connection);
+}
+
+/// Something from an adapter connection.
+sealed class AdapterEvent {}
+
+/// Bytes the adapter sent.
+class AdapterBytes extends AdapterEvent {
+  AdapterBytes({required this.connection, required this.bytes});
+
+  int connection;
+  Uint8List bytes;
+}
+
+/// The connection dropped; nothing more comes from it. Not sent for a
+/// connection Dart closed.
+class AdapterDropped extends AdapterEvent {
+  AdapterDropped({required this.connection});
+
+  int connection;
 }
 
 /// What Android reports as it happens.
 @EventChannelApi()
 abstract class BluetoothEvents {
-  /// Bytes from the connected adapter. Ends with a `disconnected` error if
-  /// the link drops.
-  Uint8List adapterInput();
+  /// Every adapter connection's events, each with its number.
+  AdapterEvent adapterEvents();
 
   /// Whether Bluetooth is on: now, then each change.
   bool bluetoothEnabled();
