@@ -153,13 +153,10 @@ class WebhookSender {
       }
       // Kept, as a full queue can drop it from the front while it's posted.
       final sent = _queue.first;
-      final (:result, elapsed: _) = await _post(
-        target,
-        jsonEncode(sent.toPayload()),
-      );
+      final attempt = await _post(target, jsonEncode(sent.toPayload()));
       // The reading stays queued; the next run delivers it.
       if (_disposed) return;
-      if (result case final DeliveryError error) {
+      if (attempt.result case final DeliveryError error) {
         _failed(error);
         return;
       }
@@ -171,11 +168,11 @@ class WebhookSender {
   }
 
   /// Sends a test payload straight to [target], without queueing it.
-  Future<TestResult> sendTest(WebhookTarget target) async {
+  Future<DeliveryAttempt> sendTest(WebhookTarget target) async {
     if (_unusable(target) case final error?) {
-      return TestResult(elapsed: Duration.zero, result: error);
+      return DeliveryAttempt(elapsed: Duration.zero, result: error, test: true);
     }
-    final (:result, :elapsed) = await _post(
+    return _post(
       target,
       jsonEncode({
         ...buildPayload(
@@ -189,7 +186,6 @@ class WebhookSender {
       }),
       test: true,
     );
-    return TestResult(elapsed: elapsed, result: result);
   }
 
   void dispose() {
@@ -199,7 +195,7 @@ class WebhookSender {
     status.dispose();
   }
 
-  Future<({SendResult result, Duration elapsed})> _post(
+  Future<DeliveryAttempt> _post(
     WebhookTarget target,
     String body, {
     bool test = false,
@@ -228,10 +224,13 @@ class WebhookSender {
       result = const Unreachable();
     }
     stopwatch.stop();
-    onAttempt?.call(
-      DeliveryAttempt(elapsed: stopwatch.elapsed, result: result, test: test),
+    final attempt = DeliveryAttempt(
+      elapsed: stopwatch.elapsed,
+      result: result,
+      test: test,
     );
-    return (result: result, elapsed: stopwatch.elapsed);
+    onAttempt?.call(attempt);
+    return attempt;
   }
 
   /// Why [target] can't be sent to, as [WebhookTarget.problem] decides.

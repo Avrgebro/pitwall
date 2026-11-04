@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/webhook/delivery_storage.dart';
 import 'package:pitwall/core/webhook/queued_reading.dart';
+
+import '../../helpers/temporary_app_files.dart';
 
 void main() {
   final reading = QueuedReading(
@@ -60,52 +63,72 @@ void main() {
   });
 
   group('the file', () {
-    final now = DateTime.utc(2026, 11, 2);
+    late File file;
+    setUp(() => file = File('${useTemporaryAppFiles().path}/delivery.json'));
 
-    test('saved before versions, with payloads, is brought up to date', () {
-      final state = FileDeliveryStorage.decode(
-        jsonEncode({
-          'seq': 7,
-          'deliveredThrough': 6,
-          'queue': [reading.toPayload()],
-        }),
-        now: now,
-      );
+    test('a round trip through it keeps the state', () async {
+      final storage = FileDeliveryStorage();
+      await storage.save(DeliveryState(queue: [reading], seq: 7));
 
-      expect(state.seq, 7);
-      expect(state.deliveredThrough, 6);
-      expect(state.queue.single.values, {
-        'odometer_km': 33999.7,
-        'battery_v': 14.1,
-      });
-      expect(state.queue.single.engineRunning, isTrue);
+      final back = await storage.load();
+
+      expect(back.seq, 7);
+      expect(back.queue.single.toJson(), reading.toJson());
     });
 
-    test('version 2, with the fields beside the version, still loads', () {
-      final state = FileDeliveryStorage.decode(
-        jsonEncode({
-          ...DeliveryState(queue: [reading], seq: 7).toJson(),
-          'version': 2,
-        }),
-        now: now,
-      );
+    test(
+      'saved before versions, with payloads, is brought up to date',
+      () async {
+        file.writeAsStringSync(
+          jsonEncode({
+            'seq': 7,
+            'deliveredThrough': 6,
+            'queue': [reading.toPayload()],
+          }),
+        );
 
-      expect(state.seq, 7);
-      expect(state.queue.single.toJson(), reading.toJson());
-    });
+        final state = await FileDeliveryStorage().load();
 
-    test('missing, broken, or from a newer version, is a lost state', () {
+        expect(state.seq, 7);
+        expect(state.deliveredThrough, 6);
+        expect(state.queue.single.values, {
+          'odometer_km': 33999.7,
+          'battery_v': 14.1,
+        });
+        expect(state.queue.single.engineRunning, isTrue);
+      },
+    );
+
+    test(
+      'version 2, with the fields beside the version, still loads',
+      () async {
+        file.writeAsStringSync(
+          jsonEncode({
+            ...DeliveryState(queue: [reading], seq: 7).toJson(),
+            'version': 2,
+          }),
+        );
+
+        final state = await FileDeliveryStorage().load();
+
+        expect(state.seq, 7);
+        expect(state.queue.single.toJson(), reading.toJson());
+      },
+    );
+
+    test('missing, broken, or from a newer version, is a lost state', () async {
       for (final source in [
         null,
         'garbage',
         '{"version": 99, "data": {"seq": 7}}',
         '{"version": 3, "data": "not a state"}',
       ]) {
-        expect(
-          FileDeliveryStorage.decode(source, now: now).seq,
-          now.millisecondsSinceEpoch,
-          reason: source,
-        );
+        if (source != null) file.writeAsStringSync(source);
+        final before = DateTime.now().millisecondsSinceEpoch;
+
+        final state = await FileDeliveryStorage().load();
+
+        expect(state.seq, greaterThanOrEqualTo(before), reason: source);
       }
     });
   });

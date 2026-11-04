@@ -37,9 +37,15 @@ final class WaitingControls extends ManualControls {
 /// Nothing running: connect to [vehicle] by hand, or start a trip for it
 /// as if the car's Bluetooth connected.
 final class IdleControls extends ManualControls {
-  const IdleControls(this.vehicle);
+  const IdleControls(this.vehicle, this.adapter, {this.problem});
 
   final Vehicle vehicle;
+
+  /// The vehicle's adapter, which it has to have to connect.
+  final VehicleAdapter adapter;
+
+  /// Why the last connection ended, if it failed or was lost.
+  final ConnectionProblem? problem;
 }
 
 /// Nothing running, and nothing can start until [blocker] is dealt with.
@@ -64,12 +70,15 @@ ManualControls manualControlsFrom(
   TripIdle() => switch (session) {
     SessionConnected(:final busy) => SessionControls(canRead: !busy),
     SessionConnecting() => const WaitingControls(),
-    SessionIdle() => switch (vehicle) {
+    SessionIdle(:final problem) => switch (vehicle) {
       null => const BlockedControls(IdleBlocker.noVehicle),
-      _ when vehicle.needs.contains(VehicleNeed.adapter) =>
-        const BlockedControls(IdleBlocker.needsAdapter),
+      Vehicle(adapter: null) => const BlockedControls(IdleBlocker.needsAdapter),
       _ when !bluetoothOn => const BlockedControls(IdleBlocker.bluetoothOff),
-      final vehicle => IdleControls(vehicle),
+      final Vehicle ready && Vehicle(:final adapter?) => IdleControls(
+        ready,
+        adapter,
+        problem: problem,
+      ),
     },
   },
   TripEnding() => const TripControls(canStop: false),

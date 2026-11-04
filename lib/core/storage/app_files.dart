@@ -10,28 +10,24 @@ export 'versioned.dart';
 Future<File> appFile(String name) async =>
     File('${(await getApplicationSupportDirectory()).path}/$name');
 
-/// The app file [name], read by [readVersioned] with [readers] and
-/// [before]. A file that was read but can't be understood is set aside
-/// first, as [UnreadableData] says.
+/// What the app file [name] holds, read by [decodeVersioned], or null if
+/// there's none, or it was read but can't be understood: then it's set
+/// aside first, as [decodeVersioned] says.
 ///
 /// Throws [FileSystemException] if the file is there but couldn't be read,
 /// or couldn't be set aside: neither says anything about what it holds, so
 /// it's left as it is. Whoever loads it then mustn't save over it.
-Future<Saved<T>> readVersionedFile<T>(
-  String name, {
-  required Map<int, T? Function(Object? data)> readers,
-  Map<int, T? Function(Map<String, Object?> json)> before = const {},
-}) async {
+Future<T?> readVersionedFile<T>(String name, VersionReaders<T> readers) async {
   final file = await appFile(name);
   final String source;
   try {
     source = await file.readAsString();
   } on PathNotFoundException {
-    return const NothingSaved();
+    return null;
   }
-  final saved = readVersioned(source, readers: readers, before: before);
-  if (saved is UnreadableData<T>) await _setAside(file);
-  return saved;
+  final value = decodeVersioned(source, readers);
+  if (value == null) await _setAside(file);
+  return value;
 }
 
 /// Writes [data] to the app file [name], as [encodeVersioned] does.

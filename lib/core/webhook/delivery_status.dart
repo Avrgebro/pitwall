@@ -208,7 +208,9 @@ class DeliveryStatus {
   final DeliveryOutcome outcome;
 }
 
-/// One POST to the webhook, for the developer log.
+/// One send to the webhook: how it went, how long it took, and whether it
+/// was a test. Every POST is one, for the developer log; a test send is
+/// one too, unless the webhook can't be used, when nothing went out.
 @immutable
 class DeliveryAttempt {
   const DeliveryAttempt({
@@ -220,15 +222,6 @@ class DeliveryAttempt {
   final Duration elapsed;
   final SendResult result;
   final bool test;
-}
-
-/// The outcome of a test send.
-@immutable
-class TestResult {
-  const TestResult({required this.elapsed, required this.result});
-
-  final Duration elapsed;
-  final SendResult result;
 
   bool get succeeded => result is Accepted;
 }

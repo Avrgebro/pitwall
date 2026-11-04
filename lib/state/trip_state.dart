@@ -362,7 +362,9 @@ class TripController extends Notifier<TripState> {
     state = TripIdle(lastEnd: end);
   }
 
-  /// Runs one step of ending a trip, reporting it if it fails.
+  /// Runs [action], a call to Android nothing else awaits, such as a step
+  /// of ending a trip or telling it the head units, and reports it if it
+  /// fails.
   Future<void> _guarded(String step, Future<void> Function() action) async {
     try {
       await action();

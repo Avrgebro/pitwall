@@ -123,18 +123,14 @@ class FileLastValuesStorage implements LastValuesStorage {
 
   /// No values saved, or none readable, is no values.
   @override
-  Future<LastValues> load() async => switch (await readVersionedFile(
-    _fileName,
-    readers: {_version: _vehicles},
-    before: {
-      // Before versions, the file was the vehicles alone.
-      0: LastValues.fromJson,
-      1: (json) => _vehicles(json['vehicles']),
-    },
-  )) {
-    SavedData(:final value) => value,
-    NothingSaved() || UnreadableData() => const LastValues(),
-  };
+  Future<LastValues> load() async =>
+      await readVersionedFile(_fileName, {
+        // Before versions, the file was the vehicles alone.
+        0: LastValues.fromJson,
+        1: (json) => _vehicles(json['vehicles']),
+        _version: (json) => _vehicles(json['data']),
+      }) ??
+      const LastValues();
 
   static LastValues? _vehicles(Object? json) => switch (json) {
     final Map<String, Object?> vehicles => LastValues.fromJson(vehicles),

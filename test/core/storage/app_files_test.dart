@@ -1,26 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 
-/// The app's private storage, in a temporary directory.
-class _TemporaryAppFiles extends PathProviderPlatform {
-  _TemporaryAppFiles(this.directory);
-
-  final Directory directory;
-
-  @override
-  Future<String?> getApplicationSupportPath() async => directory.path;
-}
+import '../../helpers/temporary_app_files.dart';
 
 void main() {
   late Directory directory;
-  setUp(() {
-    directory = Directory.systemTemp.createTempSync('pitwall');
-    PathProviderPlatform.instance = _TemporaryAppFiles(directory);
-  });
-  tearDown(() => directory.deleteSync(recursive: true));
+  setUp(() => directory = useTemporaryAppFiles());
 
   File file(String name) => File('${directory.path}/$name');
 

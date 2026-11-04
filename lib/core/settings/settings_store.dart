@@ -55,24 +55,24 @@ class SettingsStore {
     }
   }
 
-  Future<AppSettings> _loadSettings() async => switch (await _read(
-    _settingsKey,
-    from: _preferences.getString,
-    setAside: _preferences.setString,
-    remove: _preferences.remove,
-    readers: {_settingsVersion: _settings},
-    // Version 1 kept the fields next to the version, and before versions
-    // they were alone; both read the same.
-    before: {0: AppSettings.fromJson, 1: AppSettings.fromJson},
-  )) {
-    SavedData(:final value) => value,
-    NothingSaved() || UnreadableData() => const AppSettings(),
-  };
-
-  static AppSettings? _settings(Object? data) => switch (data) {
-    final Map<String, Object?> json => AppSettings.fromJson(json),
-    _ => null,
-  };
+  Future<AppSettings> _loadSettings() async =>
+      await _read(
+        _settingsKey,
+        from: _preferences.getString,
+        setAside: _preferences.setString,
+        remove: _preferences.remove,
+        readers: {
+          // Version 1 kept the fields next to the version, and before
+          // versions they were alone; both read the same.
+          0: AppSettings.fromJson,
+          1: AppSettings.fromJson,
+          _settingsVersion: (json) => switch (dataOf(json)) {
+            final data? => AppSettings.fromJson(data),
+            null => null,
+          },
+        },
+      ) ??
+      const AppSettings();
 
   Future<void> save(AppSettings settings) => _preferences.setString(
     _settingsKey,
@@ -81,22 +81,21 @@ class SettingsStore {
 
   /// The webhook URL and credentials; [WebhookTarget.none] if not set, or
   /// not readable. Throws if they can't be read at all; see [_read].
-  Future<WebhookTarget> loadWebhook() async => switch (await _read(
-    _webhookKey,
-    from: (key) => _secrets.read(key: key),
-    setAside: (key, value) => _secrets.write(key: key, value: value),
-    remove: (key) => _secrets.delete(key: key),
-    readers: {_webhookVersion: _webhook},
-    before: {0: WebhookTarget.fromJson},
-  )) {
-    SavedData(:final value) => value,
-    NothingSaved() || UnreadableData() => WebhookTarget.none,
-  };
-
-  static WebhookTarget? _webhook(Object? data) => switch (data) {
-    final Map<String, Object?> json => WebhookTarget.fromJson(json),
-    _ => null,
-  };
+  Future<WebhookTarget> loadWebhook() async =>
+      await _read(
+        _webhookKey,
+        from: (key) => _secrets.read(key: key),
+        setAside: (key, value) => _secrets.write(key: key, value: value),
+        remove: (key) => _secrets.delete(key: key),
+        readers: {
+          0: WebhookTarget.fromJson,
+          _webhookVersion: (json) => switch (dataOf(json)) {
+            final data? => WebhookTarget.fromJson(data),
+            null => null,
+          },
+        },
+      ) ??
+      WebhookTarget.none;
 
   Future<void> saveWebhook(WebhookTarget target) => target == WebhookTarget.none
       ? _secrets.delete(key: _webhookKey)
@@ -105,27 +104,27 @@ class SettingsStore {
           value: encodeVersioned(_webhookVersion, target.toJson()),
         );
 
-  /// What's saved under [key], read by [readVersioned]. What was read but
-  /// can't be understood is moved to its own key first, as
-  /// [UnreadableData] says, the same as a file is renamed.
+  /// What's saved under [key], read by [decodeVersioned], or null if
+  /// there's nothing. What was read but can't be understood is moved to
+  /// its own key first, as a file is renamed, and is then nothing too.
   ///
   /// Throws if it can't be read, or can't be moved: then it's left as it
   /// is, and whoever loads it mustn't save over it.
-  static Future<Saved<T>> _read<T>(
+  static Future<T?> _read<T>(
     String key, {
     required Future<String?> Function(String key) from,
     required Future<void> Function(String key, String value) setAside,
     required Future<void> Function(String key) remove,
-    required Map<int, T? Function(Object? data)> readers,
-    required Map<int, T? Function(Map<String, Object?> json)> before,
+    required VersionReaders<T> readers,
   }) async {
     final source = await from(key);
-    final saved = readVersioned(source, readers: readers, before: before);
-    if ((saved, source) case (UnreadableData(), final source?)) {
+    if (source == null) return null;
+    final value = decodeVersioned(source, readers);
+    if (value == null) {
       await setAside('$key.unreadable', source);
       await remove(key);
     }
-    return saved;
+    return value;
   }
 
   /// The vehicle's imported profile, as found on the phone. A file that's

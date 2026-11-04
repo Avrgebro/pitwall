@@ -68,41 +68,20 @@ class FileDeliveryStorage implements DeliveryStorage {
   /// The format [save] writes.
   static const _version = 3;
 
+  /// No state, saved or readable, is a lost state: numbering resumes
+  /// above anything before, which a first start needs no less.
   @override
-  Future<DeliveryState> load() async => _from(
-    await readVersionedFile(_fileName, readers: _readers, before: _before),
-    now: DateTime.now(),
-  );
-
-  /// What [source], the file's contents, or null without one, means; see
-  /// [_from].
-  static DeliveryState decode(String? source, {required DateTime now}) => _from(
-    readVersioned(source, readers: _readers, before: _before),
-    now: now,
-  );
-
-  /// No state, saved or readable, is a lost state: numbering resumes above
-  /// anything before, which a first start needs no less.
-  static DeliveryState _from(
-    Saved<DeliveryState> saved, {
-    required DateTime now,
-  }) => switch (saved) {
-    SavedData(:final value) => value,
-    NothingSaved() || UnreadableData() => DeliveryState.afterLoss(now),
-  };
-
-  static final _readers = <int, DeliveryState? Function(Object?)>{
-    _version: (data) => switch (data) {
-      final Map<String, Object?> json => DeliveryState.fromJson(json),
-      _ => null,
-    },
-  };
-
-  static final _before = <int, DeliveryState? Function(Map<String, Object?>)>{
-    // Before versions, each reading was kept as its webhook payload.
-    0: (json) => DeliveryState._read(json, _readingFromPayload),
-    2: DeliveryState.fromJson,
-  };
+  Future<DeliveryState> load() async =>
+      await readVersionedFile(_fileName, {
+        // Before versions, each reading was kept as its webhook payload.
+        0: (json) => DeliveryState._read(json, _readingFromPayload),
+        2: DeliveryState.fromJson,
+        _version: (json) => switch (dataOf(json)) {
+          final data? => DeliveryState.fromJson(data),
+          null => null,
+        },
+      }) ??
+      DeliveryState.afterLoss(DateTime.now());
 
   @override
   Future<void> save(DeliveryState state) =>

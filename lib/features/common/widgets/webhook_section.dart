@@ -125,9 +125,9 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
                 : const Icon(Symbols.send_rounded),
             child: const Text('Send test'),
           ),
-          if (settings.lastTest case (:final result, :final at)) ...[
+          if (settings.lastTest case (:final attempt, :final at)) ...[
             const SizedBox(height: Insets.m),
-            if (result.result case final DeliveryError error)
+            if (attempt.result case final DeliveryError error)
               ResultBanner(
                 tone: StatusTone.error,
                 title: DeliveryText.error(error).title,
@@ -139,7 +139,7 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
                 title: 'Test reading delivered',
                 message:
                     'The server accepted it in '
-                    '${Formatters.elapsed(result.elapsed)}, at '
+                    '${Formatters.elapsed(attempt.elapsed)}, at '
                     '${Formatters.clock(at)}',
               ),
           ],

@@ -28,6 +28,18 @@ void main() {
     );
   });
 
+  test('idle carries the adapter to connect to and how the last one ended', () {
+    expect(
+      controls(
+        const SessionIdle(problem: ConnectionProblem.connectFailed),
+        const TripIdle(),
+      ),
+      isA<IdleControls>()
+          .having((c) => c.adapter.name, 'adapter', 'vLinker')
+          .having((c) => c.problem, 'problem', ConnectionProblem.connectFailed),
+    );
+  });
+
   test('idle says what stops it from starting anything', () {
     IdleBlocker? blocker(Vehicle? vehicle, {bool bluetoothOn = true}) =>
         switch (manualControlsFrom(

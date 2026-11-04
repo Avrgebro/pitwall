@@ -26,7 +26,7 @@ class WebhookSettings {
   final WebhookTarget draft;
 
   /// The last test send, of [saved]. Any edit clears it.
-  final ({TestResult result, DateTime at})? lastTest;
+  final ({DeliveryAttempt attempt, DateTime at})? lastTest;
 
   bool get hasUrl => saved.hasUrl;
 
@@ -36,7 +36,7 @@ class WebhookSettings {
   /// A test saves the draft first, so the result says what readings get.
   bool get canTest => draft.isUsable;
 
-  bool get testPassed => lastTest?.result.succeeded ?? false;
+  bool get testPassed => lastTest?.attempt.succeeded ?? false;
 }
 
 final webhookProvider = AsyncNotifierProvider<WebhookNotifier, WebhookSettings>(
@@ -115,14 +115,14 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
     if (!_current.canTest) return;
     await save();
     final tested = _current.saved;
-    final result = await ref.read(webhookSenderProvider).sendTest(tested);
+    final attempt = await ref.read(webhookSenderProvider).sendTest(tested);
     // An edit while it was on its way makes the result stale.
     if (_current.saved != tested || _current.draft != tested) return;
     state = AsyncData(
       WebhookSettings(
         saved: tested,
         draft: tested,
-        lastTest: (result: result, at: DateTime.now()),
+        lastTest: (attempt: attempt, at: DateTime.now()),
       ),
     );
   }

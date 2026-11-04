@@ -46,7 +46,9 @@ class _FilterFieldState extends State<FilterField> {
   void didUpdateWidget(FilterField old) {
     super.didUpdateWidget(old);
     // Typing changes the query to match; only a change from outside
-    // changes the text.
+    // changes the text. That holds because a query only trims what was
+    // typed: if it changed it otherwise, say to lower case, typed text
+    // would no longer match its query and would be replaced as it's typed.
     if (TextQuery(_text.text) != widget.query) _text.text = widget.query.text;
   }
 
