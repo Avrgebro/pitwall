@@ -9,58 +9,40 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   const startService = 'dev.flutter.pigeon.pitwall.TripServiceApi.startService';
 
-  test('every target reads back as itself', () {
-    for (final target in const [
-      HeadUnitTarget('AA:BB'),
-      VehicleTarget('mazda'),
-      AnyVehicleTarget(),
-    ]) {
-      final back = tripTargetFrom(target.toMessage());
-      expect(back.toMessage().encode(), target.toMessage().encode());
-    }
-  });
+  /// [message] after a trip through the channel's codec.
+  T throughCodec<T>(T message) =>
+      TripServiceApi.pigeonChannelCodec.decodeMessage(
+        TripServiceApi.pigeonChannelCodec.encodeMessage(message),
+      ) as T;
 
-  test('a kind without what it names, or with another\'s, is an error', () {
-    for (final message in [
-      TripTargetMessage(kind: TripTargetKind.headUnit),
-      TripTargetMessage(kind: TripTargetKind.vehicle, address: 'AA:BB'),
-      TripTargetMessage(
-        kind: TripTargetKind.headUnit,
-        address: 'AA:BB',
-        vehicleId: 'mazda',
-      ),
-      TripTargetMessage(kind: TripTargetKind.anyVehicle, vehicleId: 'mazda'),
-    ]) {
-      expect(() => tripTargetFrom(message), throwsFormatException);
-    }
-  });
-
-  test('Android\'s starts come back as targets, or errors', () async {
+  test('Android\'s starts come back as targets', () async {
     final gateway = AndroidTripServiceGateway();
     final targets = <TripTarget>[];
-    final errors = <Object>[];
-    gateway.starts.listen(targets.add, onError: errors.add);
+    gateway.starts.listen(targets.add);
 
-    gateway.tripStart(
-      TripTargetMessage(kind: TripTargetKind.headUnit, address: 'AA:BB'),
-    );
-    gateway.tripStart(TripTargetMessage(kind: TripTargetKind.vehicle));
+    for (final message in [
+      HeadUnitMessage(address: 'AA:BB'),
+      AppRequestMessage(target: VehicleMessage(id: 'mazda')),
+      AppRequestMessage(target: AnyVehicleMessage()),
+    ]) {
+      gateway.tripStart(throughCodec<TripTargetMessage>(message));
+    }
     await Future<void>.delayed(Duration.zero);
 
-    expect(
-      targets.single,
+    expect(targets, [
       isA<HeadUnitTarget>().having((t) => t.address, 'address', 'AA:BB'),
-    );
-    expect(errors.single, isFormatException);
+      isA<VehicleTarget>().having((t) => t.id, 'id', 'mazda'),
+      isA<AnyVehicleTarget>(),
+    ]);
   });
 
   test('the app\'s request travels as its message', () async {
-    TripTargetMessage? sent;
+    AppTripTargetMessage? sent;
     messenger.setMockMessageHandler(startService, (data) async {
       final args =
           TripServiceApi.pigeonChannelCodec.decodeMessage(data)!
               as List<Object?>;
-      sent = args.single! as TripTargetMessage;
+      sent = args.single! as AppTripTargetMessage;
       return TripServiceApi.pigeonChannelCodec.encodeMessage(<Object?>[null]);
     });
     addTearDown(() => messenger.setMockMessageHandler(startService, null));
@@ -69,7 +51,6 @@ void main() {
       const VehicleTarget('mazda'),
     );
 
-    expect(sent?.kind, TripTargetKind.vehicle);
-    expect(sent?.vehicleId, 'mazda');
+    expect(sent, VehicleMessage(id: 'mazda'));
   });
 }

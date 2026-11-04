@@ -201,46 +201,32 @@ class FlutterError (
   val details: Any? = null
 ) : RuntimeException()
 
-/** Which vehicle a trip is for. */
-enum class TripTargetKind(val raw: Int) {
-  /** A car's head unit connected: [TripTargetMessage.address] is it. */
-  HEAD_UNIT(0),
-  /** The app asked for one vehicle: [TripTargetMessage.vehicleId] is it. */
-  VEHICLE(1),
-  /** The app asked for whichever vehicle's adapter answers. */
-  ANY_VEHICLE(2);
-
-  companion object {
-    fun ofRaw(raw: Int): TripTargetKind? {
-      return values().firstOrNull { it.raw == raw }
-    }
-  }
-}
-
 /**
- * A trip target as it travels: its kind, and what that kind names.
+ * Which vehicle a trip is for, as it travels between Dart and Android.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ * This class should not be extended by any user class outside of the generated file.
+ */
+sealed class TripTargetMessage 
+/**
+ * A car's head unit connected: the trip is for the vehicle whose trips
+ * it starts.
  *
  * Generated class from Pigeon that represents data sent in messages.
  */
-data class TripTargetMessage (
-  val kind: TripTargetKind,
-  val address: String? = null,
-  val vehicleId: String? = null
-)
+data class HeadUnitMessage (
+  val address: String
+) : TripTargetMessage()
  {
   companion object {
-    fun fromList(pigeonVar_list: List<Any?>): TripTargetMessage {
-      val kind = pigeonVar_list[0] as TripTargetKind
-      val address = pigeonVar_list[1] as String?
-      val vehicleId = pigeonVar_list[2] as String?
-      return TripTargetMessage(kind, address, vehicleId)
+    fun fromList(pigeonVar_list: List<Any?>): HeadUnitMessage {
+      val address = pigeonVar_list[0] as String
+      return HeadUnitMessage(address)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
-      kind,
       address,
-      vehicleId,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -250,19 +236,141 @@ data class TripTargetMessage (
     if (this === other) {
       return true
     }
-    val other = other as TripTargetMessage
-    return MessagesPigeonUtils.deepEquals(this.kind, other.kind) && MessagesPigeonUtils.deepEquals(this.address, other.address) && MessagesPigeonUtils.deepEquals(this.vehicleId, other.vehicleId)
+    val other = other as HeadUnitMessage
+    return MessagesPigeonUtils.deepEquals(this.address, other.address)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
-    result = 31 * result + MessagesPigeonUtils.deepHash(this.kind)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.address)
-    result = 31 * result + MessagesPigeonUtils.deepHash(this.vehicleId)
     return result
   }
   override fun toString(): String {
-    return "TripTargetMessage(kind=$kind, address=$address, vehicleId=$vehicleId)"
+    return "HeadUnitMessage(address=$address)"
+  }
+}
+
+/**
+ * The app asked for the trip.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class AppRequestMessage (
+  val target: AppTripTargetMessage
+) : TripTargetMessage()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AppRequestMessage {
+      val target = pigeonVar_list[0] as AppTripTargetMessage
+      return AppRequestMessage(target)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      target,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as AppRequestMessage
+    return MessagesPigeonUtils.deepEquals(this.target, other.target)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.target)
+    return result
+  }
+  override fun toString(): String {
+    return "AppRequestMessage(target=$target)"
+  }
+}
+
+/**
+ * What the app can ask for: one vehicle, or any. Only a head unit names
+ * itself, so the app never asks for one.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ * This class should not be extended by any user class outside of the generated file.
+ */
+sealed class AppTripTargetMessage 
+/**
+ * A trip for one vehicle.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class VehicleMessage (
+  val id: String
+) : AppTripTargetMessage()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): VehicleMessage {
+      val id = pigeonVar_list[0] as String
+      return VehicleMessage(id)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      id,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as VehicleMessage
+    return MessagesPigeonUtils.deepEquals(this.id, other.id)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.id)
+    return result
+  }
+  override fun toString(): String {
+    return "VehicleMessage(id=$id)"
+  }
+}
+
+/**
+ * A trip for whichever vehicle's adapter answers.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+class AnyVehicleMessage  : AppTripTargetMessage() {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AnyVehicleMessage {
+      return AnyVehicleMessage()
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return true
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    return result
+  }
+  override fun toString(): String {
+    return "AnyVehicleMessage()"
   }
 }
 
@@ -413,26 +521,36 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
       129.toByte() -> {
-        return (readValue(buffer) as Long?)?.let {
-          TripTargetKind.ofRaw(it.toInt())
+        return (readValue(buffer) as? List<Any?>)?.let {
+          HeadUnitMessage.fromList(it)
         }
       }
       130.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          TripTargetMessage.fromList(it)
+          AppRequestMessage.fromList(it)
         }
       }
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BondedDeviceMessage.fromList(it)
+          VehicleMessage.fromList(it)
         }
       }
       132.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AdapterBytes.fromList(it)
+          AnyVehicleMessage.fromList(it)
         }
       }
       133.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          BondedDeviceMessage.fromList(it)
+        }
+      }
+      134.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdapterBytes.fromList(it)
+        }
+      }
+      135.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           AdapterDropped.fromList(it)
         }
@@ -442,24 +560,32 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
   }
   override fun writeValue(stream: ByteArrayOutputStream, value: Any?)   {
     when (value) {
-      is TripTargetKind -> {
+      is HeadUnitMessage -> {
         stream.write(129)
-        writeValue(stream, value.raw.toLong())
+        writeValue(stream, value.toList())
       }
-      is TripTargetMessage -> {
+      is AppRequestMessage -> {
         stream.write(130)
         writeValue(stream, value.toList())
       }
-      is BondedDeviceMessage -> {
+      is VehicleMessage -> {
         stream.write(131)
         writeValue(stream, value.toList())
       }
-      is AdapterBytes -> {
+      is AnyVehicleMessage -> {
         stream.write(132)
         writeValue(stream, value.toList())
       }
-      is AdapterDropped -> {
+      is BondedDeviceMessage -> {
         stream.write(133)
+        writeValue(stream, value.toList())
+      }
+      is AdapterBytes -> {
+        stream.write(134)
+        writeValue(stream, value.toList())
+      }
+      is AdapterDropped -> {
+        stream.write(135)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -479,7 +605,7 @@ interface TripServiceApi {
   /** The head units whose connection starts a trip. */
   fun configure(headUnitAddresses: List<String>)
   /** Starts the service for a trip the app asked for: a vehicle, or any. */
-  fun startService(target: TripTargetMessage)
+  fun startService(target: AppTripTargetMessage)
   fun stopService()
   fun updateNotification(text: String)
   /**
@@ -520,7 +646,7 @@ interface TripServiceApi {
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
-            val targetArg = args[0] as TripTargetMessage
+            val targetArg = args[0] as AppTripTargetMessage
             val wrapped: List<Any?> = try {
               api.startService(targetArg)
               listOf(null)

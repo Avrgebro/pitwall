@@ -32,7 +32,7 @@ class TripService : Service() {
         // One trip at a time: a head unit connecting mid-trip, say after
         // the stereo was handed to someone else and back, changes nothing.
         if (!tripActive) {
-            val target = TripTarget.from(intent)
+            val target = TripTargetExtras.from(intent)
             if (target == null) {
                 // Nothing to run a trip for, so nothing to keep running.
                 stopSelf()
@@ -76,9 +76,12 @@ class TripService : Service() {
         private var tripActive = false
 
         /** Starts a trip for [target]. */
-        fun start(context: Context, target: TripTarget) {
+        fun start(context: Context, target: TripTargetMessage) {
             context.startForegroundService(
-                target.putIn(Intent(context, TripService::class.java).setAction(ACTION_START)),
+                TripTargetExtras.putIn(
+                    Intent(context, TripService::class.java).setAction(ACTION_START),
+                    target,
+                ),
             )
         }
 

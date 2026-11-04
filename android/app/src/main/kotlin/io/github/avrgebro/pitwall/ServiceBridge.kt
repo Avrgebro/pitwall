@@ -26,7 +26,7 @@ object ServiceBridge {
     private var dartReady = false
 
     /** A trip asked for before Dart was listening. */
-    private var pendingStart: TripTarget? = null
+    private var pendingStart: TripTargetMessage? = null
 
     fun attach(context: Context, messenger: BinaryMessenger) {
         dart = TripStartApi(messenger)
@@ -37,12 +37,12 @@ object ServiceBridge {
     fun startsTrip(context: Context, address: String): Boolean =
         address.uppercase() in prefs(context).getStringSet(KEY_HEAD_UNITS, emptySet()).orEmpty()
 
-    fun requestTripStart(target: TripTarget) = main.post {
+    fun requestTripStart(target: TripTargetMessage) = main.post {
         val dart = dart
         if (dartReady && dart != null) {
             CoroutineScope(Dispatchers.Main).launch {
                 try {
-                    dart.tripStart(target.toMessage())
+                    dart.tripStart(target)
                 } catch (e: FlutterError) {
                     Log.w("Pitwall", "Dart didn't take the trip start: ${e.code}")
                 }
@@ -62,11 +62,8 @@ object ServiceBridge {
                 .apply()
         }
 
-        override fun startService(target: TripTargetMessage) {
-            val trip = TripTarget.fromApp(target)
-                ?: throw FlutterError("bad_target", "Not a trip the app can ask for")
-            TripService.start(context, trip)
-        }
+        override fun startService(target: AppTripTargetMessage) =
+            TripService.start(context, AppRequestMessage(target))
 
         override fun stopService() = TripService.stop(context)
 
@@ -77,7 +74,7 @@ object ServiceBridge {
             dartReady = true
             val pending = pendingStart
             pendingStart = null
-            return pending?.toMessage()
+            return pending
         }
     }
 }

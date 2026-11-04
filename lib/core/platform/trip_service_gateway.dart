@@ -10,12 +10,10 @@ import 'messages.g.dart';
 /// Android only ever starts trips; the trip decides when it's over.
 abstract interface class TripServiceGateway {
   /// Trips Android started: a car's head unit connected, or the app asked.
-  /// A start whose target can't be read arrives as a [FormatException].
   Stream<TripTarget> get starts;
 
   /// The trip Android asked for before Dart was ready to hear it, if any.
-  /// Asking also tells Android that Dart is now listening. Throws
-  /// [FormatException] if its target can't be read.
+  /// Asking also tells Android that Dart is now listening.
   Future<TripTarget?> takeTripRequest();
 
   /// The head units whose connection starts a trip, one per vehicle at
@@ -45,20 +43,11 @@ class AndroidTripServiceGateway implements TripServiceGateway, TripStartApi {
 
   /// Called by Android with each trip it starts.
   @override
-  void tripStart(TripTargetMessage target) {
-    try {
-      _starts.add(tripTargetFrom(target));
-    } on FormatException catch (error, stack) {
-      _starts.addError(error, stack);
-    }
-  }
+  void tripStart(TripTargetMessage target) => _starts.add(target.toTarget());
 
   @override
   Future<TripTarget?> takeTripRequest() async =>
-      switch (await _api.takeTripRequest()) {
-        final message? => tripTargetFrom(message),
-        null => null,
-      };
+      (await _api.takeTripRequest())?.toTarget();
 
   @override
   Future<void> configure({required Set<String> headUnitAddresses}) =>
@@ -75,31 +64,19 @@ class AndroidTripServiceGateway implements TripServiceGateway, TripStartApi {
   Future<void> updateNotification(String text) => _api.updateNotification(text);
 }
 
-/// A trip target as it travels to Android.
-extension TripTargetMessages on TripTarget {
-  TripTargetMessage toMessage() => switch (this) {
-    HeadUnitTarget(:final address) => TripTargetMessage(
-      kind: TripTargetKind.headUnit,
-      address: address,
-    ),
-    VehicleTarget(:final id) => TripTargetMessage(
-      kind: TripTargetKind.vehicle,
-      vehicleId: id,
-    ),
-    AnyVehicleTarget() => TripTargetMessage(kind: TripTargetKind.anyVehicle),
+/// What the app asks for, as it travels to Android.
+extension AppTripTargetMessages on AppTripTarget {
+  AppTripTargetMessage toMessage() => switch (this) {
+    VehicleTarget(:final id) => VehicleMessage(id: id),
+    AnyVehicleTarget() => AnyVehicleMessage(),
   };
 }
 
-/// The target [message] names. A kind without what it names, or with what
-/// another kind names, is a mistake in the bridge: a [FormatException],
-/// rather than a trip for any vehicle.
-TripTarget tripTargetFrom(TripTargetMessage message) => switch ((
-  message.kind,
-  message.address,
-  message.vehicleId,
-)) {
-  (TripTargetKind.headUnit, final address?, null) => HeadUnitTarget(address),
-  (TripTargetKind.vehicle, null, final id?) => VehicleTarget(id),
-  (TripTargetKind.anyVehicle, null, null) => const AnyVehicleTarget(),
-  _ => throw FormatException('Not a trip target: ${message.kind.name}'),
-};
+/// A trip target as it arrives from Android.
+extension TripTargetMessageTargets on TripTargetMessage {
+  TripTarget toTarget() => switch (this) {
+    HeadUnitMessage(:final address) => HeadUnitTarget(address),
+    AppRequestMessage(target: VehicleMessage(:final id)) => VehicleTarget(id),
+    AppRequestMessage(target: AnyVehicleMessage()) => const AnyVehicleTarget(),
+  };
+}

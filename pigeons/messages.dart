@@ -11,26 +11,37 @@ import 'package:pigeon/pigeon.dart';
     kotlinOptions: KotlinOptions(package: 'io.github.avrgebro.pitwall'),
   ),
 )
-/// Which vehicle a trip is for.
-enum TripTargetKind {
-  /// A car's head unit connected: [TripTargetMessage.address] is it.
-  headUnit,
+/// Which vehicle a trip is for, as it travels between Dart and Android.
+sealed class TripTargetMessage {}
 
-  /// The app asked for one vehicle: [TripTargetMessage.vehicleId] is it.
-  vehicle,
+/// A car's head unit connected: the trip is for the vehicle whose trips
+/// it starts.
+class HeadUnitMessage extends TripTargetMessage {
+  HeadUnitMessage({required this.address});
 
-  /// The app asked for whichever vehicle's adapter answers.
-  anyVehicle,
+  String address;
 }
 
-/// A trip target as it travels: its kind, and what that kind names.
-class TripTargetMessage {
-  TripTargetMessage({required this.kind, this.address, this.vehicleId});
+/// The app asked for the trip.
+class AppRequestMessage extends TripTargetMessage {
+  AppRequestMessage({required this.target});
 
-  TripTargetKind kind;
-  String? address;
-  String? vehicleId;
+  AppTripTargetMessage target;
 }
+
+/// What the app can ask for: one vehicle, or any. Only a head unit names
+/// itself, so the app never asks for one.
+sealed class AppTripTargetMessage {}
+
+/// A trip for one vehicle.
+class VehicleMessage extends AppTripTargetMessage {
+  VehicleMessage({required this.id});
+
+  String id;
+}
+
+/// A trip for whichever vehicle's adapter answers.
+class AnyVehicleMessage extends AppTripTargetMessage {}
 
 /// The trip service, called from Dart.
 @HostApi()
@@ -39,7 +50,7 @@ abstract class TripServiceApi {
   void configure(List<String> headUnitAddresses);
 
   /// Starts the service for a trip the app asked for: a vehicle, or any.
-  void startService(TripTargetMessage target);
+  void startService(AppTripTargetMessage target);
 
   void stopService();
 
