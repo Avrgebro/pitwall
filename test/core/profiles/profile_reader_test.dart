@@ -59,12 +59,27 @@ void main() {
   );
 
   test('without flow control, requests that need it aren\'t sent', () async {
-    final transport = FakeTransport({...replies, 'ATFCSH7A0': '?'});
+    final transport = FakeTransport({
+      ...replies,
+      'ATZ': 'ELM327 v2.1',
+      'ATE0': 'OK',
+      'ATL0': 'OK',
+      'ATS0': 'OK',
+      'ATH0': 'OK',
+      'ATSP0': 'OK',
+      'ATFCSM0': '?',
+    });
+    final elm = Elm327(transport);
+    await elm.initialize();
+    transport.sent.clear();
 
-    final values = await readProfile(Elm327(transport), signalSet, 2023);
+    final values = await readProfile(elm, signalSet, 2023);
 
     expect(values, isNot(contains('test_fcm1')));
+    // Not even addressed: known before reading, not found out while.
     expect(transport.sent, isNot(contains('220100')));
+    expect(transport.sent, isNot(contains('ATSH7E0')));
+    expect(transport.sent, isNot(contains('ATFCSH7A0')));
     // The rest is still read; the long reply from 7A0 just comes back short.
     expect(transport.sent, contains('221234'));
   });

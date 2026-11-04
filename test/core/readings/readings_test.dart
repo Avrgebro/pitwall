@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/obd/elm327.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/profiles/signal_set.dart';
@@ -49,6 +50,33 @@ void main() {
       expect(sent, isNot(contains('test_fuel_vol')));
       expect(sent, contains('odometer_km'));
     });
+  });
+
+  test('a vehicle\'s values are what its adapter can read', () {
+    VehicleValues values(bool? setsFlowControl) => VehicleValues.of(
+      Vehicle(
+        id: 'tucson',
+        modelYear: 2023,
+        adapter: VehicleAdapter(
+          address: 'A',
+          name: 'OBDII',
+          type: AdapterType.classic,
+          setsFlowControl: setsFlowControl,
+        ),
+      ),
+      LoadedProfile(const ProfileRef('default.json'), profile),
+    );
+    bool offers(VehicleValues v, String key) =>
+        v.options.any((o) => o.metric.key == key);
+
+    // Not yet connected to: as if it could.
+    expect(offers(values(null), 'test_fcm1'), isTrue);
+    expect(offers(values(true), 'test_fcm1'), isTrue);
+    expect(offers(values(false), 'test_fcm1'), isFalse);
+    expect(
+      values(false).profile!.notYetReadable.map((r) => r.reason),
+      contains(SkipReason.needsFlowControl),
+    );
   });
 
   test('only the requests for the chosen keys are sent', () async {

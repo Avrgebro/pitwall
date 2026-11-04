@@ -15,11 +15,39 @@ void main() {
       'ATS0': 'OK',
       'ATH0': 'OK',
       'ATSP0': 'OK',
+      'ATFCSM0': 'OK',
     });
     final elm = Elm327(transport);
 
     expect(await elm.initialize(), 'ELM327 v1.5');
-    expect(transport.sent, ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATSP0']);
+    expect(transport.sent, [
+      'ATZ',
+      'ATE0',
+      'ATL0',
+      'ATS0',
+      'ATH0',
+      'ATSP0',
+      'ATFCSM0',
+    ]);
+    expect(elm.setsFlowControl, isTrue);
+  });
+
+  test('initialize finds out an adapter can\'t set flow control', () async {
+    final elm = Elm327(
+      FakeTransport({
+        'ATZ': 'ELM327 v2.1',
+        'ATE0': 'OK',
+        'ATL0': 'OK',
+        'ATS0': 'OK',
+        'ATH0': 'OK',
+        'ATSP0': 'OK',
+        'ATFCSM0': '?',
+      }),
+    );
+
+    await elm.initialize();
+
+    expect(elm.setsFlowControl, isFalse);
   });
 
   test('reads a value with spaces and a SEARCHING line', () async {

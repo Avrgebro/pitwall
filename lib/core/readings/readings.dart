@@ -50,7 +50,11 @@ class VehicleValues {
   factory VehicleValues.of(Vehicle vehicle, StoredProfile? stored) {
     final year = vehicle.modelYear;
     final profile = switch ((stored, year)) {
-      (LoadedProfile(:final signals), final year?) => signals.summaryFor(year),
+      // Until its adapter is known, as if it could read them all.
+      (LoadedProfile(:final signals), final year?) => signals.summaryFor(
+        year,
+        flowControl: vehicle.adapter?.setsFlowControl ?? true,
+      ),
       _ => null,
     };
     final options = valueOptions(profile);

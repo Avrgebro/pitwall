@@ -574,6 +574,34 @@ void main() {
     expect(storage.saves, 0);
   });
 
+  test('a connection notes what the adapter can do', () async {
+    final store = FakeSettingsStore(
+      settings: const AppSettings(
+        vehicles: [
+          Vehicle(
+            id: 'tucson',
+            name: 'A',
+            adapter: VehicleAdapter(
+              address: 'A',
+              name: 'OBDII',
+              type: AdapterType.classic,
+            ),
+          ),
+        ],
+      ),
+    );
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+
+    await container
+        .read(appSettingsProvider.notifier)
+        .markConnected('tucson', DateTime(2026, 11, 3), setsFlowControl: false);
+
+    final vehicle = store.settings.vehicleById('tucson')!;
+    expect(vehicle.adapter?.setsFlowControl, isFalse);
+    expect(vehicle.lastSeen, DateTime(2026, 11, 3));
+  });
+
   test('noting when a vehicle was seen never throws', () async {
     final store = FakeSettingsStore(
       settings: const AppSettings(
@@ -589,7 +617,7 @@ void main() {
 
     await container
         .read(appSettingsProvider.notifier)
-        .markSeen('tucson', DateTime(2026, 11, 3));
+        .markConnected('tucson', DateTime(2026, 11, 3), setsFlowControl: true);
 
     expect(reported.single.library, 'settings');
     expect(container.read(vehicleProvider('tucson'))!.lastSeen, isNull);

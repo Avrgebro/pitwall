@@ -12,6 +12,7 @@ abstract final class ProfileText {
     SkipReason.unusualRequest => 'Written in a form Pitwall doesn\'t recognise',
     SkipReason.noUsableSignals => 'In a format Pitwall can\'t decode',
     SkipReason.notReadOnly => 'Would change something in the car',
+    SkipReason.needsFlowControl => 'Need an adapter that can set flow control',
   };
 
   /// What [reason] means, in a sentence.
@@ -24,6 +25,9 @@ abstract final class ProfileText {
       'The values are encoded in a way Pitwall doesn\'t know.',
     SkipReason.notReadOnly =>
       'Pitwall only reads from the car, so these are never sent.',
+    SkipReason.needsFlowControl =>
+      'Their replies are long, and this vehicle\'s adapter can\'t ask the '
+          'car to send them whole. A better adapter can read them.',
   };
 
   /// "271 values for 2023".

@@ -90,13 +90,14 @@ class Elm327 {
   /// Whether the connection to the adapter has closed.
   bool get isClosed => _closed;
 
-  /// Whether the adapter takes the flow-control commands [setTarget] sends.
-  /// Assumed until one is refused.
+  /// Whether the adapter takes the flow-control commands [setTarget] sends,
+  /// as [initialize] found.
   bool get setsFlowControl => _flowControlSupported;
 
   /// Resets the adapter and configures it for compact, header-free replies
-  /// with automatic protocol detection. Returns the adapter's banner, such as
-  /// `ELM327 v1.5`.
+  /// with automatic protocol detection, and finds out whether it can set
+  /// flow control ([setsFlowControl]). Returns the adapter's banner, such
+  /// as `ELM327 v1.5`.
   Future<String> initialize() async {
     final banner = await send('ATZ', timeout: resetTimeout);
     _header = CanId.broadcast;
@@ -104,6 +105,15 @@ class Elm327 {
     _manualFlowControl = false;
     for (final command in ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATSP0']) {
       await send(command);
+    }
+    // Automatic flow control, which it starts in anyway: only whether it
+    // knows the command matters.
+    try {
+      await send('ATFCSM0');
+      _flowControlSupported = true;
+    } on ElmException catch (e) {
+      if (e.error != ElmError.unknownCommand) rethrow;
+      _flowControlSupported = false;
     }
     return banner.split('\n').last;
   }

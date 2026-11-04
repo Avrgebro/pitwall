@@ -34,7 +34,7 @@ void main() {
     final full = Vehicle(
       id: 'tucson',
       name: 'Tucson',
-      adapter: ready.adapter,
+      adapter: ready.adapter?.withFlowControl(false),
       tripStart: TripStart.drivingDetection,
       headUnit: ready.headUnit,
       modelYear: 2023,
@@ -46,6 +46,7 @@ void main() {
 
     for (final copy in [
       full.copyWith(),
+      Vehicle.fromJson(full.toJson()),
       full.withProfile(full.profile, modelYear: full.modelYear),
       full.withSelectedKeys(full.selectedKeys),
     ]) {

@@ -66,13 +66,18 @@ class SessionController extends Notifier<SessionState> {
   @override
   SessionState build() {
     ref.onDispose(() => _connection?.close());
-    // A connection means the car was seen, however it was made.
+    // A connection means the car was seen, however it was made, and
+    // shows what its adapter can do.
     listenSelf((previous, next) {
       if (next is SessionConnected && previous is! SessionConnected) {
         unawaited(
           ref
               .read(appSettingsProvider.notifier)
-              .markSeen(next.vehicleId, next.connectedAt),
+              .markConnected(
+                next.vehicleId,
+                next.connectedAt,
+                setsFlowControl: next.setsFlowControl,
+              ),
         );
       }
     });
@@ -144,6 +149,7 @@ class SessionController extends Notifier<SessionState> {
         vehicleId: vehicle.id,
         connectedAt: DateTime.now(),
         adapterVersion: version,
+        setsFlowControl: elm.setsFlowControl,
         supportedPids: car.supportedPids,
         carState: car.carState,
       );

@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 
 /**
  * Keeps Pitwall running during a trip, with the notification Android
@@ -34,6 +35,9 @@ class TripService : Service() {
         if (!tripActive) {
             val target = TripTargetExtras.from(intent)
             if (target == null) {
+                if (intent?.extras != null) {
+                    Log.w("Pitwall", "A trip start this version can't read")
+                }
                 // Nothing to run a trip for, so nothing to keep running.
                 stopSelf()
                 return START_NOT_STICKY

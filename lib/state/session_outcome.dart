@@ -106,6 +106,7 @@ final class SessionConnected extends SessionState {
     required this.vehicleId,
     required this.connectedAt,
     this.adapterVersion,
+    this.setsFlowControl = true,
     this.supportedPids = const {},
     this.carState = CarState.unknown,
     this.busy = false,
@@ -114,6 +115,9 @@ final class SessionConnected extends SessionState {
   final String vehicleId;
   final DateTime connectedAt;
   final String? adapterVersion;
+
+  /// Whether the adapter can set flow control; see `Elm327.setsFlowControl`.
+  final bool setsFlowControl;
   final Set<int> supportedPids;
   final CarState carState;
 
@@ -128,6 +132,7 @@ final class SessionConnected extends SessionState {
     vehicleId: vehicleId,
     connectedAt: connectedAt,
     adapterVersion: adapterVersion,
+    setsFlowControl: setsFlowControl,
     supportedPids: supportedPids ?? this.supportedPids,
     carState: carState ?? this.carState,
     busy: busy ?? this.busy,

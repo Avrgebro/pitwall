@@ -76,4 +76,6 @@ flutter {
 dependencies {
     // The Pigeon-generated channel code runs async calls as coroutines.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    testImplementation("junit:junit:4.13.2")
 }

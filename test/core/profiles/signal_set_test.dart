@@ -227,6 +227,22 @@ void main() {
       expect(unreadable(2023), isEmpty);
     });
 
+    test('without flow control, its requests are listed, not read', () {
+      final summary = signalSet.summaryFor(2023, flowControl: false);
+
+      expect(summary.readable.map((s) => s.metric.key), [
+        'test_fuel_vol',
+        'test_odo_mi',
+      ]);
+      expect(
+        summary.notYetReadable
+            .firstWhere((r) => r.reason == SkipReason.needsFlowControl)
+            .signals
+            .map((s) => s.id),
+        ['TEST_FCM1'],
+      );
+    });
+
     test('a value readable through another request isn\'t missing', () {
       final summary = SignalSet.parse(extendedOnly).summaryFor(2023);
 

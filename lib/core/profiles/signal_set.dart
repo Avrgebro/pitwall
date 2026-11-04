@@ -66,24 +66,49 @@ class SignalSet {
     return SignalSet._(source, requests);
   }
 
-  /// The requests that apply to a car of [modelYear].
-  Iterable<ProfileRequest> requestsFor(int modelYear) =>
-      requests.where((request) => request.appliesTo(modelYear));
+  /// The requests that apply to a car of [modelYear], through an adapter
+  /// that can set flow control, or not, as `Elm327.setsFlowControl` says.
+  /// Without it, a request that needs it is skipped: its reply would come
+  /// back cut short.
+  Iterable<ProfileRequest> requestsFor(
+    int modelYear, {
+    bool flowControl = true,
+  }) => [
+    for (final request in requests)
+      if (request.appliesTo(modelYear))
+        switch (request) {
+          ProfileCommand(needsFlowControl: true) when !flowControl =>
+            SkippedRequest(
+              request.description,
+              SkipReason.needsFlowControl,
+              filter: request.filter,
+              signals: request.signals,
+            ),
+          _ => request,
+        },
+  ];
 
-  /// The requests Pitwall sends to a car of [modelYear].
-  Iterable<ProfileCommand> commandsFor(int modelYear) =>
-      requestsFor(modelYear).whereType<ProfileCommand>();
+  /// The requests Pitwall sends to a car of [modelYear]; see
+  /// [requestsFor].
+  Iterable<ProfileCommand> commandsFor(
+    int modelYear, {
+    bool flowControl = true,
+  }) => requestsFor(
+    modelYear,
+    flowControl: flowControl,
+  ).whereType<ProfileCommand>();
 
   /// The requests Pitwall sends to a car of [modelYear], each with the
   /// values read through it. A value several requests carry is read
-  /// through the first, so its name, unit and reading all come from one
-  /// place.
+  /// through the first this adapter can send, so its name, unit and
+  /// reading all come from one place.
   List<({ProfileCommand command, List<ProfileSignal> signals})> readsFor(
-    int modelYear,
-  ) {
+    int modelYear, {
+    bool flowControl = true,
+  }) {
     final claimed = <String>{};
     return [
-      for (final command in commandsFor(modelYear))
+      for (final command in commandsFor(modelYear, flowControl: flowControl))
         (
           command: command,
           signals: [
@@ -94,15 +119,20 @@ class SignalSet {
     ];
   }
 
-  /// What this profile offers a car of [modelYear]; see [ProfileSummary].
-  ProfileSummary summaryFor(int modelYear) {
+  /// What this profile offers a car of [modelYear], through an adapter
+  /// that can set flow control or not; see [ProfileSummary] and
+  /// [requestsFor].
+  ProfileSummary summaryFor(int modelYear, {bool flowControl = true}) {
     final readable = {
-      for (final (:signals, command: _) in readsFor(modelYear))
+      for (final (:signals, command: _) in readsFor(
+        modelYear,
+        flowControl: flowControl,
+      ))
         for (final signal in signals) signal.metric.key: signal,
     };
     final missing = <SkipReason, Map<String, ProfileSignal>>{};
     var neverSent = 0;
-    for (final request in requestsFor(modelYear)) {
+    for (final request in requestsFor(modelYear, flowControl: flowControl)) {
       switch (request) {
         case ProfileCommand():
           break;
@@ -161,6 +191,7 @@ class SignalSet {
     }
     if (signals.isEmpty) throw const _Unsupported(SkipReason.noUsableSignals);
     return ProfileCommand(
+      _describe(entry),
       header: header,
       receive: receive,
       needsFlowControl: entry['fcm1'] == true,
@@ -199,7 +230,8 @@ sealed class ProfileRequest {
 
 /// A request Pitwall sends to one module.
 final class ProfileCommand extends ProfileRequest {
-  const ProfileCommand({
+  const ProfileCommand(
+    this.description, {
     required this.header,
     required this.receive,
     this.needsFlowControl = false,
@@ -209,6 +241,9 @@ final class ProfileCommand extends ProfileRequest {
     required super.signals,
   });
 
+  /// The request, like `7E0: 22 0100`.
+  final String description;
+
   /// CAN id the request is sent to, e.g. `7C6`.
   final CanId header;
 
@@ -217,7 +252,8 @@ final class ProfileCommand extends ProfileRequest {
 
   /// OBDb's `fcm1`: the reply comes back whole only with flow control
   /// aimed at the module, which `Elm327.setTarget` sets up where the
-  /// adapter can.
+  /// adapter can. Where it can't, the request isn't sent; see
+  /// [SignalSet.requestsFor].
   final bool needsFlowControl;
 
   final int service;
@@ -237,6 +273,9 @@ enum SkipReason {
 
   /// None of its signals could be read.
   noUsableSignals,
+
+  /// Its reply needs flow control, which this vehicle's adapter can't set.
+  needsFlowControl,
 }
 
 /// A request Pitwall doesn't send, and why. Its signals are what it would

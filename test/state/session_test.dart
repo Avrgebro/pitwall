@@ -24,6 +24,7 @@ class _Adapter extends FakeTransport implements ClosableAdapter {
         'ATS0': 'OK',
         'ATH0': 'OK',
         'ATSP0': 'OK',
+        'ATFCSM0': 'OK',
         '0100': '410000000000',
         'ATRV': '13.6V',
       });

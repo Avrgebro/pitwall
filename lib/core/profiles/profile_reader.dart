@@ -8,7 +8,7 @@ import 'signal_set.dart';
 /// [SignalSet.readsFor].
 ///
 /// Requests that need flow control are skipped on adapters that can't set
-/// it.
+/// it, as [Elm327.initialize] found.
 ///
 /// Always switches the adapter back to the default broadcast address, so
 /// standard reads keep working afterwards.
@@ -22,13 +22,13 @@ Future<Map<String, double>> readProfile(
       keys?.contains(signal.metric.key) ?? true;
   final values = <String, double>{};
   try {
-    for (final (:command, :signals) in signalSet.readsFor(modelYear)) {
+    for (final (:command, :signals) in signalSet.readsFor(
+      modelYear,
+      flowControl: elm.setsFlowControl,
+    )) {
       final read = signals.where(wanted).toList();
       if (read.isEmpty) continue;
       await elm.setTarget(command.header, receive: command.receive);
-      // Without flow control its reply comes back cut short, so asking
-      // would only take time.
-      if (command.needsFlowControl && !elm.setsFlowControl) continue;
       final List<List<int>> replies;
       try {
         replies = await elm.request(command.service, command.id);

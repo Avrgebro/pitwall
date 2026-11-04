@@ -152,13 +152,24 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     await _queued((store) => store.deleteProfile(id));
   }
 
-  /// Called by a listener as a connection is made, which can be before
-  /// the settings have loaded. Nothing awaits it, so it never throws: a
-  /// failure is reported here.
-  Future<void> markSeen(String id, DateTime time) async {
+  /// Notes that the vehicle was connected to at [time], and what its
+  /// adapter can do. Called by a listener as a connection is made, which
+  /// can be before the settings have loaded. Nothing awaits it, so it
+  /// never throws: a failure is reported here.
+  Future<void> markConnected(
+    String id,
+    DateTime time, {
+    required bool setsFlowControl,
+  }) async {
     try {
       await future;
-      await _modifyVehicle(id, (v) => v.copyWith(lastSeen: time));
+      await _modifyVehicle(
+        id,
+        (v) => v.copyWith(
+          lastSeen: time,
+          adapter: v.adapter?.withFlowControl(setsFlowControl),
+        ),
+      );
     } on Object catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(

@@ -40,9 +40,11 @@ class VehicleAdapter {
     required this.address,
     required this.name,
     required this.type,
+    this.setsFlowControl,
   });
 
-  /// [device], chosen as the adapter.
+  /// [device], chosen as the adapter. What it can do isn't known until
+  /// it's connected to.
   VehicleAdapter.of(BondedDevice device)
     : this(address: device.address, name: device.name, type: device.type);
 
@@ -50,15 +52,27 @@ class VehicleAdapter {
   final String name;
   final AdapterType type;
 
+  /// Whether it can set flow control, as found the last time it was
+  /// connected to; null before then. Some profile values need it.
+  final bool? setsFlowControl;
+
+  VehicleAdapter withFlowControl(bool sets) => VehicleAdapter(
+    address: address,
+    name: name,
+    type: type,
+    setsFlowControl: sets,
+  );
+
   @override
   bool operator ==(Object other) =>
       other is VehicleAdapter &&
       other.address == address &&
       other.name == name &&
-      other.type == type;
+      other.type == type &&
+      other.setsFlowControl == setsFlowControl;
 
   @override
-  int get hashCode => Object.hash(address, name, type);
+  int get hashCode => Object.hash(address, name, type, setsFlowControl);
 }
 
 /// The car's own Bluetooth (its head unit), whose connection can start
@@ -202,6 +216,7 @@ class Vehicle {
     'adapterAddress': adapter?.address,
     'adapterName': adapter?.name,
     'adapterType': adapter?.type.name,
+    'adapterSetsFlowControl': adapter?.setsFlowControl,
     'tripStart': tripStart.name,
     'headUnitAddress': headUnit?.address,
     'headUnitName': headUnit?.name,
@@ -227,6 +242,10 @@ class Vehicle {
         type:
             AdapterType.values.asNameMap()[json['adapterType']] ??
             AdapterType.classic,
+        setsFlowControl: switch (json['adapterSetsFlowControl']) {
+          final bool sets => sets,
+          _ => null,
+        },
       ),
       null => null,
     },
