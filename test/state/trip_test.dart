@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
-import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -30,7 +29,7 @@ import '../helpers/fakes.dart';
 
 /// An adapter that answers like a car with the ignition on, or like one
 /// that's off.
-class _Adapter extends FakeTransport implements ClosableTransport {
+class _Adapter extends FakeTransport implements ClosableAdapter {
   _Adapter({bool carOn = true})
     : super({
         'ATZ': 'ELM327 v2.1',
@@ -87,7 +86,7 @@ void main() {
   late FakeLastValuesStorage lastValues;
 
   ProviderContainer container({
-    ClosableTransport? Function(String)? adapter,
+    ClosableAdapter? Function(String)? adapter,
     List<Vehicle> vehicles = const [_tucson],
     TripTarget? pendingRequest,
     FakePermissionGateway? permissions,

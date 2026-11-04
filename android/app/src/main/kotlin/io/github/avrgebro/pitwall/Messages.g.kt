@@ -478,7 +478,7 @@ data class AdapterBytes (
 
 /**
  * The connection dropped; nothing more comes from it. Not sent for a
- * connection Dart closed.
+ * connection closed on purpose: by Dart, or by connecting again.
  *
  * Generated class from Pigeon that represents data sent in messages.
  */
@@ -748,16 +748,20 @@ class TripStartApi(private val binaryMessenger: BinaryMessenger, private val mes
  * errors coded `unavailable`, `disabled`, `permission`, `connect_failed`
  * or `write_failed`.
  *
- * There's one serial connection at a time, and each gets its own number:
- * writing to or closing a connection that's no longer the current one
- * does nothing to the one that is.
+ * There's one serial connection at a time, each with a number Dart gives
+ * it, never reused: writing to or closing a connection that's no longer
+ * the current one does nothing to the one that is, and Dart can close a
+ * connection while it's still connecting.
  *
  * Generated interface from Pigeon that represents a handler of messages from Flutter.
  */
 interface ClassicBluetoothApi {
   fun bondedDevices(): List<BondedDeviceMessage>
-  /** Opens a serial connection, closing any other, and returns its number. */
-  suspend fun connect(address: String): Long
+  /**
+   * Opens serial connection [connection], closing any other. Fails with
+   * `connect_failed` if it can't, or if it was closed before it opened.
+   */
+  suspend fun connect(connection: Long, address: String)
   suspend fun write(connection: Long, bytes: ByteArray)
   /** Closes the connection, or the attempt to make it, at once. */
   fun disconnect(connection: Long)
@@ -791,10 +795,12 @@ interface ClassicBluetoothApi {
         if (api != null) {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
-            val addressArg = args[0] as String
+            val connectionArg = args[0] as Long
+            val addressArg = args[1] as String
             CoroutineScope(Dispatchers.Main).launch {
               val wrapped: List<Any?> = try {
-                listOf(api.connect(addressArg))
+                api.connect(connectionArg, addressArg)
+                listOf(null)
               } catch (exception: Throwable) {
                 MessagesPigeonUtils.wrapError(exception)
               }

@@ -14,22 +14,33 @@ void main() {
   const codec = ClassicBluetoothApi.pigeonChannelCodec;
 
   late List<String> calls;
+  late List<int> numbers;
   late StreamController<AdapterEvent> events;
-  var nextConnection = 0;
   var writesFail = false;
 
-  void answer(String method, Object? Function(List<Object?> args) reply) =>
-      messenger.setMockMessageHandler('$api.$method', (data) async {
-        final args = codec.decodeMessage(data)! as List<Object?>;
-        return codec.encodeMessage(reply(args));
-      });
+  /// Holds Android's answer to connect until it completes.
+  Completer<void>? connecting;
+
+  void answer(
+    String method,
+    FutureOr<Object?> Function(List<Object?> args) reply,
+  ) => messenger.setMockMessageHandler('$api.$method', (data) async {
+    final args = codec.decodeMessage(data)! as List<Object?>;
+    return codec.encodeMessage(await reply(args));
+  });
 
   setUp(() {
     calls = [];
-    nextConnection = 0;
+    numbers = [];
     writesFail = false;
+    connecting = null;
     events = StreamController<AdapterEvent>.broadcast();
-    answer('connect', (_) => [++nextConnection]);
+    answer('connect', (args) async {
+      numbers.add(args[0]! as int);
+      calls.add('connect ${args[0]}');
+      await connecting?.future;
+      return [null];
+    });
     answer('write', (args) {
       calls.add('write ${args[0]}');
       return writesFail ? ['write_failed', 'Gone', null] : [null];
@@ -58,22 +69,43 @@ void main() {
 
   test('closing an old connection leaves the newer one alone', () async {
     final gateway = ClassicBluetoothGateway();
-    final old = await gateway.connect('AA');
-    final current = await gateway.connect('AA');
+    final old = gateway.connect('AA');
+    final oldTransport = await old.opened;
+    final current = await gateway.connect('AA').opened;
+    final [first, second] = numbers;
+    calls.clear();
 
     await old.close();
-    await old.write([0x41]);
+    await oldTransport.write([0x41]);
     await current.write([0x42]);
 
-    expect(calls, ['disconnect 1', 'write 1', 'write 2']);
+    expect(second, greaterThan(first));
+    expect(calls, ['disconnect $first', 'write $first', 'write $second']);
+  });
+
+  test('a connection can be closed while Android is connecting', () async {
+    connecting = Completer<void>();
+    final connection = ClassicBluetoothGateway().connect('AA');
+    await Future<void>.delayed(Duration.zero);
+
+    await connection.close();
+
+    // Before Android answered: the number was Dart's from the start.
+    expect(calls, [
+      'connect ${numbers.single}',
+      'disconnect ${numbers.single}',
+    ]);
+    connecting!.complete();
+    await connection.opened;
   });
 
   test(
     'each connection hears only its own bytes, and ends when it drops',
     () async {
       final gateway = ClassicBluetoothGateway();
-      final old = await gateway.connect('AA');
-      final current = await gateway.connect('AA');
+      final old = await gateway.connect('AA').opened;
+      final current = await gateway.connect('AA').opened;
+      final [first, second] = numbers;
       final heardOld = <List<int>>[];
       final heardCurrent = <List<int>>[];
       var oldEnded = false;
@@ -82,9 +114,9 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       events
-        ..add(AdapterBytes(connection: 1, bytes: Uint8List.fromList([1])))
-        ..add(AdapterBytes(connection: 2, bytes: Uint8List.fromList([2])))
-        ..add(AdapterDropped(connection: 1));
+        ..add(AdapterBytes(connection: first, bytes: Uint8List.fromList([1])))
+        ..add(AdapterBytes(connection: second, bytes: Uint8List.fromList([2])))
+        ..add(AdapterDropped(connection: first));
       await Future<void>.delayed(Duration.zero);
 
       expect(heardOld, [
@@ -98,7 +130,7 @@ void main() {
   );
 
   test('a failed write says the connection is gone', () async {
-    final transport = await ClassicBluetoothGateway().connect('AA');
+    final transport = await ClassicBluetoothGateway().connect('AA').opened;
     writesFail = true;
 
     await expectLater(transport.write([0x41]), throwsA(isA<TransportClosed>()));

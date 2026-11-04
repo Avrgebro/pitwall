@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/obd/elm327.dart';
+import '../core/obd/obd_transport.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/profiles/stored_profile.dart';
@@ -19,34 +20,34 @@ import 'settings_state.dart';
 export 'session_outcome.dart';
 
 /// One connection, from the moment it's asked for until it's closed: the
-/// vehicle it's for, and the link once the transport is open. The session
-/// holds at most one, and only it can close it; a step that finds another
-/// one current, or none, knows the connection it began with is gone.
+/// vehicle it's for, the adapter connection once one is asked for, and
+/// the adapter on it once it opens. The session holds at most one, and
+/// only it can close it; a step that finds another one current, or none,
+/// knows the connection it began with is gone.
 class _Connection {
   _Connection(this.vehicleId);
 
   final String vehicleId;
-  _Link? link;
 
-  /// Closes the link, if there is one. A command waiting on it fails at
-  /// once, as disconnected.
-  Future<void> close() async => link?.close();
-}
+  AdapterConnection? _adapter;
+  Elm327? _elm;
 
-/// The open transport and the adapter on it, always together.
-class _Link {
-  const _Link(this.transport, this.elm);
+  /// Whether connecting finished: the car was asked, and the session is
+  /// connected through [elm].
+  bool _live = false;
 
-  final ClosableTransport transport;
-  final Elm327 elm;
+  /// The adapter, once the connection is live; null while it's being made.
+  Elm327? get live => _live ? _elm : null;
 
+  void asked(AdapterConnection adapter) => _adapter = adapter;
+  void opened(Elm327 elm) => _elm = elm;
+  void connected() => _live = true;
+
+  /// Closes it at whatever stage: a connect still under way stops, and a
+  /// command waiting on the adapter fails at once, as disconnected.
   Future<void> close() async {
-    await elm.dispose();
-    try {
-      await transport.close();
-    } on PlatformException {
-      // Already gone.
-    }
+    await _elm?.dispose();
+    await _adapter?.close();
   }
 }
 
@@ -120,25 +121,25 @@ class SessionController extends Notifier<SessionState> {
         .check(AppPermission.bluetooth);
     if (!_isCurrent(connection)) return abandoned;
     if (!granted) return _lost(ConnectionProblem.permissionDenied);
-    final ClosableTransport transport;
+    final adapter = ref.read(bluetoothGatewayProvider).connect(address);
+    connection.asked(adapter);
+    final ObdTransport transport;
     try {
-      transport = await ref.read(bluetoothGatewayProvider).connect(address);
+      transport = await adapter.opened;
     } on PlatformException {
       if (!_isCurrent(connection)) return abandoned;
       log.note('Couldn\'t connect to the adapter', warning: true);
       return _lost(ConnectionProblem.connectFailed);
     }
-    final link = _Link(transport, Elm327(transport, log: log.exchange));
-    if (!_isCurrent(connection)) {
-      // It opened after the disconnect, so nothing else will close it.
-      await link.close();
-      return abandoned;
-    }
-    connection.link = link;
+    // Closed meanwhile, so the disconnect closed the adapter connection.
+    if (!_isCurrent(connection)) return abandoned;
+    final elm = Elm327(transport, log: log.exchange);
+    connection.opened(elm);
     try {
-      final version = await link.elm.initialize();
-      final car = await _askCar(link.elm);
+      final version = await elm.initialize();
+      final car = await _askCar(elm);
       if (!_isCurrent(connection)) return abandoned;
+      connection.connected();
       final live = SessionConnected(
         vehicleId: vehicle.id,
         connectedAt: DateTime.now(),
@@ -221,7 +222,7 @@ class SessionController extends Notifier<SessionState> {
     Future<ReadOutcome> Function(Vehicle vehicle, _Connection connection) ask,
   ) async {
     final connection = _connection;
-    if (state is! SessionConnected || connection == null) {
+    if (connection == null || connection.live == null) {
       return const StepRefused(Refusal.notConnected);
     }
     final vehicle = ref.read(vehicleProvider(connection.vehicleId));
@@ -311,18 +312,20 @@ class SessionController extends Notifier<SessionState> {
     _Connection? connection,
     Future<T> Function(SessionConnected session, Elm327 elm) operation,
   ) async {
-    final link = connection?.link;
+    if (connection == null || !_isCurrent(connection)) {
+      return const StepRefused(Refusal.notConnected);
+    }
+    final elm = connection.live;
     final session = state;
-    if (connection == null ||
-        link == null ||
-        !_isCurrent(connection) ||
-        session is! SessionConnected) {
+    // A live, current connection is a connected session: connect makes
+    // both so together.
+    if (elm == null || session is! SessionConnected) {
       return const StepRefused(Refusal.notConnected);
     }
     if (session.busy) return const StepRefused(Refusal.busy);
     state = session.copyWith(busy: true);
     try {
-      return StepDone(await operation(session, link.elm));
+      return StepDone(await operation(session, elm));
     } on ElmException catch (e) {
       if (!_isCurrent(connection)) {
         return const StepFailed(ConnectionProblem.disconnected);

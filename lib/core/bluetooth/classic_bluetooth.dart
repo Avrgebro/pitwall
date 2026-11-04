@@ -36,17 +36,41 @@ class ClassicBluetoothGateway implements BluetoothGateway {
       ),
   ];
 
-  /// Opens a serial connection to the adapter at [address]. Only one is
-  /// open at a time; connecting again closes the previous one, whose
-  /// transport then does nothing.
+  /// Connection numbers, never reused, even after Dart restarts while
+  /// Android carries on: they start from the time the gateway is made.
+  int _lastConnection = DateTime.now().microsecondsSinceEpoch;
+
+  /// Starts a serial connection to the adapter at [address]. Its number
+  /// is chosen here, before anything is sent, so it can be closed while
+  /// Android is still connecting.
   @override
-  Future<ClosableTransport> connect(String address) async =>
-      _ClassicTransport(this, await _api.connect(address));
+  AdapterConnection connect(String address) =>
+      _ClassicConnection(this, ++_lastConnection, address);
+}
+
+class _ClassicConnection implements AdapterConnection {
+  _ClassicConnection(this._gateway, this._number, String address) {
+    opened = _open(address);
+  }
+
+  final ClassicBluetoothGateway _gateway;
+  final int _number;
+
+  @override
+  late final Future<ObdTransport> opened;
+
+  Future<ObdTransport> _open(String address) async {
+    await _gateway._api.connect(_number, address);
+    return _ClassicTransport(_gateway, _number);
+  }
+
+  @override
+  Future<void> close() => _gateway._api.disconnect(_number);
 }
 
 /// One serial connection, by its number: writing or closing reaches only
 /// it, and its input holds only its own bytes.
-class _ClassicTransport implements ClosableTransport {
+class _ClassicTransport implements ObdTransport {
   _ClassicTransport(this._gateway, this._connection);
 
   final ClassicBluetoothGateway _gateway;
@@ -72,7 +96,4 @@ class _ClassicTransport implements ClosableTransport {
       throw const TransportClosed();
     }
   }
-
-  @override
-  Future<void> close() => _gateway._api.disconnect(_connection);
 }

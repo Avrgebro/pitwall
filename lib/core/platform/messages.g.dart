@@ -405,7 +405,7 @@ class AdapterBytes extends AdapterEvent {
 }
 
 /// The connection dropped; nothing more comes from it. Not sent for a
-/// connection Dart closed.
+/// connection closed on purpose: by Dart, or by connecting again.
 class AdapterDropped extends AdapterEvent {
   AdapterDropped({
     required this.connection,
@@ -664,9 +664,10 @@ abstract class TripStartApi {
 /// errors coded `unavailable`, `disabled`, `permission`, `connect_failed`
 /// or `write_failed`.
 ///
-/// There's one serial connection at a time, and each gets its own number:
-/// writing to or closing a connection that's no longer the current one
-/// does nothing to the one that is.
+/// There's one serial connection at a time, each with a number Dart gives
+/// it, never reused: writing to or closing a connection that's no longer
+/// the current one does nothing to the one that is, and Dart can close a
+/// connection while it's still connecting.
 class ClassicBluetoothApi {
   /// Constructor for [ClassicBluetoothApi]. The [binaryMessenger] named argument is
   /// available for dependency injection. If it is left null, the default
@@ -703,24 +704,24 @@ class ClassicBluetoothApi {
     return (pigeonVar_replyValue! as List<Object?>).cast<BondedDeviceMessage>();
   }
 
-  /// Opens a serial connection, closing any other, and returns its number.
-  Future<int> connect(String address) async {
+  /// Opens serial connection [connection], closing any other. Fails with
+  /// `connect_failed` if it can't, or if it was closed before it opened.
+  Future<void> connect(int connection, String address) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.pitwall.ClassicBluetoothApi.connect$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[address]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[connection, address]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
-    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+    _extractReplyValueOrThrow(
         pigeonVar_replyList,
         pigeonVar_channelName,
-        isNullValid: false,
+        isNullValid: true,
     )
     ;
-    return pigeonVar_replyValue! as int;
   }
 
   Future<void> write(int connection, Uint8List bytes) async {

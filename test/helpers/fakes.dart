@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
+import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/readings/last_values.dart';
@@ -43,6 +44,12 @@ class FakePermissionGateway implements PermissionGateway {
       granted[permission] = true;
 }
 
+/// An adapter in tests: its transport, and what closing its connection
+/// does to it.
+abstract interface class ClosableAdapter implements ObdTransport {
+  Future<void> close();
+}
+
 class FakeBluetoothGateway implements BluetoothGateway {
   FakeBluetoothGateway({
     this.devices = const [],
@@ -56,11 +63,15 @@ class FakeBluetoothGateway implements BluetoothGateway {
 
   /// Hands out a connection per attempt; null means the adapter can't be
   /// reached.
-  final ClosableTransport? Function(String address)? adapter;
+  final ClosableAdapter? Function(String address)? adapter;
   int attempts = 0;
 
   /// The adapter addresses connected to, in order.
   final connected = <String>[];
+
+  /// Holds connections opening until it completes, like an adapter slow to
+  /// answer.
+  Future<void>? opening;
 
   @override
   Future<List<BondedDevice>> bondedDevices() async => devices;
@@ -69,14 +80,38 @@ class FakeBluetoothGateway implements BluetoothGateway {
   Stream<bool> get enabled => Stream.value(bluetoothOn);
 
   @override
-  Future<ClosableTransport> connect(String address) async {
+  AdapterConnection connect(String address) {
     attempts++;
     connected.add(address);
-    final transport = adapter?.call(address);
-    if (transport == null) {
+    return _FakeConnection(adapter?.call(address), opening);
+  }
+}
+
+/// Like Android's: closing it before it opens makes it fail to open.
+class _FakeConnection implements AdapterConnection {
+  _FakeConnection(this._adapter, this._opening);
+
+  final ClosableAdapter? _adapter;
+  final Future<void>? _opening;
+  bool _closed = false;
+
+  @override
+  late final Future<ObdTransport> opened = _open();
+
+  Future<ObdTransport> _open() async {
+    // A platform call answers later, never at once.
+    await (_opening ?? Future<void>.value());
+    final adapter = _adapter;
+    if (adapter == null || _closed) {
       throw PlatformException(code: 'connect_failed');
     }
-    return transport;
+    return adapter;
+  }
+
+  @override
+  Future<void> close() async {
+    _closed = true;
+    await _adapter?.close();
   }
 }
 

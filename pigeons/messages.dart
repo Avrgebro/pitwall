@@ -86,16 +86,18 @@ class BondedDeviceMessage {
 /// errors coded `unavailable`, `disabled`, `permission`, `connect_failed`
 /// or `write_failed`.
 ///
-/// There's one serial connection at a time, and each gets its own number:
-/// writing to or closing a connection that's no longer the current one
-/// does nothing to the one that is.
+/// There's one serial connection at a time, each with a number Dart gives
+/// it, never reused: writing to or closing a connection that's no longer
+/// the current one does nothing to the one that is, and Dart can close a
+/// connection while it's still connecting.
 @HostApi()
 abstract class ClassicBluetoothApi {
   List<BondedDeviceMessage> bondedDevices();
 
-  /// Opens a serial connection, closing any other, and returns its number.
+  /// Opens serial connection [connection], closing any other. Fails with
+  /// `connect_failed` if it can't, or if it was closed before it opened.
   @async
-  int connect(String address);
+  void connect(int connection, String address);
 
   @async
   void write(int connection, Uint8List bytes);
@@ -116,7 +118,7 @@ class AdapterBytes extends AdapterEvent {
 }
 
 /// The connection dropped; nothing more comes from it. Not sent for a
-/// connection Dart closed.
+/// connection closed on purpose: by Dart, or by connecting again.
 class AdapterDropped extends AdapterEvent {
   AdapterDropped({required this.connection});
 

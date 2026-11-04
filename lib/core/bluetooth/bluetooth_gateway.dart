@@ -8,8 +8,9 @@ abstract interface class BluetoothGateway {
   /// Devices paired in Android's Bluetooth settings.
   Future<List<BondedDevice>> bondedDevices();
 
-  /// Opens a connection to the adapter at [address].
-  Future<ClosableTransport> connect(String address);
+  /// Starts connecting to the adapter at [address]. Only one connection
+  /// is open at a time: connecting again closes the previous one.
+  AdapterConnection connect(String address);
 
   /// Whether Bluetooth is on: the current state, then each change.
   Stream<bool> get enabled;
@@ -32,7 +33,13 @@ class BondedDevice {
   final AdapterType type;
 }
 
-/// A transport the app can close when it's done.
-abstract interface class ClosableTransport implements ObdTransport {
+/// One connection to an adapter, from the moment it's asked for, so it can
+/// be closed at any stage.
+abstract interface class AdapterConnection {
+  /// The transport, once connected. Fails with a `PlatformException` if
+  /// the adapter can't be reached, or if [close] came first.
+  Future<ObdTransport> get opened;
+
+  /// Closes the connection, stopping a connect still under way.
   Future<void> close();
 }

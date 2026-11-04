@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
-import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -16,7 +15,7 @@ import '../core/obd/fake_transport.dart';
 import '../helpers/fakes.dart';
 
 /// An adapter on a car with the ignition on.
-class _Adapter extends FakeTransport implements ClosableTransport {
+class _Adapter extends FakeTransport implements ClosableAdapter {
   _Adapter()
     : super({
         'ATZ': 'ELM327 v2.1',
@@ -116,6 +115,29 @@ void main() {
     expect(await connecting, isA<StepFailed<SessionConnected>>());
     expect(c.read(sessionProvider), isA<SessionIdle>());
   });
+
+  test(
+    'disconnecting while the adapter connects closes that connect',
+    () async {
+      final c = await start();
+      final session = c.read(sessionProvider.notifier);
+      final slow = Completer<void>();
+      bluetooth.opening = slow.future;
+
+      final connecting = session.connect(_tucson);
+      while (adapters.isEmpty) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      await session.disconnect();
+
+      // Closed while still connecting, not once the connect is done.
+      expect(adapters.single.closed, isTrue);
+      slow.complete();
+      expect(await connecting, isA<StepFailed<SessionConnected>>());
+      expect(adapters.single.sent, isEmpty);
+      expect(c.read(sessionProvider), isA<SessionIdle>());
+    },
+  );
 
   test('disconnecting once the transport is open closes it at once', () async {
     final c = await start();
