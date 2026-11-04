@@ -62,6 +62,10 @@ final webhookSenderProvider = Provider<WebhookSender>((ref) {
     storage: ref.watch(deliveryStorageProvider),
     webhookTarget: ref.watch(settingsStoreProvider).loadWebhook,
     onAttempt: (attempt) => _logAttempt(log, attempt),
+    onDropped: (reading, attempt) => log.delivery(
+      'Dropped reading ${reading.seq}: the server won\'t take it',
+      warning: true,
+    ),
   );
   ref.onDispose(sender.dispose);
   return sender;

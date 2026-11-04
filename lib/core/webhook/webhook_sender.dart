@@ -24,6 +24,7 @@ class WebhookSender {
     DateTime Function()? clock,
     Duration Function(int attempt)? backoff,
     this.onAttempt,
+    this.onDropped,
   }) : _client = client ?? http.Client(),
        _clock = clock ?? DateTime.now,
        _backoff = backoff ?? defaultBackoff;
@@ -48,6 +49,11 @@ class WebhookSender {
   /// Called after every POST, for the developer log.
   final void Function(DeliveryAttempt attempt)? onAttempt;
 
+  /// Called when the server refused a reading for what it holds, and it
+  /// was dropped, for the developer log.
+  final void Function(QueuedReading reading, DeliveryAttempt attempt)?
+  onDropped;
+
   final status = ValueNotifier(const DeliveryStatus());
 
   /// How the attempts so far went, which only deliveries change.
@@ -70,12 +76,12 @@ class WebhookSender {
   bool _saves = true;
 
   /// Loads what was left from earlier runs and starts delivering it. Never
-  /// throws: if the saved state can't be read, readings are numbered above
-  /// anything before and kept in memory only, and the failure is reported.
+  /// throws: if the saved state can't be read, readings are kept in memory
+  /// only, and the failure is reported.
   Future<void> init() async {
     final DeliveryState state;
     try {
-      state = await _storage.load();
+      state = await _storage.load() ?? DeliveryState.afterLoss(_clock());
     } on Object catch (error, stack) {
       _saves = false;
       FlutterError.reportError(
@@ -102,14 +108,19 @@ class WebhookSender {
   /// Queues a reading and starts delivering what's queued, without waiting
   /// for it; [flush] waits. Returns the reading's sequence number: it's
   /// delivered once the status's `deliveredThrough` reaches it.
+  ///
+  /// Numbers come from the clock, in milliseconds, and are always above
+  /// the one before: they only ever go up for the receiver, across
+  /// restarts and even after the saved state was lost.
   Future<int> queue({
     required String device,
     required Map<String, double> values,
     required bool connected,
     bool? engineRunning,
   }) async {
+    _seq = max(_seq + 1, _clock().millisecondsSinceEpoch);
     final reading = QueuedReading(
-      seq: ++_seq,
+      seq: _seq,
       device: device,
       timestamp: _clock(),
       values: values,
@@ -122,17 +133,31 @@ class WebhookSender {
     }
     await _persist();
     _publish();
-    unawaited(flush());
+    // Waiting for the user, readings only queue up.
+    if (!_waitingForFix) unawaited(flush());
     return reading.seq;
   }
+
+  /// Whether the last failure needs the user, on the server or in the
+  /// settings: nothing is sent until they [retry].
+  bool _waitingForFix = false;
 
   /// Delivers queued readings, oldest first, until the queue is empty or a
   /// send fails, and completes then. A delivery already under way is the
   /// one waited for: it takes in readings queued meanwhile. After a failure
-  /// that retrying can fix, a retry is scheduled; see
-  /// [DeliveryError.fix].
-  Future<void> flush() =>
-      _flushing ??= _deliver().whenComplete(() => _flushing = null);
+  /// that retrying can fix, a retry is scheduled; after one only the user
+  /// can fix, nothing is sent until [retry]. See [DeliveryError.fix].
+  Future<void> flush() async {
+    if (_waitingForFix) return;
+    await (_flushing ??= _deliver().whenComplete(() => _flushing = null));
+  }
+
+  /// Delivers queued readings again, as after the user fixed what stopped
+  /// them: from the Retry button, or a change in the webhook settings.
+  Future<void> retry() {
+    _waitingForFix = false;
+    return flush();
+  }
 
   Future<void> _deliver() async {
     _retry?.cancel();
@@ -154,8 +179,20 @@ class WebhookSender {
       // Kept, as a full queue can drop it from the front while it's posted.
       final sent = _queue.first;
       final attempt = await _post(target, jsonEncode(sent.toPayload()));
-      // The reading stays queued; the next run delivers it.
       if (_disposed) return;
+      // The server won't take this reading however often it's sent: it's
+      // dropped, so the ones behind it still go.
+      if (attempt.result case Rejected(
+        reason: RejectionReason.refusedPayload,
+      )) {
+        _queue.remove(sent);
+        await _persist();
+        _outcome = _outcome.failed(attempt.result as DeliveryError, _clock());
+        onDropped?.call(sent, attempt);
+        _publish();
+        continue;
+      }
+      // The reading stays queued; the next run delivers it.
       if (attempt.result case final DeliveryError error) {
         _failed(error);
         return;
@@ -248,9 +285,12 @@ class WebhookSender {
   void _failed(DeliveryError error) {
     _outcome = _outcome.failed(error, _clock());
     _publish();
-    // Only the user can fix the rest; delivery resumes on the next send,
-    // when the webhook settings change, or on Retry.
-    if (error.fix != DeliveryFix.retry) return;
+    // Only the user can fix the rest: delivery resumes when the webhook
+    // settings change, or on Retry, not with every reading.
+    if (error.fix != DeliveryFix.retry) {
+      _waitingForFix = true;
+      return;
+    }
     _retry = Timer(
       _backoff(_outcome.failedAttempts - 1),
       () => unawaited(flush()),

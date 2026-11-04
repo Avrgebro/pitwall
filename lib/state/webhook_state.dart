@@ -106,7 +106,7 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
     await ref.read(settingsStoreProvider).saveWebhook(saved);
     // A fixed URL or token should deliver what's queued without waiting
     // for the next retry; saving doesn't wait for it.
-    unawaited(ref.read(webhookSenderProvider).flush());
+    unawaited(ref.read(webhookSenderProvider).retry());
   }
 
   /// Saves the draft and sends a test reading to it.
@@ -151,5 +151,5 @@ class DeliveryStatusNotifier extends Notifier<DeliveryStatus> {
   }
 
   /// Tries to deliver queued readings now instead of at the next retry.
-  Future<void> retryNow() => ref.read(webhookSenderProvider).flush();
+  Future<void> retryNow() => ref.read(webhookSenderProvider).retry();
 }

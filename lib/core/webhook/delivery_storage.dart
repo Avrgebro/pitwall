@@ -10,14 +10,12 @@ class DeliveryState {
     this.deliveredThrough = 0,
   });
 
-  /// After the saved state was lost: numbering resumes above anything it
-  /// could have reached, so readings keep going up for the receiver, and
-  /// numbers kept elsewhere, as with the last values, still read right.
+  /// With nothing saved, or nothing readable: everything numbered before
+  /// [now] counts as delivered, so numbers kept elsewhere, as with the last
+  /// values, still read right. Numbering itself never goes back anyway;
+  /// see `WebhookSender.queue`.
   DeliveryState.afterLoss(DateTime now)
-    : this(
-        seq: now.millisecondsSinceEpoch,
-        deliveredThrough: now.millisecondsSinceEpoch,
-      );
+    : this(deliveredThrough: now.millisecondsSinceEpoch);
 
   final List<QueuedReading> queue;
   final int seq;
@@ -56,7 +54,8 @@ class DeliveryState {
 }
 
 abstract interface class DeliveryStorage {
-  Future<DeliveryState> load();
+  /// The saved state, or null if there's none, or none readable.
+  Future<DeliveryState?> load();
   Future<void> save(DeliveryState state);
 }
 
@@ -68,20 +67,16 @@ class FileDeliveryStorage implements DeliveryStorage {
   /// The format [save] writes.
   static const _version = 3;
 
-  /// No state, saved or readable, is a lost state: numbering resumes
-  /// above anything before, which a first start needs no less.
   @override
-  Future<DeliveryState> load() async =>
-      await readVersionedFile(_fileName, {
-        // Before versions, each reading was kept as its webhook payload.
-        0: (json) => DeliveryState._read(json, _readingFromPayload),
-        2: DeliveryState.fromJson,
-        _version: (json) => switch (dataOf(json)) {
-          final data? => DeliveryState.fromJson(data),
-          null => null,
-        },
-      }) ??
-      DeliveryState.afterLoss(DateTime.now());
+  Future<DeliveryState?> load() => readVersionedFile(_fileName, {
+    // Before versions, each reading was kept as its webhook payload.
+    0: (json) => DeliveryState._read(json, _readingFromPayload),
+    2: DeliveryState.fromJson,
+    _version: (json) => switch (dataOf(json)) {
+      final data? => DeliveryState.fromJson(data),
+      null => null,
+    },
+  });
 
   @override
   Future<void> save(DeliveryState state) =>

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pitwall/core/webhook/delivery_status.dart';
+import 'package:pitwall/core/webhook/delivery_storage.dart';
 import 'package:pitwall/core/webhook/webhook_auth.dart';
 import 'package:pitwall/core/webhook/webhook_sender.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
@@ -16,6 +17,9 @@ import 'fake_delivery_storage.dart';
 
 const _url = 'https://example.com/api/webhook/secret-id';
 const _target = WebhookTarget(_url);
+
+/// The first number the sender's clock gives a reading.
+final _start = DateTime.utc(2026, 10, 31, 19, 40).millisecondsSinceEpoch;
 
 void main() {
   late FakeDeliveryStorage storage;
@@ -106,7 +110,8 @@ void main() {
     await sendFuel(pitwall, 47.5);
     await sendFuel(pitwall, 47);
 
-    expect(received.map((p) => p['seq']), [1, 2]);
+    // From the clock, in milliseconds, and up by one at least.
+    expect(received.map((p) => p['seq']), [_start, _start + 1]);
     expect(received.first['device'], 'tucson');
     expect(received.first['values'], {'tucson_fli_vol': 47.5});
     expect(pitwall.status.value.queued, 0);
@@ -128,7 +133,7 @@ void main() {
     // The retries succeed once the server recovers.
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
-    expect(received.map((p) => p['seq']), [1, 2]);
+    expect(received.map((p) => p['seq']), [_start, _start + 1]);
     expect(pitwall.status.value.queued, 0);
     expect(pitwall.status.value.outcome.lastError, isNull);
     pitwall.dispose();
@@ -148,7 +153,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await sendFuel(second, 47);
 
-    expect(received.map((p) => p['seq']), [1, 2]);
+    expect(received.map((p) => p['seq']), [_start, _start + 1]);
     second.dispose();
   });
 
@@ -220,26 +225,100 @@ void main() {
     pitwall.dispose();
   });
 
-  test('errors only the user can fix are not retried', () async {
-    for (final status in [301, 400, 401, 403, 404, 410, 422]) {
-      storage = FakeDeliveryStorage();
-      var requests = 0;
-      final pitwall = sender(
-        client: MockClient((_) async {
-          requests++;
-          return http.Response('', status);
-        }),
-      );
-      await pitwall.init();
+  test(
+    'errors only the user can fix wait for them, however many readings come',
+    () async {
+      for (final status in [301, 401, 403, 404, 405, 410]) {
+        storage = FakeDeliveryStorage();
+        var requests = 0;
+        final pitwall = sender(
+          client: MockClient((_) async {
+            requests++;
+            return http.Response('', status);
+          }),
+        );
+        await pitwall.init();
 
-      await sendFuel(pitwall, 47.5);
-      // Well past several backoff periods.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+        await sendFuel(pitwall, 47.5);
+        await sendFuel(pitwall, 47);
+        // Well past several backoff periods.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      expect(requests, 1, reason: 'HTTP $status');
-      expect(pitwall.status.value.queued, 1);
-      pitwall.dispose();
-    }
+        expect(requests, 1, reason: 'HTTP $status');
+        expect(pitwall.status.value.queued, 2);
+
+        // Retry tries again.
+        await pitwall.retry();
+        expect(requests, 2, reason: 'HTTP $status');
+        pitwall.dispose();
+      }
+    },
+  );
+
+  test(
+    'a reading the server refuses is dropped, and the rest still go',
+    () async {
+      for (final status in [400, 413, 422]) {
+        storage = FakeDeliveryStorage();
+        received = [];
+        final dropped = <int>[];
+        var refuseNext = true;
+        final pitwall = WebhookSender(
+          storage: storage,
+          webhookTarget: () async => _target,
+          client: MockClient((request) async {
+            if (refuseNext) {
+              refuseNext = false;
+              return http.Response('', status);
+            }
+            received.add(jsonDecode(request.body) as Map<String, Object?>);
+            return http.Response('', 200);
+          }),
+          clock: () => DateTime.utc(2026, 10, 31, 19, 40),
+          onDropped: (reading, _) => dropped.add(reading.seq),
+        );
+        await pitwall.init();
+
+        await sendFuel(pitwall, 47.5);
+        await sendFuel(pitwall, 47);
+
+        expect(dropped, [_start], reason: 'HTTP $status');
+        expect(received.map((p) => p['seq']), [_start + 1]);
+        expect(pitwall.status.value.queued, 0);
+        expect(storage.state.queue, isEmpty);
+        pitwall.dispose();
+      }
+    },
+  );
+
+  test('numbers never go back, even after the saved queue was lost', () async {
+    var now = DateTime.utc(2026, 10, 31, 19, 40);
+    WebhookSender at(DeliveryStorage storage) => WebhookSender(
+      storage: storage,
+      webhookTarget: () async => _target,
+      client: server(),
+      clock: () => now,
+    );
+    // The file can't be read: readings go out, but aren't saved.
+    final lost = at(FakeDeliveryStorage()..loadError = StateError('broken'));
+    final previous = FlutterError.onError;
+    FlutterError.onError = (_) {};
+    addTearDown(() => FlutterError.onError = previous);
+    await lost.init();
+    await sendFuel(lost, 47.5);
+    lost.dispose();
+
+    // Next launch, an hour on, the file reads again, with its old numbers.
+    now = now.add(const Duration(hours: 1));
+    final recovered = at(
+      FakeDeliveryStorage()..state = const DeliveryState(seq: 500),
+    );
+    await recovered.init();
+    await sendFuel(recovered, 47);
+
+    final [before, after] = received.map((p) => p['seq']! as int).toList();
+    expect(after, greaterThan(before));
+    recovered.dispose();
   });
 
   test('failed attempts are counted once, and back off with each', () async {
@@ -343,7 +422,7 @@ void main() {
     await second.init();
     // Its first attempt, which fails too.
     await Future<void>.delayed(Duration.zero);
-    expect(second.status.value.deliveredThrough, 1);
+    expect(second.status.value.deliveredThrough, _start);
     expect(second.status.value.queued, 1);
     second.dispose();
   });
@@ -408,7 +487,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       // Only reading 1 went out: reading 2, never posted, is still queued.
-      expect(pitwall.status.value.deliveredThrough, 1);
+      expect(pitwall.status.value.deliveredThrough, _start);
       expect(pitwall.status.value.queued, WebhookSender.maxQueued);
       pitwall.dispose();
     },

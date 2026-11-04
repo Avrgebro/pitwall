@@ -30,10 +30,10 @@ abstract final class DeliveryText {
           message: urlProblem(problem),
         ),
         Rejected(reason: RejectionReason.unknownWebhook, :final statusCode) => (
-          title: 'The webhook doesn\'t exist',
+          title: 'The webhook isn\'t there',
           message:
-              'The server doesn\'t know this webhook (HTTP $statusCode). '
-              'Check the URL in Settings.',
+              'The server takes no readings at this address '
+              '(HTTP $statusCode). Check the URL in Settings.',
         ),
         Rejected(reason: RejectionReason.moved, :final statusCode) => (
           title: 'The webhook has moved',
@@ -43,10 +43,11 @@ abstract final class DeliveryText {
               'common cause.',
         ),
         Rejected(reason: RejectionReason.refusedPayload, :final statusCode) => (
-          title: 'The server won\'t take the readings',
+          title: 'The server refused a reading',
           message:
-              'It refused what Pitwall sent (HTTP $statusCode). Check how the '
-              'webhook is set up on the server, then tap Retry.',
+              'It wouldn\'t take what Pitwall sent (HTTP $statusCode), so '
+              'that reading was dropped; the rest still go. Check how the '
+              'webhook is set up on the server.',
         ),
         Rejected(reason: RejectionReason.notAllowed, :final statusCode) => (
           title: 'The webhook is refusing readings',

@@ -35,7 +35,7 @@ Example payload (not final yet):
 ```json
 {
   "device": "my-car",
-  "seq": 1284,
+  "seq": 1793475600000,
   "timestamp": "2026-10-31T19:40:00Z",
   "values": {
     "fuel_level_pct": 46.3,
@@ -48,6 +48,10 @@ Example payload (not final yet):
   "connected": true
 }
 ```
+
+`seq` only ever goes up, across restarts too, so a receiver can drop
+anything it has already seen. It comes from the clock, so it isn't a
+count of readings.
 
 `engine` is `"running"` or `"off"` (ignition on, engine stopped). When the
 car is switched off, a last message with `"connected": false` and no values

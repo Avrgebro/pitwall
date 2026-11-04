@@ -28,10 +28,11 @@ void main() {
     expect(back.queue.single.toJson(), reading.toJson());
   });
 
-  test('after a loss, numbering resumes above anything before', () {
-    final state = DeliveryState.afterLoss(DateTime.utc(2026, 11, 2));
-    expect(state.seq, greaterThan(1000000000));
-    expect(state.deliveredThrough, state.seq);
+  test('after a loss, everything numbered before counts as delivered', () {
+    final now = DateTime.utc(2026, 11, 2);
+    final state = DeliveryState.afterLoss(now);
+    expect(state.deliveredThrough, now.millisecondsSinceEpoch);
+    expect(state.queue, isEmpty);
   });
 
   test('a reading is stored at full precision, apart from its payload', () {
@@ -70,7 +71,7 @@ void main() {
       final storage = FileDeliveryStorage();
       await storage.save(DeliveryState(queue: [reading], seq: 7));
 
-      final back = await storage.load();
+      final back = (await storage.load())!;
 
       expect(back.seq, 7);
       expect(back.queue.single.toJson(), reading.toJson());
@@ -87,7 +88,7 @@ void main() {
           }),
         );
 
-        final state = await FileDeliveryStorage().load();
+        final state = (await FileDeliveryStorage().load())!;
 
         expect(state.seq, 7);
         expect(state.deliveredThrough, 6);
@@ -109,14 +110,14 @@ void main() {
           }),
         );
 
-        final state = await FileDeliveryStorage().load();
+        final state = (await FileDeliveryStorage().load())!;
 
         expect(state.seq, 7);
         expect(state.queue.single.toJson(), reading.toJson());
       },
     );
 
-    test('missing, broken, or from a newer version, is a lost state', () async {
+    test('missing, broken, or from a newer version, is nothing', () async {
       for (final source in [
         null,
         'garbage',
@@ -124,11 +125,8 @@ void main() {
         '{"version": 3, "data": "not a state"}',
       ]) {
         if (source != null) file.writeAsStringSync(source);
-        final before = DateTime.now().millisecondsSinceEpoch;
 
-        final state = await FileDeliveryStorage().load();
-
-        expect(state.seq, greaterThanOrEqualTo(before), reason: source);
+        expect(await FileDeliveryStorage().load(), isNull, reason: source);
       }
     });
   });
