@@ -95,14 +95,22 @@ class FakeSettingsStore implements SettingsStore {
     putProfile(vehicleId, ref, profile.source);
   }
 
-  @override
-  Future<void> deleteProfile(String vehicleId, ProfileRef ref) async =>
-      files.remove(SettingsStore.profileFileName(vehicleId, ref));
+  /// Makes deleting profile files fail with this.
+  Object? deleteError;
 
   @override
-  Future<void> deleteProfiles(String vehicleId) async => files.removeWhere(
-    (name, _) =>
-        name == 'profiles/$vehicleId.json' ||
-        name.startsWith('profiles/$vehicleId/'),
-  );
+  Future<void> deleteProfile(String vehicleId, ProfileRef ref) async {
+    if (deleteError case final error?) throw error;
+    files.remove(SettingsStore.profileFileName(vehicleId, ref));
+  }
+
+  @override
+  Future<void> deleteProfiles(String vehicleId) async {
+    if (deleteError case final error?) throw error;
+    files.removeWhere(
+      (name, _) =>
+          name == 'profiles/$vehicleId.json' ||
+          name.startsWith('profiles/$vehicleId/'),
+    );
+  }
 }

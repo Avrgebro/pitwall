@@ -78,6 +78,25 @@ class _WebhookFormState extends ConsumerState<_WebhookForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (settings.unreadable) ...[
+            InfoNote(
+              icon: Icons.error_outline,
+              tone: StatusTone.error,
+              text: const TextSpan(
+                text:
+                    'This phone couldn\'t read the saved webhook, so the form '
+                    'is empty. Try again, or enter it again to replace it.',
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _webhook.reload,
+                child: const Text('Try again'),
+              ),
+            ),
+            const SizedBox(height: Insets.s),
+          ],
           ContentCard(
             child: SecretTextField(
               controller: _url,

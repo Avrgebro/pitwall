@@ -156,15 +156,39 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   /// Removes the vehicle and its profile files; its last values follow.
   /// The settings go first: a profile file left behind does no harm, but
-  /// a vehicle whose file is gone would.
+  /// a vehicle whose file is gone would. So files that couldn't be deleted
+  /// are reported, not thrown: the vehicle is gone either way, and the
+  /// next start sweeps them.
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await _save(_current.withoutVehicle(id));
-    await _queued((store) async {
-      // Unless it was added back meanwhile, as by Undo.
-      if (_newest.vehicleById(id) == null) await store.deleteProfiles(id);
-    });
+    await _queued(
+      (store) => _reported(
+        'deleting the profile files of a deleted vehicle',
+        () => store.deleteProfiles(id),
+      ),
+    );
+  }
+
+  /// Runs [action], reporting a failure rather than throwing it, for work
+  /// whose failure leaves nothing wrong: a file left behind.
+  static Future<void> _reported(
+    String what,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } on Object catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'settings',
+          context: ErrorDescription('while $what'),
+        ),
+      );
+    }
   }
 
   /// Notes that the vehicle was connected to at [time], and what its
@@ -318,21 +342,27 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   /// Deletes the files of [refs] that the vehicle's settings, as written,
-  /// don't name.
+  /// don't name. Never throws: a file left behind does no harm, so the
+  /// change's own outcome stands, and the next start sweeps it.
   Future<void> _deleteUnnamed(String vehicleId, List<ProfileRef> refs) =>
-      _queued((store) async {
-        String? named(AppSettings settings) =>
-            switch (settings.vehicleById(vehicleId)?.profile) {
-              final ref? => SettingsStore.profileFileName(vehicleId, ref),
-              null => null,
-            };
-        final kept = {named(_onDisk), named(_newest)};
-        for (final ref in refs) {
-          if (!kept.contains(SettingsStore.profileFileName(vehicleId, ref))) {
-            await store.deleteProfile(vehicleId, ref);
-          }
-        }
-      });
+      _queued(
+        (store) =>
+            _reported('deleting a profile file no longer named', () async {
+              String? named(AppSettings settings) =>
+                  switch (settings.vehicleById(vehicleId)?.profile) {
+                    final ref? => SettingsStore.profileFileName(vehicleId, ref),
+                    null => null,
+                  };
+              final kept = {named(_onDisk), named(_newest)};
+              for (final ref in refs) {
+                if (!kept.contains(
+                  SettingsStore.profileFileName(vehicleId, ref),
+                )) {
+                  await store.deleteProfile(vehicleId, ref);
+                }
+              }
+            }),
+      );
 }
 
 /// One vehicle by id, or null if it doesn't exist (anymore).

@@ -698,6 +698,46 @@ void main() {
     });
   });
 
+  test('files that can\'t be deleted don\'t fail what was saved', () async {
+    final store =
+        FakeSettingsStore(
+            settings: const AppSettings(
+              vehicles: [
+                Vehicle(
+                  id: 'tucson',
+                  name: 'A',
+                  profile: ProfileRef('default.json'),
+                ),
+              ],
+            ),
+          )
+          ..putProfile(
+            'tucson',
+            const ProfileRef('default.json'),
+            testProfileJson,
+          )
+          ..deleteError = const FileSystemException('busy');
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    await container.read(appSettingsProvider.future);
+    final notifier = container.read(appSettingsProvider.notifier);
+    final reported = <FlutterErrorDetails>[];
+    final previous = FlutterError.onError;
+    FlutterError.onError = reported.add;
+    addTearDown(() => FlutterError.onError = previous);
+
+    // The import's settings land; the old file stays, and that's reported.
+    await notifier.importProfile(
+      'tucson',
+      const PickedFile(name: 'newer.json', contents: testProfileJson),
+    );
+    expect(store.settings.vehicleById('tucson')!.profile?.name, 'newer.json');
+
+    await notifier.deleteVehicle('tucson');
+    expect(store.settings.vehicles, isEmpty);
+    expect(reported, hasLength(2));
+  });
+
   test('a webhook that can\'t be read can be entered again', () async {
     final store = FakeSettingsStore()..webhookError = StateError('keystore');
     final container = ProviderContainer(overrides: testOverrides(store: store));
@@ -708,6 +748,21 @@ void main() {
 
     final settings = await container.read(webhookProvider.future);
     expect(settings.saved, WebhookTarget.none);
+    expect(settings.unreadable, isTrue);
+
+    // Read again once storage recovers, it's there.
+    store
+      ..webhookError = null
+      ..webhook = const WebhookTarget('https://example.com/api/webhook/old');
+    container.read(webhookProvider.notifier).reload();
+    final again = await container.read(webhookProvider.future);
+    expect(again.saved.url, 'https://example.com/api/webhook/old');
+    expect(again.unreadable, isFalse);
+    store
+      ..webhookError = StateError('keystore')
+      ..webhook = WebhookTarget.none;
+    container.read(webhookProvider.notifier).reload();
+    await container.read(webhookProvider.future);
 
     final notifier = container.read(webhookProvider.notifier);
     await notifier.editUrl('https://example.com/api/webhook/x');

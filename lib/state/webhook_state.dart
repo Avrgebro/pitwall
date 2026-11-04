@@ -15,7 +15,12 @@ class WebhookSettings {
     this.saved = WebhookTarget.none,
     WebhookTarget? draft,
     this.lastTest,
+    this.unreadable = false,
   }) : draft = draft ?? saved;
+
+  /// The saved webhook couldn't be read: the form starts empty, and
+  /// entering one replaces it. Saving one clears this.
+  final bool unreadable;
 
   /// What readings are sent to.
   final WebhookTarget saved;
@@ -44,8 +49,9 @@ final webhookProvider = AsyncNotifierProvider<WebhookNotifier, WebhookSettings>(
 );
 
 class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
-  /// A saved webhook that can't be read starts the form empty, so it can
-  /// be entered again: only saving replaces it, and only the user saves.
+  /// A saved webhook that can't be read starts the form empty and says so,
+  /// so it can be entered again, or read again ([reload]): only saving
+  /// replaces it, and only the user saves.
   @override
   Future<WebhookSettings> build() async {
     try {
@@ -61,9 +67,12 @@ class WebhookNotifier extends AsyncNotifier<WebhookSettings> {
           context: ErrorDescription('while reading the saved webhook'),
         ),
       );
-      return const WebhookSettings(saved: WebhookTarget.none);
+      return const WebhookSettings(unreadable: true);
     }
   }
+
+  /// Reads the saved webhook again, as after it couldn't be read.
+  void reload() => ref.invalidateSelf();
 
   /// Only read after the saved webhook has loaded (every edit awaits
   /// [future] first), so an early edit can't start from nothing and save

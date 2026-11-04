@@ -156,7 +156,19 @@ class VehicleDetailScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    // Taken before the page goes, and its ref with it.
+    final settings = ref.read(appSettingsProvider.notifier);
     context.pop();
-    await ref.read(appSettingsProvider.notifier).deleteVehicle(vehicle.id);
+    try {
+      await settings.deleteVehicle(vehicle.id);
+    } on Exception {
+      // The settings couldn't be saved, so the vehicle is back.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Couldn\'t delete ${vehicle.name} on this phone.'),
+        ),
+      );
+    }
   }
 }

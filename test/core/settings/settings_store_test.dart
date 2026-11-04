@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/profiles/stored_profile.dart';
@@ -124,5 +125,108 @@ void main() {
 
     expect(await store.loadProfile(vehicle), isA<LoadedProfile>());
     expect(File('${directory.path}/profiles/a1.json').existsSync(), isFalse);
+  });
+
+  group('a webhook that can\'t be understood', () {
+    const broken = '{"version": 99, "data": {}}';
+
+    test('is only read by deliveries, never moved', () async {
+      FlutterSecureStorage.setMockInitialValues({'webhook': broken});
+      const secrets = FlutterSecureStorage();
+
+      await expectLater(
+        SettingsStore(secrets: secrets).loadWebhook(),
+        throwsA(isA<UnreadableWebhookException>()),
+      );
+      expect(await secrets.read(key: 'webhook'), broken);
+    });
+
+    test('is set aside once, as the store loads', () async {
+      FlutterSecureStorage.setMockInitialValues({'webhook': broken});
+      const secrets = FlutterSecureStorage();
+      final store = SettingsStore(secrets: secrets);
+
+      await store.load();
+
+      expect(await secrets.read(key: 'webhook'), isNull);
+      expect(await secrets.read(key: 'webhook.unreadable'), broken);
+      expect(await store.loadWebhook(), WebhookTarget.none);
+    });
+  });
+
+  group('profile files, as the store loads', () {
+    late Directory directory;
+    setUp(() {
+      directory = useTemporaryAppFiles();
+      FlutterSecureStorage.setMockInitialValues({});
+    });
+    File file(String name) => File('${directory.path}/$name');
+
+    Future<SettingsStore> saved(String vehicles) async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'settings',
+        '{"version": 2, "data": {"vehicles": $vehicles}}',
+      );
+      return SettingsStore(preferences: preferences);
+    }
+
+    const tucson =
+        '[{"id": "a1", "name": "Tucson", "profileName": "default.json", '
+        '"profileImportedAt": "2026-11-01T10:00:00.000Z"}]';
+    final kept =
+        'profiles/a1/${DateTime.utc(2026, 11, 1, 10).microsecondsSinceEpoch}.json';
+
+    test('ones the settings don\'t name are swept', () async {
+      for (final name in [kept, 'profiles/a1/1.json', 'profiles/gone/2.json']) {
+        file(name)
+          ..createSync(recursive: true)
+          ..writeAsStringSync(testProfileJson);
+      }
+      final store = await saved(tucson);
+
+      await store.load();
+
+      expect(file(kept).existsSync(), isTrue);
+      expect(file('profiles/a1/1.json').existsSync(), isFalse);
+      expect(
+        Directory('${directory.path}/profiles/gone').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('none are swept when the settings couldn\'t be read', () async {
+      file('profiles/a1/1.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(testProfileJson);
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString('settings', '{"version": 99}');
+
+      await SettingsStore(preferences: preferences).load();
+
+      expect(file('profiles/a1/1.json').existsSync(), isTrue);
+    });
+
+    test('one that can\'t be moved fails only its own vehicle', () async {
+      file('profiles/a1.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(testProfileJson);
+      // Where its folder should go, a file: the move can't happen.
+      file('profiles/a1').writeAsStringSync('in the way');
+      final previous = FlutterError.onError;
+      final reported = <FlutterErrorDetails>[];
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = previous);
+      final store = await saved(tucson);
+
+      final settings = await store.load();
+
+      expect(settings.vehicles.single.name, 'Tucson');
+      expect(reported, isNotEmpty);
+      expect(
+        await store.loadProfile(settings.vehicles.single),
+        isA<UnreadableProfile>(),
+      );
+    });
   });
 }

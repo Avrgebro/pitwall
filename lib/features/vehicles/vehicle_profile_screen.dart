@@ -77,18 +77,32 @@ class VehicleProfileScreen extends ConsumerWidget {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(appSettingsProvider.notifier);
-    await notifier.removeProfile(vehicle.id);
+    void couldNot(String what) => messenger.showSnackBar(
+      SnackBar(content: Text('Couldn\'t $what on this phone. Try again.')),
+    );
+    try {
+      await notifier.removeProfile(vehicle.id);
+    } on Exception {
+      couldNot('remove the profile');
+      return;
+    }
     messenger.showSnackBar(
       SnackBar(
         content: const Text('Profile removed'),
         action: switch (stored) {
           final LoadedProfile profile => SnackBarAction(
             label: 'Undo',
-            onPressed: () => notifier.restoreProfile(
-              vehicle.id,
-              profile,
-              modelYear: vehicle.modelYear,
-            ),
+            onPressed: () async {
+              try {
+                await notifier.restoreProfile(
+                  vehicle.id,
+                  profile,
+                  modelYear: vehicle.modelYear,
+                );
+              } on Exception {
+                couldNot('put the profile back');
+              }
+            },
           ),
           NoProfile() || UnreadableProfile() => null,
         },
@@ -120,6 +134,9 @@ class VehicleProfileScreen extends ConsumerWidget {
           : 'That file isn\'t text.';
     } on FormatException catch (e) {
       message = 'That isn\'t an OBDb profile: ${e.message}';
+    } on Exception {
+      // Saving it failed: the file, or the settings naming it.
+      message = 'Couldn\'t save the profile on this phone. Try again.';
     }
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
