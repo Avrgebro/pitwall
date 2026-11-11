@@ -16,7 +16,36 @@ enum DeviceKind {
   uncategorized,
 
   /// Anything else, such as printers or toys.
-  other;
+  other,
+
+  /// A Bluetooth LE device named like an OBD adapter. Those carry no
+  /// device class, so their name is all there is to go by.
+  obdAdapter,
+
+  /// A Bluetooth LE device named like anything else: a watch, a TV, a tag.
+  bluetoothLe;
+
+  /// The kind for a Bluetooth LE device advertising [name].
+  factory DeviceKind.fromName(String name) {
+    final lower = name.toLowerCase();
+    return _adapterNames.any(lower.contains)
+        ? DeviceKind.obdAdapter
+        : DeviceKind.bluetoothLe;
+  }
+
+  /// What OBD adapters' names contain, such as "IOS-Vlink", "OBDII",
+  /// "vLinker MC+" or "Veepeak".
+  static const _adapterNames = [
+    'obd',
+    'elm',
+    'vlink',
+    'v-link',
+    'vgate',
+    'icar',
+    'veepeak',
+    'konnwei',
+    'carista',
+  ];
 
   /// The kind for a Bluetooth device class, as Android reports it.
   factory DeviceKind.fromClass(int deviceClass) {
@@ -53,7 +82,8 @@ enum DeviceRole {
     DeviceRole.adapter => switch (kind) {
       DeviceKind.uncategorized ||
       DeviceKind.peripheral ||
-      DeviceKind.other => true,
+      DeviceKind.other ||
+      DeviceKind.obdAdapter => true,
       _ => false,
     },
     DeviceRole.headUnit => kind == DeviceKind.carAudio,

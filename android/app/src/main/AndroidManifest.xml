@@ -2,8 +2,13 @@
     <!-- Sending readings to the webhook. Flutter's template only declares
          this for debug builds. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Connecting to paired OBD adapters (Android 12+). -->
+    <!-- Connecting to OBD adapters (Android 12+). -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Finding Bluetooth LE adapters nearby, which aren't paired. Never used
+         to find where the phone is. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <!-- The notification Android requires while working in the background. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Asking to be exempt from battery optimisation, from the background checks. -->

@@ -4,14 +4,16 @@ import '../../core/platform/permission_gateway.dart';
 /// Settings and setup.
 abstract final class PermissionText {
   static String title(AppPermission permission) => switch (permission) {
-    AppPermission.bluetooth => 'Bluetooth',
+    AppPermission.bluetooth => 'Nearby devices',
     AppPermission.notifications => 'Notifications',
     AppPermission.batteryOptimisation => 'Battery optimisation',
   };
 
   /// Why it's needed, for setup.
   static String purpose(AppPermission permission) => switch (permission) {
-    AppPermission.bluetooth => 'To talk to the adapter in your car.',
+    AppPermission.bluetooth =>
+      'To find the adapter in your car and talk to it. It\'s never used to '
+          'find where you are.',
     AppPermission.notifications =>
       'Android needs a small notification while Pitwall works in the '
           'background.',
@@ -26,7 +28,7 @@ abstract final class PermissionText {
     required bool granted,
   }) => switch (permission) {
     AppPermission.bluetooth => (
-      title: 'Bluetooth permission',
+      title: 'Nearby devices permission',
       status: granted
           ? 'Allowed'
           : 'Not allowed. Pitwall can\'t talk to the adapter.',

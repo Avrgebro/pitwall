@@ -6,7 +6,7 @@ import 'adapter_picker.dart';
 import 'vehicle_name_field.dart';
 
 /// A vehicle ready to save: its name, trimmed, and its adapter.
-typedef NewVehicle = ({String name, BondedDevice adapter});
+typedef NewVehicle = ({String name, BluetoothDevice adapter});
 
 /// What the user has entered for a new vehicle so far.
 @immutable
@@ -14,7 +14,7 @@ class VehicleDraft {
   const VehicleDraft({this.name = '', this.adapter});
 
   final String name;
-  final BondedDevice? adapter;
+  final BluetoothDevice? adapter;
 
   /// The vehicle to save, once it has a name and an adapter.
   NewVehicle? get complete => switch (adapter) {
@@ -28,7 +28,7 @@ class VehicleDraft {
   VehicleDraft withName(String name) =>
       VehicleDraft(name: name, adapter: adapter);
 
-  VehicleDraft withAdapter(BondedDevice adapter) =>
+  VehicleDraft withAdapter(BluetoothDevice adapter) =>
       VehicleDraft(name: name, adapter: adapter);
 }
 
@@ -47,7 +47,7 @@ class NewVehicleForm extends StatelessWidget {
 
   final VehicleDraft draft;
   final ValueChanged<String> onNameChanged;
-  final ValueChanged<BondedDevice> onAdapterChanged;
+  final ValueChanged<BluetoothDevice> onAdapterChanged;
 
   @override
   Widget build(BuildContext context) => Column(

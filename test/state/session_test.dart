@@ -242,7 +242,7 @@ void main() {
         .read(appSettingsProvider.notifier)
         .setAdapter(
           'tucson',
-          const BondedDevice(
+          const BluetoothDevice(
             name: 'IOS-Vlink',
             address: 'C0:FF:EE:00:00:01',
             type: AdapterType.ble,

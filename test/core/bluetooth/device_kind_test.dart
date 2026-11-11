@@ -20,4 +20,19 @@ void main() {
     expect(DeviceRole.headUnit.suits(DeviceKind.carAudio), isTrue);
     expect(DeviceRole.headUnit.suits(DeviceKind.uncategorized), isFalse);
   });
+
+  test('a Bluetooth LE device is told by its name', () {
+    for (final name in [
+      'IOS-Vlink',
+      'Android-Vlink',
+      'OBDII',
+      'vLinker MC+',
+      'Veepeak BLE+',
+    ]) {
+      expect(DeviceKind.fromName(name), DeviceKind.obdAdapter, reason: name);
+    }
+    expect(DeviceKind.fromName('Galaxy Watch'), DeviceKind.bluetoothLe);
+    expect(DeviceRole.adapter.suits(DeviceKind.obdAdapter), isTrue);
+    expect(DeviceRole.adapter.suits(DeviceKind.bluetoothLe), isFalse);
+  });
 }

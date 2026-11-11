@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../obd/obd_transport.dart';
 import '../platform/messages.g.dart';
+import '../platform/messages.g.dart' as pigeon show nearbyDevices;
 import 'adapter_type.dart';
 import 'bluetooth_gateway.dart';
 import 'device_kind.dart';
@@ -28,15 +29,26 @@ class AndroidBluetoothGateway implements BluetoothGateway {
   late final Stream<bool> enabled = bluetoothEnabled();
 
   @override
-  Future<List<BondedDevice>> bondedDevices() async => [
+  Future<List<BluetoothDevice>> bondedDevices() async => [
     for (final device in await _classic.bondedDevices())
-      BondedDevice(
+      BluetoothDevice(
         name: device.name,
         address: device.address,
         kind: DeviceKind.fromClass(device.deviceClass),
         type: AdapterType.classic,
       ),
   ];
+
+  /// Each listen starts a scan of its own, stopped when it's cancelled.
+  @override
+  Stream<BluetoothDevice> nearbyDevices() => pigeon.nearbyDevices().map(
+    (found) => BluetoothDevice(
+      name: found.name,
+      address: found.address,
+      kind: DeviceKind.fromName(found.name),
+      type: AdapterType.ble,
+    ),
+  );
 
   /// Connection numbers, which only go up, even after Dart restarts while
   /// Android carries on: they start from the time the gateway is made.

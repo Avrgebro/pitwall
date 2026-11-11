@@ -6,7 +6,12 @@ import 'device_kind.dart';
 /// controllers can be tested without a phone.
 abstract interface class BluetoothGateway {
   /// Devices paired in Android's Bluetooth settings.
-  Future<List<BondedDevice>> bondedDevices();
+  Future<List<BluetoothDevice>> bondedDevices();
+
+  /// Bluetooth LE devices nearby, each as it's found, for as long as the
+  /// stream is listened to: scanning stops when it's cancelled. Devices
+  /// without a name are left out.
+  Stream<BluetoothDevice> nearbyDevices();
 
   /// Starts connecting to the adapter at [address], of [type]. Only one
   /// connection is open at a time: connecting again closes the previous
@@ -17,9 +22,11 @@ abstract interface class BluetoothGateway {
   Stream<bool> get enabled;
 }
 
-/// A device paired with the phone in Android's Bluetooth settings.
-class BondedDevice {
-  const BondedDevice({
+/// A Bluetooth device the phone knows of: one paired in Android's
+/// Bluetooth settings, or a Bluetooth LE one found nearby, which needs no
+/// pairing.
+class BluetoothDevice {
+  const BluetoothDevice({
     required this.name,
     required this.address,
     this.kind = DeviceKind.uncategorized,

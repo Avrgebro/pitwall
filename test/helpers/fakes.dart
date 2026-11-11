@@ -60,7 +60,7 @@ class FakeBluetoothGateway implements BluetoothGateway {
 
   final bool bluetoothOn;
 
-  final List<BondedDevice> devices;
+  final List<BluetoothDevice> devices;
 
   /// Hands out a connection per attempt; null means the adapter can't be
   /// reached.
@@ -78,10 +78,29 @@ class FakeBluetoothGateway implements BluetoothGateway {
   final closedWhileOpening = <String>[];
 
   @override
-  Future<List<BondedDevice>> bondedDevices() async => devices;
+  Future<List<BluetoothDevice>> bondedDevices() async => devices;
 
   @override
   Stream<bool> get enabled => Stream.value(bluetoothOn);
+
+  /// Bluetooth LE devices "nearby", found one after another.
+  List<BluetoothDevice> nearby = const [];
+
+  /// Whether a scan is listened to now.
+  bool scanning = false;
+
+  @override
+  Stream<BluetoothDevice> nearbyDevices() {
+    late final StreamController<BluetoothDevice> controller;
+    controller = StreamController<BluetoothDevice>(
+      onListen: () {
+        scanning = true;
+        nearby.forEach(controller.add);
+      },
+      onCancel: () => scanning = false,
+    );
+    return controller.stream;
+  }
 
   /// The type each connect asked for, in order.
   final connectedTypes = <AdapterType>[];

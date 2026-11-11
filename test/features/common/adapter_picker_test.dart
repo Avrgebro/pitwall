@@ -11,13 +11,13 @@ import 'package:pitwall/ui/ui.dart';
 
 import '../../helpers/fakes.dart';
 
-const _adapter = BondedDevice(
+const _adapter = BluetoothDevice(
   name: 'vLinker MC+',
   address: 'A',
   type: AdapterType.classic,
 );
 
-BondedDevice _audio(int i) => BondedDevice(
+BluetoothDevice _audio(int i) => BluetoothDevice(
   name: 'Earbuds $i',
   address: 'E$i',
   kind: DeviceKind.audio,
@@ -26,16 +26,18 @@ BondedDevice _audio(int i) => BondedDevice(
 
 Future<void> _pump(
   WidgetTester tester,
-  List<BondedDevice> devices, {
+  List<BluetoothDevice> devices, {
   String? selected,
   String? Function(String address)? ownerOf,
   Map<AppPermission, bool>? permissions,
   DeviceRole role = DeviceRole.adapter,
+  FakeBluetoothGateway? bluetooth,
+  ValueChanged<BluetoothDevice>? onSelected,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: testOverrides(
-        bluetooth: FakeBluetoothGateway(devices: devices),
+        bluetooth: bluetooth ?? FakeBluetoothGateway(devices: devices),
         permissions: permissions,
       ),
       child: MaterialApp(
@@ -46,7 +48,7 @@ Future<void> _pump(
               selectedAddress: selected,
               role: role,
               ownerOf: ownerOf,
-              onSelected: (_) {},
+              onSelected: onSelected ?? (_) {},
             ),
           ),
         ),
@@ -157,7 +159,7 @@ void main() {
 
   testWidgets('a head unit shows just its address', (tester) async {
     await _pump(tester, [
-      const BondedDevice(
+      const BluetoothDevice(
         name: 'TUCSON BT',
         address: 'B',
         kind: DeviceKind.audio,
@@ -165,5 +167,72 @@ void main() {
       ),
     ], role: DeviceRole.headUnit);
     expect(find.text('B'), findsOneWidget);
+  });
+
+  group('Bluetooth LE adapters nearby', () {
+    const iCar = BluetoothDevice(
+      name: 'IOS-Vlink',
+      address: 'C0:FF:EE:00:00:01',
+      kind: DeviceKind.obdAdapter,
+      type: AdapterType.ble,
+    );
+    const watch = BluetoothDevice(
+      name: 'Galaxy Watch',
+      address: 'C0:FF:EE:00:00:02',
+      kind: DeviceKind.bluetoothLe,
+      type: AdapterType.ble,
+    );
+
+    testWidgets('join the paired ones, saying how they connect', (
+      tester,
+    ) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar, watch];
+      BluetoothDevice? chosen;
+      await _pump(
+        tester,
+        const [],
+        bluetooth: bluetooth,
+        onSelected: (device) => chosen = device,
+      );
+
+      expect(
+        find.text('Looking for Bluetooth LE adapters nearby'),
+        findsOneWidget,
+      );
+      expect(find.text('IOS-Vlink'), findsOneWidget);
+      expect(find.text('Bluetooth LE, C0:FF:EE:00:00:01'), findsOneWidget);
+      // Not named like an adapter: folded away with the other devices.
+      expect(find.text('Galaxy Watch'), findsNothing);
+
+      await tester.tap(find.text('IOS-Vlink'));
+      expect(chosen?.type, AdapterType.ble);
+    });
+
+    testWidgets('are looked for only while the picker is open', (tester) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar];
+      await _pump(tester, const [], bluetooth: bluetooth);
+      expect(bluetooth.scanning, isTrue);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+
+      expect(bluetooth.scanning, isFalse);
+    });
+
+    testWidgets('aren\'t looked for when choosing a head unit', (tester) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar];
+      await _pump(
+        tester,
+        const [],
+        bluetooth: bluetooth,
+        role: DeviceRole.headUnit,
+      );
+
+      expect(bluetooth.scanning, isFalse);
+      expect(find.text('IOS-Vlink'), findsNothing);
+    });
   });
 }

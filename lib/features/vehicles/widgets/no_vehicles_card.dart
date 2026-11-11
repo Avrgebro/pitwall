@@ -39,7 +39,12 @@ class NoVehiclesCard extends StatelessWidget {
                 'Plug the adapter into the car\'s OBD-II port',
                 detail: 'Any ELM327-compatible Bluetooth adapter works.',
               ),
-              NumberedStep('Pair it in your phone\'s Bluetooth settings'),
+              NumberedStep(
+                'Switch the ignition on',
+                detail:
+                    'A Bluetooth LE adapter shows up by itself. A classic one '
+                    'needs pairing in your phone\'s Bluetooth settings first.',
+              ),
               NumberedStep('Add it here'),
             ],
           ),

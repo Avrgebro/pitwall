@@ -426,6 +426,52 @@ class AdapterDropped extends AdapterEvent {
   }
 }
 
+/// A Bluetooth LE device found nearby, with the name it advertises.
+class FoundDeviceMessage {
+  FoundDeviceMessage({required this.name, required this.address});
+
+  String name;
+
+  String address;
+
+  List<Object?> _toList() {
+    return <Object?>[name, address];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static FoundDeviceMessage decode(Object result) {
+    result as List<Object?>;
+    return FoundDeviceMessage(
+      name: result[0]! as String,
+      address: result[1]! as String,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! FoundDeviceMessage || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(name, other.name) && _deepEquals(address, other.address);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'FoundDeviceMessage(name: $name, address: $address)';
+  }
+}
+
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -454,6 +500,9 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is AdapterDropped) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
+    } else if (value is FoundDeviceMessage) {
+      buffer.putUint8(136);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -476,6 +525,8 @@ class _PigeonCodec extends StandardMessageCodec {
         return AdapterBytes.decode(readValue(buffer)!);
       case 135:
         return AdapterDropped.decode(readValue(buffer)!);
+      case 136:
+        return FoundDeviceMessage.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -887,5 +938,28 @@ Stream<bool> bluetoothEnabled({String instanceName = ''}) {
   );
   return bluetoothEnabledChannel.receiveBroadcastStream().map((dynamic event) {
     return event as bool;
+  });
+}
+
+/// Bluetooth LE devices nearby, each time one is seen, while listened
+/// to: scanning stops when Dart stops listening. Devices without a name
+/// aren't sent. Fails with `disabled` or `permission`.
+///
+/// Returns a broadcast [Stream] of events from the `nearbyDevices` event channel.
+///
+/// Each call to this method creates a new [EventChannel], so it should
+/// not be called multiple times for the same `instanceName`. To deliver
+/// events to multiple listeners, call this method once and listen to the
+/// returned broadcast stream multiple times instead.
+Stream<FoundDeviceMessage> nearbyDevices({String instanceName = ''}) {
+  if (instanceName.isNotEmpty) {
+    instanceName = '.$instanceName';
+  }
+  final EventChannel nearbyDevicesChannel = EventChannel(
+    'dev.flutter.pigeon.pitwall.BluetoothEvents.nearbyDevices$instanceName',
+    pigeonMethodCodec,
+  );
+  return nearbyDevicesChannel.receiveBroadcastStream().map((dynamic event) {
+    return event as FoundDeviceMessage;
   });
 }

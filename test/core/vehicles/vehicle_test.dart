@@ -55,7 +55,7 @@ void main() {
   });
 
   test('a paired device becomes the adapter as it is', () {
-    const device = BondedDevice(
+    const device = BluetoothDevice(
       name: 'vLinker MC+',
       address: '00:1D:A5:68:98:8B',
       type: AdapterType.ble,

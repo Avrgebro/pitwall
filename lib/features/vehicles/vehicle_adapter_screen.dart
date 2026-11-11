@@ -6,7 +6,8 @@ import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
 import 'widgets/vehicle_page.dart';
 
-/// Picks which paired adapter belongs to this vehicle.
+/// Picks which adapter belongs to this vehicle: a paired one, or a
+/// Bluetooth LE one found nearby.
 class VehicleAdapterScreen extends ConsumerWidget {
   const VehicleAdapterScreen({super.key, required this.vehicleId});
 

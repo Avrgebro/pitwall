@@ -504,7 +504,7 @@ void main() {
           settings: const AppSettings(setupDone: true),
           bluetooth: FakeBluetoothGateway(
             devices: const [
-              BondedDevice(
+              BluetoothDevice(
                 name: 'OBDII',
                 address: 'A',
                 type: AdapterType.classic,

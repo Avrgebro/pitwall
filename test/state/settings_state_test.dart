@@ -71,7 +71,7 @@ void main() {
   });
 
   group('adapters', () {
-    const vlinker = BondedDevice(
+    const vlinker = BluetoothDevice(
       name: 'vLinker MC+',
       address: '00:1D:A5:68:98:8B',
       type: AdapterType.classic,
@@ -108,7 +108,7 @@ void main() {
           .read(appSettingsProvider.notifier)
           .addVehicle(
             name: 'Tucson',
-            adapter: const BondedDevice(
+            adapter: const BluetoothDevice(
               name: 'iCar Pro',
               address: 'C0:FF:EE:00:00:01',
               type: AdapterType.ble,

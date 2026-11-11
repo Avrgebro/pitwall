@@ -25,6 +25,7 @@ object EngineHolder {
         AdapterEventsStreamHandler.register(messenger, AdapterEvents)
         ClassicBluetoothChannel(appContext, messenger)
         BleChannel(appContext, messenger)
+        BleScanner(appContext, messenger)
         BluetoothStateChannel(appContext, messenger)
         ServiceBridge.attach(appContext, messenger)
         engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())

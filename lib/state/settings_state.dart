@@ -134,7 +134,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   /// Adds a vehicle named [name] whose adapter is [adapter].
   Future<Vehicle> addVehicle({
     required String name,
-    required BondedDevice adapter,
+    required BluetoothDevice adapter,
   }) async {
     final vehicle = _withAdapter(Vehicle.create(name: name.trim()), adapter);
     await _save(_current.withVehicle(vehicle));
@@ -158,7 +158,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> updateVehicle(
     String vehicleId, {
     required String name,
-    required BondedDevice adapter,
+    required BluetoothDevice adapter,
   }) async {
     await _modifyVehicle(
       vehicleId,
@@ -167,10 +167,10 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   /// Makes [adapter] the vehicle's adapter.
-  Future<void> setAdapter(String vehicleId, BondedDevice adapter) =>
+  Future<void> setAdapter(String vehicleId, BluetoothDevice adapter) =>
       _modifyVehicle(vehicleId, (v) => _withAdapter(v, adapter));
 
-  static Vehicle _withAdapter(Vehicle vehicle, BondedDevice adapter) =>
+  static Vehicle _withAdapter(Vehicle vehicle, BluetoothDevice adapter) =>
       vehicle.copyWith(adapter: VehicleAdapter.of(adapter));
 
   /// Removes the vehicle and its profile files; its last values follow.

@@ -11,21 +11,23 @@ import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
 import '../vehicle_text.dart';
 
-/// The paired devices as a single-choice list, used to pick an OBD
-/// adapter or the car's head unit. Devices that suit the [role] come first;
-/// the rest fold away under "Other devices". A long list gets a filter.
+/// Bluetooth devices as a single-choice list, used to pick an OBD adapter
+/// or the car's head unit. For an adapter, Bluetooth LE devices found
+/// nearby join the paired ones, as those need no pairing; a head unit is
+/// always paired. Devices that suit the [role] come first; the rest fold
+/// away under "Other devices". A long list gets a filter.
 class AdapterPicker extends ConsumerStatefulWidget {
   const AdapterPicker({
     super.key,
     required this.selectedAddress,
     required this.onSelected,
-    this.title = 'Paired adapters',
+    this.title = 'Adapters',
     this.role = DeviceRole.adapter,
     this.ownerOf,
   });
 
   final String? selectedAddress;
-  final ValueChanged<BondedDevice> onSelected;
+  final ValueChanged<BluetoothDevice> onSelected;
   final String title;
   final DeviceRole role;
 
@@ -33,7 +35,7 @@ class AdapterPicker extends ConsumerStatefulWidget {
   /// any. Those devices can't be chosen.
   final String? Function(String address)? ownerOf;
 
-  /// More paired devices than this, and the list gets a filter field.
+  /// More devices than this, and the list gets a filter field.
   static const filterAbove = 5;
 
   @override
@@ -46,7 +48,17 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final devices = ref.watch(pairedDevicesProvider);
+    // Looking for Bluetooth LE adapters only while choosing one.
+    final looks = widget.role == DeviceRole.adapter;
+    final nearby = looks ? ref.watch(nearbyDevicesProvider) : null;
+    final devices = switch (ref.watch(pairedDevicesProvider)) {
+      AsyncData(value: final paired) => AsyncData([
+        ...paired,
+        for (final device in nearby?.value ?? const <BluetoothDevice>[])
+          if (!paired.any((p) => p.address == device.address)) device,
+      ]),
+      final other => other,
+    };
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,16 +74,27 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Refresh',
-              onPressed: () => ref.invalidate(pairedDevicesProvider),
+              onPressed: () {
+                ref.invalidate(pairedDevicesProvider);
+                if (looks) ref.invalidate(nearbyDevicesProvider);
+              },
             ),
           ],
         ),
+        if (nearby case AsyncData()) ...[
+          const _Looking(),
+          const SizedBox(height: Insets.s),
+        ],
         switch (devices) {
-          AsyncData(:final value) when value.isEmpty => const InfoNote(
+          AsyncData(:final value) when value.isEmpty => InfoNote(
             text: TextSpan(
-              text:
-                  'No paired devices yet. Pair the adapter in Android\'s '
-                  'Bluetooth settings, then refresh.',
+              text: looks
+                  ? 'No adapters yet. A Bluetooth LE adapter shows up here '
+                        'once it\'s plugged in with the ignition on. A '
+                        'classic one needs pairing in Android\'s Bluetooth '
+                        'settings first.'
+                  : 'No paired devices yet. Pair it in Android\'s '
+                        'Bluetooth settings, then refresh.',
             ),
           ),
           AsyncData(:final value) => RadioGroup<String>(
@@ -99,7 +122,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
     );
   }
 
-  Widget _list(List<BondedDevice> devices) {
+  Widget _list(List<BluetoothDevice> devices) {
     final matches = [
       for (final device in devices)
         if (_query.matches([device.name, device.address])) device,
@@ -123,7 +146,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       open: _showOthers,
     );
 
-    Widget group(List<BondedDevice> list) => RowGroup(
+    Widget group(List<BluetoothDevice> list) => RowGroup(
       children: [
         for (final device in list)
           switch (widget.ownerOf?.call(device.address)) {
@@ -179,7 +202,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
 
   static String _describe(Object error) => switch (error) {
     BluetoothPermissionDenied() =>
-      'Pitwall needs the Bluetooth permission to see paired devices.',
+      'Pitwall needs the Nearby devices permission to find adapters.',
     PlatformException(code: 'disabled') => 'Bluetooth is off. Turn it on.',
     _ => 'Couldn\'t list Bluetooth devices.',
   };
@@ -187,11 +210,15 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
   static Future<void> _showPairingHelp(BuildContext context) => showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Pair the adapter first'),
+      title: const Text('Finding your adapter'),
       content: const Text(
-        'Plug the adapter in and switch the ignition on. Then open Android '
-        'Settings → Connected devices → Pair new device, and choose it. The '
-        'PIN is usually 1234 or 0000. Come back and refresh.',
+        'Plug the adapter in and switch the ignition on.\n\n'
+        'A Bluetooth LE adapter needs no pairing: it shows up here on its '
+        'own within a few seconds. If it doesn\'t, unplug it and plug it '
+        'back in.\n\n'
+        'A classic adapter needs pairing first: open Android Settings → '
+        'Connected devices → Pair new device, and choose it. The PIN is '
+        'usually 1234 or 0000. Come back and refresh.',
       ),
       actions: [
         TextButton(
@@ -201,4 +228,32 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
       ],
     ),
   );
+}
+
+/// Says the picker is still looking for Bluetooth LE adapters nearby.
+class _Looking extends StatelessWidget {
+  const _Looking();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(
+          Symbols.bluetooth_searching_rounded,
+          size: Sizes.iconSmall,
+          color: theme.colorScheme.primary,
+        ),
+        const SizedBox(width: Insets.s),
+        Expanded(
+          child: Text(
+            'Looking for Bluetooth LE adapters nearby',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

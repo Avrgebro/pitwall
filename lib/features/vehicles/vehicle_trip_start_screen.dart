@@ -92,7 +92,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
     WidgetRef ref,
     Vehicle vehicle,
   ) async {
-    final device = await showAppSheet<BondedDevice>(
+    final device = await showAppSheet<BluetoothDevice>(
       context,
       builder: (context) => AdapterPicker(
         title: 'Paired devices',

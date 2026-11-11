@@ -155,6 +155,14 @@ class AdapterDropped extends AdapterEvent {
   int connection;
 }
 
+/// A Bluetooth LE device found nearby, with the name it advertises.
+class FoundDeviceMessage {
+  FoundDeviceMessage({required this.name, required this.address});
+
+  String name;
+  String address;
+}
+
 /// What Android reports as it happens.
 @EventChannelApi()
 abstract class BluetoothEvents {
@@ -163,4 +171,9 @@ abstract class BluetoothEvents {
 
   /// Whether Bluetooth is on: now, then each change.
   bool bluetoothEnabled();
+
+  /// Bluetooth LE devices nearby, each time one is seen, while listened
+  /// to: scanning stops when Dart stops listening. Devices without a name
+  /// aren't sent. Fails with `disabled` or `permission`.
+  FoundDeviceMessage nearbyDevices();
 }

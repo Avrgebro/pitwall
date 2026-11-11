@@ -45,7 +45,7 @@ class VehicleAdapter {
 
   /// [device], chosen as the adapter. What it can do isn't known until
   /// it's connected to.
-  VehicleAdapter.of(BondedDevice device)
+  VehicleAdapter.of(BluetoothDevice device)
     : this(address: device.address, name: device.name, type: device.type);
 
   final String address;

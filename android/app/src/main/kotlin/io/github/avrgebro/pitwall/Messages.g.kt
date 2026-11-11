@@ -517,6 +517,51 @@ data class AdapterDropped (
     return "AdapterDropped(connection=$connection)"
   }
 }
+
+/**
+ * A Bluetooth LE device found nearby, with the name it advertises.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class FoundDeviceMessage (
+  val name: String,
+  val address: String
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): FoundDeviceMessage {
+      val name = pigeonVar_list[0] as String
+      val address = pigeonVar_list[1] as String
+      return FoundDeviceMessage(name, address)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      name,
+      address,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as FoundDeviceMessage
+    return MessagesPigeonUtils.deepEquals(this.name, other.name) && MessagesPigeonUtils.deepEquals(this.address, other.address)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.name)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.address)
+    return result
+  }
+  override fun toString(): String {
+    return "FoundDeviceMessage(name=$name, address=$address)"
+  }
+}
 private open class MessagesPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -555,6 +600,11 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
           AdapterDropped.fromList(it)
         }
       }
+      136.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          FoundDeviceMessage.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -586,6 +636,10 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       is AdapterDropped -> {
         stream.write(135)
+        writeValue(stream, value.toList())
+      }
+      is FoundDeviceMessage -> {
+        stream.write(136)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1019,6 +1073,23 @@ abstract class BluetoothEnabledStreamHandler : MessagesPigeonEventChannelWrapper
   }
 // Implement methods from MessagesPigeonEventChannelWrapper
 override fun onListen(p0: Any?, sink: PigeonEventSink<Boolean>) {}
+
+override fun onCancel(p0: Any?) {}
+}
+      
+abstract class NearbyDevicesStreamHandler : MessagesPigeonEventChannelWrapper<FoundDeviceMessage> {
+  companion object {
+    fun register(messenger: BinaryMessenger, streamHandler: NearbyDevicesStreamHandler, instanceName: String = "") {
+      var channelName: String = "dev.flutter.pigeon.pitwall.BluetoothEvents.nearbyDevices"
+      if (instanceName.isNotEmpty()) {
+        channelName += ".$instanceName"
+      }
+      val internalStreamHandler = MessagesPigeonStreamHandler<FoundDeviceMessage>(streamHandler)
+      EventChannel(messenger, channelName, MessagesPigeonMethodCodec).setStreamHandler(internalStreamHandler)
+    }
+  }
+// Implement methods from MessagesPigeonEventChannelWrapper
+override fun onListen(p0: Any?, sink: PigeonEventSink<FoundDeviceMessage>) {}
 
 override fun onCancel(p0: Any?) {}
 }
