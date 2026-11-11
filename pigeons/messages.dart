@@ -112,6 +112,30 @@ abstract class ClassicBluetoothApi {
   void disconnect(int connection);
 }
 
+/// Bluetooth LE adapters, called from Dart. Failures arrive as errors coded
+/// `unavailable`, `disabled`, `permission`, `connect_failed` or
+/// `write_failed`.
+///
+/// Connections are numbered by Dart as for [ClassicBluetoothApi], with the
+/// same rules, and report through the same `adapterEvents`. An adapter's
+/// GATT service is found by what its characteristics do: one that notifies,
+/// for replies, and one that takes writes, for commands.
+@HostApi()
+abstract class BleApi {
+  /// Opens connection [connection] to the adapter at [address], closing any
+  /// other Bluetooth LE connection, even if it then fails. Done once its
+  /// replies are switched on, so it's ready for commands.
+  @async
+  void connect(int connection, String address);
+
+  /// Sends [bytes], split to what the adapter takes in one write.
+  @async
+  void write(int connection, Uint8List bytes);
+
+  /// Closes the connection, or the attempt to make it, at once.
+  void disconnect(int connection);
+}
+
 /// Something from an adapter connection.
 sealed class AdapterEvent {}
 

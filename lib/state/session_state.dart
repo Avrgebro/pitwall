@@ -111,8 +111,8 @@ class SessionController extends Notifier<SessionState> {
       case SessionIdle():
         break;
     }
-    final address = vehicle.adapter?.address;
-    if (address == null) return const StepRefused(Refusal.noAdapter);
+    final vehicleAdapter = vehicle.adapter;
+    if (vehicleAdapter == null) return const StepRefused(Refusal.noAdapter);
     final connection = _Connection(vehicle.id);
     _connection = connection;
     state = SessionConnecting(vehicle.id);
@@ -127,7 +127,9 @@ class SessionController extends Notifier<SessionState> {
         .check(AppPermission.bluetooth);
     if (!_isCurrent(connection)) return abandoned;
     if (!granted) return _lost(ConnectionProblem.permissionDenied);
-    final adapter = ref.read(bluetoothGatewayProvider).connect(address);
+    final adapter = ref
+        .read(bluetoothGatewayProvider)
+        .connect(vehicleAdapter.address, vehicleAdapter.type);
     connection.asked(adapter);
     final ObdTransport transport;
     try {

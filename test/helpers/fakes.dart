@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
@@ -82,10 +83,14 @@ class FakeBluetoothGateway implements BluetoothGateway {
   @override
   Stream<bool> get enabled => Stream.value(bluetoothOn);
 
+  /// The type each connect asked for, in order.
+  final connectedTypes = <AdapterType>[];
+
   @override
-  AdapterConnection connect(String address) {
+  AdapterConnection connect(String address, AdapterType type) {
     attempts++;
     connected.add(address);
+    connectedTypes.add(type);
     return _FakeConnection(
       adapter?.call(address),
       opening,

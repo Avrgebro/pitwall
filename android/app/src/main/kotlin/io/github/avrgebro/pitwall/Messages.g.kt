@@ -855,6 +855,102 @@ interface ClassicBluetoothApi {
     }
   }
 }
+/**
+ * Bluetooth LE adapters, called from Dart. Failures arrive as errors coded
+ * `unavailable`, `disabled`, `permission`, `connect_failed` or
+ * `write_failed`.
+ *
+ * Connections are numbered by Dart as for [ClassicBluetoothApi], with the
+ * same rules, and report through the same `adapterEvents`. An adapter's
+ * GATT service is found by what its characteristics do: one that notifies,
+ * for replies, and one that takes writes, for commands.
+ *
+ * Generated interface from Pigeon that represents a handler of messages from Flutter.
+ */
+interface BleApi {
+  /**
+   * Opens connection [connection] to the adapter at [address], closing any
+   * other Bluetooth LE connection, even if it then fails. Done once its
+   * replies are switched on, so it's ready for commands.
+   */
+  suspend fun connect(connection: Long, address: String)
+  /** Sends [bytes], split to what the adapter takes in one write. */
+  suspend fun write(connection: Long, bytes: ByteArray)
+  /** Closes the connection, or the attempt to make it, at once. */
+  fun disconnect(connection: Long)
+
+  companion object {
+    /** The codec used by BleApi. */
+    val codec: MessageCodec<Any?> by lazy {
+      MessagesPigeonCodec()
+    }
+    /** Sets up an instance of `BleApi` to handle messages through the `binaryMessenger`. */
+    @JvmOverloads
+    fun setUp(binaryMessenger: BinaryMessenger, api: BleApi?, messageChannelSuffix: String = "") {
+      val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.BleApi.connect$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val connectionArg = args[0] as Long
+            val addressArg = args[1] as String
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                api.connect(connectionArg, addressArg)
+                listOf(null)
+              } catch (exception: Throwable) {
+                MessagesPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.BleApi.write$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val connectionArg = args[0] as Long
+            val bytesArg = args[1] as ByteArray
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                api.write(connectionArg, bytesArg)
+                listOf(null)
+              } catch (exception: Throwable) {
+                MessagesPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.BleApi.disconnect$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val connectionArg = args[0] as Long
+            val wrapped: List<Any?> = try {
+              api.disconnect(connectionArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+    }
+  }
+}
 
 private class MessagesPigeonStreamHandler<T>(
     val wrapper: MessagesPigeonEventChannelWrapper<T>

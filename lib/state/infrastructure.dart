@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../core/bluetooth/android_bluetooth.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
-import '../core/bluetooth/classic_bluetooth.dart';
 import '../core/logging/adapter_log.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/platform/permission_gateway.dart';
@@ -20,7 +20,7 @@ import '../core/webhook/webhook_sender.dart';
 final settingsStoreProvider = Provider<SettingsStore>((ref) => SettingsStore());
 
 final bluetoothGatewayProvider = Provider<BluetoothGateway>(
-  (ref) => ClassicBluetoothGateway(),
+  (ref) => AndroidBluetoothGateway(),
 );
 
 /// Whether Bluetooth is on, kept current.

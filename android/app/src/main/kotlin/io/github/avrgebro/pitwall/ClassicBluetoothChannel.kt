@@ -4,8 +4,6 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,32 +23,20 @@ import kotlinx.coroutines.CancellationException
  * reader on its own.
  */
 class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
-    ClassicBluetoothApi, AdapterEventsStreamHandler() {
+    ClassicBluetoothApi {
 
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
-    private val main = Handler(Looper.getMainLooper())
 
     // Connects and writes run one at a time, off the main thread. Closing
     // doesn't queue: closing a socket interrupts what's blocked on it.
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val io = Dispatchers.IO.limitedParallelism(1)
 
-    private val connections = Connections()
-
-    private var events: PigeonEventSink<AdapterEvent>? = null
+    private val connections = Connections<BluetoothSocket>()
 
     init {
         ClassicBluetoothApi.setUp(messenger, this)
-        register(messenger, this)
-    }
-
-    override fun onListen(p0: Any?, sink: PigeonEventSink<AdapterEvent>) {
-        events = sink
-    }
-
-    override fun onCancel(p0: Any?) {
-        events = null
     }
 
     override fun bondedDevices(): List<BondedDeviceMessage> {
@@ -77,7 +63,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             throw FlutterError("connect_failed", "Not a Bluetooth address")
         }
-        val opening = Connection(connection)
+        val opening = Connection<BluetoothSocket>(connection)
         connections.begin(opening)
         try {
             val device = adapter.getRemoteDevice(address)
@@ -106,9 +92,12 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
      * a disconnect can close it. A socket that doesn't connect, for any
      * reason, is closed.
      */
-    private fun open(connection: Connection, create: () -> BluetoothSocket): BluetoothSocket {
+    private fun open(
+        connection: Connection<BluetoothSocket>,
+        create: () -> BluetoothSocket,
+    ): BluetoothSocket {
         val socket = create()
-        connection.socket = socket
+        connection.resource = socket
         try {
             if (connection.closed) throw IOException("Disconnected while connecting")
             socket.connect()
@@ -125,7 +114,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
 
     override suspend fun write(connection: Long, bytes: ByteArray): Unit = withContext(io) {
         try {
-            val socket = connections.live(connection)?.socket
+            val socket = connections.live(connection)?.resource
                 ?: throw IOException("Not connected")
             val out = socket.outputStream
             out.write(bytes)
@@ -137,7 +126,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
 
     override fun disconnect(connection: Long) = connections.closedByDart(connection)
 
-    private fun startReading(connection: Connection, socket: BluetoothSocket) = Thread {
+    private fun startReading(connection: Connection<BluetoothSocket>, socket: BluetoothSocket) = Thread {
         val buffer = ByteArray(1024)
         try {
             val input = socket.inputStream
@@ -145,7 +134,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
                 val count = input.read(buffer)
                 if (count < 0) break
                 val chunk = buffer.copyOf(count)
-                main.post { events?.success(AdapterBytes(connection.id, chunk)) }
+                AdapterEvents.bytes(connection.id, chunk)
             }
         } catch (_: IOException) {
             // Reading fails when the link drops or the connection is closed.
@@ -155,7 +144,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
         if (!connection.closed) {
             connections.ended(connection)
             connection.close()
-            main.post { events?.success(AdapterDropped(connection.id)) }
+            AdapterEvents.dropped(connection.id)
         }
     }.apply { isDaemon = true }.start()
 

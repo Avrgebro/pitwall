@@ -22,7 +22,9 @@ object EngineHolder {
         // Plugins register themselves when the engine is created.
         val engine = FlutterEngine(appContext)
         val messenger = engine.dartExecutor.binaryMessenger
+        AdapterEventsStreamHandler.register(messenger, AdapterEvents)
         ClassicBluetoothChannel(appContext, messenger)
+        BleChannel(appContext, messenger)
         BluetoothStateChannel(appContext, messenger)
         ServiceBridge.attach(appContext, messenger)
         engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())

@@ -1,14 +1,17 @@
 package io.github.avrgebro.pitwall
 
-import android.bluetooth.BluetoothSocket
+import java.io.Closeable
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-/** A connection being made, or made: its number, and its socket once one exists. */
-internal class Connection(val id: Long) {
+/**
+ * A connection being made, or made: its number, and what it holds once
+ * that exists, such as a socket, closed with it.
+ */
+internal class Connection<R : Closeable>(val id: Long) {
     @Volatile
-    var socket: BluetoothSocket? = null
+    var resource: R? = null
 
     @Volatile
     var closed = false
@@ -17,7 +20,7 @@ internal class Connection(val id: Long) {
     fun close() {
         closed = true
         try {
-            socket?.close()
+            resource?.close()
         } catch (_: IOException) {
         }
     }
@@ -32,8 +35,8 @@ internal class Connection(val id: Long) {
  * every earlier one too, and a connect that becomes current after Dart
  * closed its number, as one queued behind a slow one can, closes itself.
  */
-internal class Connections {
-    private val current = AtomicReference<Connection?>(null)
+internal class Connections<R : Closeable> {
+    private val current = AtomicReference<Connection<R>?>(null)
     private val closedThrough = AtomicLong(Long.MIN_VALUE)
 
     /** Closes whatever is current: connecting replaces it. */
@@ -46,13 +49,13 @@ internal class Connections {
      * already closed its number: either this sees Dart's close, or the
      * close sees this connection.
      */
-    fun begin(connection: Connection) {
+    fun begin(connection: Connection<R>) {
         current.getAndSet(connection)?.close()
         if (connection.id <= closedThrough.get()) connection.close()
     }
 
     /** The current connection, if it's numbered [id] and still open. */
-    fun live(id: Long): Connection? = current.get()?.takeIf { it.id == id && !it.closed }
+    fun live(id: Long): Connection<R>? = current.get()?.takeIf { it.id == id && !it.closed }
 
     /** Dart closed connection [id], and with it every earlier one. */
     fun closedByDart(id: Long) {
@@ -63,7 +66,7 @@ internal class Connections {
     }
 
     /** [connection] dropped, or failed to open: it's current no longer. */
-    fun ended(connection: Connection) {
+    fun ended(connection: Connection<R>) {
         current.compareAndSet(connection, null)
     }
 }

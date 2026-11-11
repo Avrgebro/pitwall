@@ -8,9 +8,10 @@ abstract interface class BluetoothGateway {
   /// Devices paired in Android's Bluetooth settings.
   Future<List<BondedDevice>> bondedDevices();
 
-  /// Starts connecting to the adapter at [address]. Only one connection
-  /// is open at a time: connecting again closes the previous one.
-  AdapterConnection connect(String address);
+  /// Starts connecting to the adapter at [address], of [type]. Only one
+  /// connection is open at a time: connecting again closes the previous
+  /// one.
+  AdapterConnection connect(String address, AdapterType type);
 
   /// Whether Bluetooth is on: the current state, then each change.
   Stream<bool> get enabled;

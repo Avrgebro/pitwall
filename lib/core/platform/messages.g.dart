@@ -758,6 +758,95 @@ class ClassicBluetoothApi {
   }
 }
 
+/// Bluetooth LE adapters, called from Dart. Failures arrive as errors coded
+/// `unavailable`, `disabled`, `permission`, `connect_failed` or
+/// `write_failed`.
+///
+/// Connections are numbered by Dart as for [ClassicBluetoothApi], with the
+/// same rules, and report through the same `adapterEvents`. An adapter's
+/// GATT service is found by what its characteristics do: one that notifies,
+/// for replies, and one that takes writes, for commands.
+class BleApi {
+  /// Constructor for [BleApi]. The [binaryMessenger] named argument is
+  /// available for dependency injection. If it is left null, the default
+  /// BinaryMessenger will be used which routes to the host platform.
+  BleApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+    : pigeonVar_binaryMessenger = binaryMessenger,
+      pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+          ? '.$messageChannelSuffix'
+          : '';
+
+  final BinaryMessenger? pigeonVar_binaryMessenger;
+  static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
+
+  final String pigeonVar_messageChannelSuffix;
+
+  /// Opens connection [connection] to the adapter at [address], closing any
+  /// other Bluetooth LE connection, even if it then fails. Done once its
+  /// replies are switched on, so it's ready for commands.
+  Future<void> connect(int connection, String address) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.BleApi.connect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection, address],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  /// Sends [bytes], split to what the adapter takes in one write.
+  Future<void> write(int connection, Uint8List bytes) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.BleApi.write$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection, bytes],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  /// Closes the connection, or the attempt to make it, at once.
+  Future<void> disconnect(int connection) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.BleApi.disconnect$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[connection],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+}
+
 /// What Android reports as it happens.
 /// Every adapter connection's events, each with its number.
 ///

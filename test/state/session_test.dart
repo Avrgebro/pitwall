@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
+import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -224,6 +225,33 @@ void main() {
     final live = c.read(sessionProvider) as SessionConnected;
     expect(live.carState, CarState.off);
     expect(live.supportedPids, isEmpty);
+  });
+
+  test('a Bluetooth LE adapter is connected to as one', () async {
+    final c = await start();
+    const bluetoothLe = Vehicle(
+      id: 'tucson',
+      name: 'Tucson',
+      adapter: VehicleAdapter(
+        address: 'C0:FF:EE:00:00:01',
+        name: 'IOS-Vlink',
+        type: AdapterType.ble,
+      ),
+    );
+    await c
+        .read(appSettingsProvider.notifier)
+        .setAdapter(
+          'tucson',
+          const BondedDevice(
+            name: 'IOS-Vlink',
+            address: 'C0:FF:EE:00:00:01',
+            type: AdapterType.ble,
+          ),
+        );
+
+    await c.read(sessionProvider.notifier).connect(bluetoothLe);
+
+    expect(bluetooth.connectedTypes, [AdapterType.ble]);
   });
 
   test('a reading says which vehicle it was for', () async {
