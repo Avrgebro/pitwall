@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../core/bluetooth/adapter_type.dart';
 import '../../../core/bluetooth/bluetooth_gateway.dart';
 import '../../../core/bluetooth/device_kind.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/format/text_query.dart';
 import '../../../state/bluetooth_state.dart';
 import '../../../ui/ui.dart';
+import 'adapter_type_tag.dart';
 
 /// Bluetooth devices as a single-choice list, used to pick an OBD adapter
 /// or the car's head unit. For an adapter, Bluetooth LE devices found
@@ -162,7 +162,7 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
               subtitle: device.address,
               // How it connects matters for an adapter, not a stereo.
               badge: switch (widget.role) {
-                DeviceRole.adapter => _TypeBadge(device.type),
+                DeviceRole.adapter => AdapterTypeTag(device.type),
                 DeviceRole.headUnit => null,
               },
             ),
@@ -257,23 +257,4 @@ class _Looking extends StatelessWidget {
       ],
     );
   }
-}
-
-/// How an adapter connects, as a small badge by its name.
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge(this.type);
-
-  final AdapterType type;
-
-  @override
-  Widget build(BuildContext context) => Tag(
-    switch (type) {
-      AdapterType.ble => 'BLE',
-      AdapterType.classic => 'Classic',
-    },
-    tone: switch (type) {
-      AdapterType.ble => StatusTone.active,
-      AdapterType.classic => StatusTone.neutral,
-    },
-  );
 }

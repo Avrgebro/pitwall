@@ -1,13 +1,4 @@
-import '../../core/bluetooth/adapter_type.dart';
 import '../../core/vehicles/vehicle.dart';
-
-/// How an adapter connects, in words.
-extension AdapterTypeText on AdapterType {
-  String get label => switch (this) {
-    AdapterType.classic => 'Classic',
-    AdapterType.ble => 'Bluetooth LE',
-  };
-}
 
 /// What a vehicle needs, in words.
 extension VehicleNeedText on VehicleNeed {

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/status_colors.dart';
+import '../theme/tokens.dart';
 import 'app_row.dart';
 
 /// The common [AppRow]: an accent icon, a title, a one-line subtitle, and
@@ -14,6 +15,7 @@ class GroupTile extends StatelessWidget {
     required this.title,
     this.icon,
     this.subtitle,
+    this.subtitleTag,
     this.subtitleTone,
     this.trailing,
     this.onTap,
@@ -28,6 +30,7 @@ class GroupTile extends StatelessWidget {
     required VoidCallback this.onTap,
     this.icon,
     this.subtitle,
+    this.subtitleTag,
     this.subtitleTone,
     this.tone,
   }) : trailing = null,
@@ -36,6 +39,10 @@ class GroupTile extends StatelessWidget {
   final String title;
   final IconData? icon;
   final String? subtitle;
+
+  /// A small label right after the subtitle, such as a [Tag], for a fact
+  /// about what the subtitle names.
+  final Widget? subtitleTag;
 
   /// Colours the subtitle, e.g. error for "1 needs fixing".
   final StatusTone? subtitleTone;
@@ -49,7 +56,17 @@ class GroupTile extends StatelessWidget {
     title: title,
     tone: tone,
     leading: icon == null ? null : Icon(icon),
-    subtitle: subtitle == null ? null : Text(subtitle!),
+    subtitle: switch ((subtitle, subtitleTag)) {
+      (null, _) => null,
+      (final text?, null) => Text(text),
+      (final text?, final tag?) => Row(
+        children: [
+          Flexible(child: Text(text)),
+          const SizedBox(width: Insets.s),
+          tag,
+        ],
+      ),
+    },
     subtitleTone: subtitleTone,
     trailing: trailing,
     opensPage: _opensPage && onTap != null && trailing == null,

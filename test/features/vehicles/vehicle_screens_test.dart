@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/readings/unreported.dart';
@@ -88,6 +89,39 @@ void main() {
       find.text('The car didn\'t answer its request, 3 min ago'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the adapter shows its name, with how it connects as a tag', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          settings: const AppSettings(
+            vehicles: [
+              Vehicle(
+                id: 'tucson',
+                name: 'Tucson',
+                adapter: VehicleAdapter(
+                  address: 'C0:FF:EE:00:00:01',
+                  name: 'IOS-Vlink',
+                  type: AdapterType.ble,
+                ),
+              ),
+            ],
+          ),
+        ),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const VehicleDetailScreen(vehicleId: 'tucson'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('IOS-Vlink'), findsOneWidget);
+    expect(find.text('BLE'), findsOneWidget);
+    expect(find.textContaining('Bluetooth LE'), findsNothing);
   });
 
   group('with a profile', () {

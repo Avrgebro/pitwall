@@ -11,7 +11,7 @@ import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
 import '../common/trip_start_text.dart';
-import '../common/vehicle_text.dart';
+import '../common/widgets/adapter_type_tag.dart';
 import 'widgets/vehicle_page.dart';
 
 /// One vehicle's overview: a row per setting, each opening its own page.
@@ -52,7 +52,11 @@ class VehicleDetailScreen extends ConsumerWidget {
             GroupTile(
               icon: Symbols.bluetooth_rounded,
               title: 'Adapter',
-              subtitle: _adapterSummary(vehicle),
+              subtitle: vehicle.adapter?.name ?? 'Not chosen yet',
+              subtitleTag: switch (vehicle.adapter) {
+                final adapter? => AdapterTypeTag(adapter.type),
+                null => null,
+              },
               subtitleTone: vehicle.needs.contains(VehicleNeed.adapter)
                   ? StatusTone.error
                   : null,
@@ -99,11 +103,6 @@ class VehicleDetailScreen extends ConsumerWidget {
       ],
     );
   }
-
-  static String _adapterSummary(Vehicle vehicle) => switch (vehicle.adapter) {
-    null => 'Not chosen yet',
-    final adapter => '${adapter.name} (${adapter.type.label})',
-  };
 
   static ({String text, bool problem}) _profileSummary(VehicleValues values) =>
       switch ((values.stored, values.profile)) {
