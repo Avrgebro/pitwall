@@ -250,7 +250,7 @@ class SessionController extends Notifier<SessionState> {
   /// first, when the count changes, and every [troubleCodesInterval]. A
   /// failure to read them never fails the reading: the codes known are
   /// kept, and only a dropped adapter goes on as one.
-  Future<TroubleCodes?> _troubleCodes(
+  Future<TroubleCodesRead?> _troubleCodes(
     _Connection connection,
     Elm327 elm,
   ) async {
@@ -262,16 +262,22 @@ class SessionController extends Notifier<SessionState> {
       if (known != null &&
           known.count == light.count &&
           now.difference(known.at) < troubleCodesInterval) {
-        return known.codes.withLight(light.checkEngine);
+        // The light is new; the codes are as read then.
+        return (codes: known.codes.withLight(light.checkEngine), at: known.at);
       }
       final codes = await readTroubleCodes(elm, light: light);
       connection.codes = (codes: codes, count: light.count, at: now);
       if (known == null || known.codes != codes) log.note(_describe(codes));
-      return codes;
+      return (codes: codes, at: now);
     } on ElmException catch (e) {
       if (e.error == ElmError.disconnected) rethrow;
+      // A reply that comes late is waited for by the next command; see
+      // Elm327. The codes known are kept, as read when they were.
       log.note('Couldn\'t read the trouble codes', warning: true);
-      return known?.codes;
+      return switch (known) {
+        final known? => (codes: known.codes, at: known.at),
+        null => null,
+      };
     }
   }
 

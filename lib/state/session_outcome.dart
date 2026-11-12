@@ -78,9 +78,9 @@ final class VehicleReading {
   final Vehicle vehicle;
   final CarReading reading;
 
-  /// The car's trouble codes as last read, if the vehicle sends them and
-  /// the car answered.
-  final TroubleCodes? troubleCodes;
+  /// The car's trouble codes as last read, and when, if the vehicle sends
+  /// them and the car answered.
+  final TroubleCodesRead? troubleCodes;
 }
 
 /// How asking the car something ended: done with what it said.

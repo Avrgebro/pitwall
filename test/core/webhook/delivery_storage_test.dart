@@ -60,7 +60,11 @@ void main() {
       timestamp: DateTime.utc(2026, 11, 2),
       values: const {},
       connected: true,
-      troubleCodes: const TroubleCodes(checkEngine: true, stored: ['P0133']),
+      // Read before this reading, which didn't read them again.
+      troubleCodes: (
+        codes: const TroubleCodes(checkEngine: true, stored: ['P0133']),
+        at: DateTime.utc(2026, 11, 1, 23, 55),
+      ),
     );
 
     expect(withCodes.toPayload()['trouble_codes'], {
@@ -68,6 +72,7 @@ void main() {
       'stored': ['P0133'],
       'pending': <String>[],
       'permanent': <String>[],
+      'read_at': '2026-11-01T23:55:00Z',
     });
     final back = QueuedReading.fromJson(
       jsonDecode(jsonEncode(withCodes.toJson())) as Map<String, Object?>,

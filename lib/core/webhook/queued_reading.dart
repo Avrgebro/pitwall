@@ -25,8 +25,8 @@ class QueuedReading {
   final bool connected;
   final bool? engineRunning;
 
-  /// The trouble codes as last read, if the vehicle sends them.
-  final TroubleCodes? troubleCodes;
+  /// The trouble codes as last read, and when, if the vehicle sends them.
+  final TroubleCodesRead? troubleCodes;
 
   /// The JSON body to post.
   Map<String, Object?> toPayload() => buildPayload(
@@ -46,7 +46,8 @@ class QueuedReading {
     'values': values,
     'connected': connected,
     'engineRunning': engineRunning,
-    'troubleCodes': ?troubleCodes?.toJson(),
+    'troubleCodes': ?troubleCodes?.codes.toJson(),
+    'troubleCodesAt': ?troubleCodes?.at.toUtc().toIso8601String(),
   };
 
   /// Null if [json] isn't a stored reading.
@@ -74,7 +75,14 @@ class QueuedReading {
           _ => null,
         },
         troubleCodes: switch (json['troubleCodes']) {
-          final Map<String, Object?> codes => TroubleCodes.fromJson(codes),
+          final Map<String, Object?> codes => (
+            codes: TroubleCodes.fromJson(codes),
+            // Queued before the time was kept: no later than the reading.
+            at: switch (json['troubleCodesAt']) {
+              final String at => DateTime.tryParse(at) ?? time,
+              _ => time,
+            },
+          ),
           _ => null,
         },
       );

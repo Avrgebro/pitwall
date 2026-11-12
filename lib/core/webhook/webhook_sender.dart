@@ -119,7 +119,7 @@ class WebhookSender {
     required Map<String, double> values,
     required bool connected,
     bool? engineRunning,
-    TroubleCodes? troubleCodes,
+    TroubleCodesRead? troubleCodes,
   }) async {
     _seq = max(_seq + 1, _clock().millisecondsSinceEpoch);
     final reading = QueuedReading(

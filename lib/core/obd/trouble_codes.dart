@@ -77,6 +77,10 @@ class TroubleCodes {
   );
 }
 
+/// Trouble codes and when they were read: kept on through readings that
+/// don't read them again, so they're never passed off as read since.
+typedef TroubleCodesRead = ({TroubleCodes codes, DateTime at});
+
 /// The check-engine light and how many confirmed codes there are, from
 /// every module's reply to `0101`: the light is on if any module turned it
 /// on, and the count is all of theirs.

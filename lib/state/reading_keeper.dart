@@ -23,13 +23,6 @@ class ReadingKeeper {
   /// failing disk can't hold it.
   Future<ReadOutcome> readAndKeep() async {
     final outcome = await _ref.read(sessionProvider.notifier).read();
-    if (outcome case StepDone(
-      value: VehicleReading(:final vehicle, troubleCodes: final codes?),
-    )) {
-      await _ref
-          .read(lastValuesProvider.notifier)
-          .recordTroubleCodes(vehicle.id, codes, DateTime.now());
-    }
     switch (outcome) {
       case StepDone(
         value: VehicleReading(
@@ -43,12 +36,19 @@ class ReadingKeeper {
         value: VehicleReading(
           :final vehicle,
           reading: CarAwake(:final unreported),
+          :final troubleCodes,
         ),
       ):
-        // Nothing to send, but what was asked for and didn't come is news.
+        // Nothing to send, but what was asked for and didn't come is news,
+        // and so are the trouble codes.
         await _ref
             .read(lastValuesProvider.notifier)
-            .noteUnreported(vehicle.id, unreported, DateTime.now());
+            .noteUnreported(
+              vehicle.id,
+              unreported,
+              DateTime.now(),
+              troubleCodes: troubleCodes,
+            );
       case StepDone() || StepRefused() || StepFailed():
         break;
     }
@@ -71,7 +71,7 @@ class ReadingKeeper {
   Future<void> _keep(
     Vehicle vehicle,
     CarAnswered reading,
-    TroubleCodes? troubleCodes,
+    TroubleCodesRead? troubleCodes,
   ) async {
     final seq = await _ref
         .read(webhookSenderProvider)
@@ -90,6 +90,7 @@ class ReadingKeeper {
           DateTime.now(),
           seq: seq,
           missing: reading.unreported,
+          troubleCodes: troubleCodes,
         );
   }
 }

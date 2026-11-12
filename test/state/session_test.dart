@@ -281,7 +281,7 @@ void main() {
       expect(
         outcome,
         isA<StepDone<VehicleReading>>().having(
-          (o) => o.value.troubleCodes,
+          (o) => o.value.troubleCodes?.codes,
           'codes',
           const TroubleCodes(
             checkEngine: true,
@@ -313,25 +313,27 @@ void main() {
         ..['03'] = '43010133';
       final outcome = await session.read();
       expect(adapter.sent, contains('03'));
-      expect((outcome as StepDone<VehicleReading>).value.troubleCodes?.stored, [
-        'P0133',
-      ]);
+      expect(
+        (outcome as StepDone<VehicleReading>).value.troubleCodes?.codes.stored,
+        ['P0133'],
+      );
     });
 
     test('that can\'t be read don\'t fail the reading', () async {
       final (c, adapter) = await connected();
       final session = c.read(sessionProvider.notifier);
-      await session.read();
+      final first = await session.read();
+      final readAt = (first as StepDone<VehicleReading>).value.troubleCodes!.at;
       // Unanswered from now on: each times out.
       adapter.replies.remove('0101');
 
       final outcome = await session.read();
 
       expect(outcome, isA<StepDone<VehicleReading>>());
-      expect(
-        (outcome as StepDone<VehicleReading>).value.troubleCodes,
-        const TroubleCodes(checkEngine: false),
-      );
+      final kept = (outcome as StepDone<VehicleReading>).value.troubleCodes;
+      expect(kept?.codes, const TroubleCodes(checkEngine: false));
+      // Kept as read then, not passed off as read now.
+      expect(kept?.at, readAt);
     });
 
     test('that time out leave the next reading its own replies', () async {

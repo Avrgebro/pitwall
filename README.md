@@ -49,7 +49,8 @@ Example payload (not final yet):
     "check_engine": false,
     "stored": [],
     "pending": ["P0420"],
-    "permanent": []
+    "permanent": [],
+    "read_at": "2026-10-31T19:32:10Z"
   },
   "connected": true
 }
@@ -64,7 +65,9 @@ the car reports, as last read: `stored` are the confirmed faults behind
 the light, `pending` faults seen once and not yet confirmed, and
 `permanent` ones that stay until the car has verified the repair. Pitwall
 reads them on the first reading, whenever the count changes, and every 10
-minutes; it never clears them. It can be turned off per vehicle.
+minutes, and `read_at` says when; it never clears them. It can be turned
+off per vehicle, and is also missing while they haven't been read yet on
+a connection, as when the first read failed.
 
 `engine` is `"running"` or `"off"` (ignition on, engine stopped). When the
 car is switched off, a last message with `"connected": false` and no values

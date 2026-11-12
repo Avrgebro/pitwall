@@ -44,35 +44,43 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     DateTime at, {
     required int seq,
     Map<String, Unreported> missing = const {},
+    TroubleCodesRead? troubleCodes,
   }) => _change(
     vehicleId,
-    (current) =>
-        current.record(vehicleId, values, at, seq: seq, missing: missing),
-    unless: values.isEmpty && missing.isEmpty,
-  );
-
-  /// Keeps the vehicle's trouble codes, as read [at].
-  Future<void> recordTroubleCodes(
-    String vehicleId,
-    TroubleCodes codes,
-    DateTime at,
-  ) => _change(
-    vehicleId,
-    (current) => current.withTroubleCodes(vehicleId, codes, at),
-    unless: false,
+    (current) => _withCodes(
+      current.record(vehicleId, values, at, seq: seq, missing: missing),
+      vehicleId,
+      troubleCodes,
+    ),
+    unless: values.isEmpty && missing.isEmpty && troubleCodes == null,
   );
 
   /// Keeps [missing], asked for in a reading at [at] that had nothing to
-  /// send.
+  /// send, and the [troubleCodes] that came with it.
   Future<void> noteUnreported(
     String vehicleId,
     Map<String, Unreported> missing,
-    DateTime at,
-  ) => _change(
+    DateTime at, {
+    TroubleCodesRead? troubleCodes,
+  }) => _change(
     vehicleId,
-    (current) => current.noteUnreported(vehicleId, missing, at),
-    unless: missing.isEmpty,
+    (current) => _withCodes(
+      current.noteUnreported(vehicleId, missing, at),
+      vehicleId,
+      troubleCodes,
+    ),
+    unless: missing.isEmpty && troubleCodes == null,
   );
+
+  /// [values] with the vehicle's trouble codes, as read when they were.
+  static LastValues _withCodes(
+    LastValues values,
+    String vehicleId,
+    TroubleCodesRead? read,
+  ) => switch (read) {
+    (:final codes, :final at) => values.withTroubleCodes(vehicleId, codes, at),
+    null => values,
+  };
 
   Future<void> _change(
     String vehicleId,

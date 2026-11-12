@@ -5,7 +5,8 @@ import '../obd/trouble_codes.dart';
 /// Values are rounded to two decimals, and whole numbers are sent without
 /// a decimal point (`52`, not `52.0`). [engineRunning] becomes `"engine":
 /// "running"` or `"off"`, on readings taken from the car. [troubleCodes],
-/// when the reading has them, go out as `trouble_codes`.
+/// when the reading has them, go out as `trouble_codes`, with when they
+/// were read: not every reading reads them again.
 Map<String, Object?> buildPayload({
   required String device,
   required int seq,
@@ -13,7 +14,7 @@ Map<String, Object?> buildPayload({
   required Map<String, double> values,
   required bool connected,
   bool? engineRunning,
-  TroubleCodes? troubleCodes,
+  TroubleCodesRead? troubleCodes,
 }) => {
   'device': device,
   'seq': seq,
@@ -26,7 +27,13 @@ Map<String, Object?> buildPayload({
     false => 'off',
     null => null,
   },
-  'trouble_codes': ?troubleCodes?.toJson(),
+  'trouble_codes': ?switch (troubleCodes) {
+    (:final codes, :final at) => {
+      ...codes.toJson(),
+      'read_at': formatTimestamp(at),
+    },
+    null => null,
+  },
   'connected': connected,
 };
 
