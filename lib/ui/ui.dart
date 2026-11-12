@@ -30,6 +30,7 @@ export 'components/shape_illustration.dart';
 export 'components/small_parts.dart';
 export 'components/status_card.dart';
 export 'components/status_chip.dart';
+export 'components/tag.dart';
 export 'components/value_tile.dart';
 export 'components/value_tile_data.dart';
 export 'layout/app_page.dart';

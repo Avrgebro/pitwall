@@ -30,7 +30,7 @@ class AppRow extends StatelessWidget {
   final Widget? leading;
   final Widget? subtitle;
 
-  /// A small label right after the title, such as a [StatusChip], for a
+  /// A small label right after the title, such as a [Tag], for a
   /// fact about the row worth seeing at a glance.
   final Widget? badge;
 

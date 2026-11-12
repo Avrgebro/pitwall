@@ -266,8 +266,8 @@ class _TypeBadge extends StatelessWidget {
   final AdapterType type;
 
   @override
-  Widget build(BuildContext context) => StatusChip(
-    label: switch (type) {
+  Widget build(BuildContext context) => Tag(
+    switch (type) {
       AdapterType.ble => 'BLE',
       AdapterType.classic => 'Classic',
     },
@@ -275,6 +275,5 @@ class _TypeBadge extends StatelessWidget {
       AdapterType.ble => StatusTone.active,
       AdapterType.classic => StatusTone.neutral,
     },
-    dense: true,
   );
 }

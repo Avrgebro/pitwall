@@ -28,6 +28,8 @@ abstract final class Insets {
 
 /// Corner radii.
 abstract final class Corners {
+  /// A tag on a row: squarer than a pill, so it reads as a label.
+  static const double tag = 4;
   static const double small = 8;
   static const double medium = 12;
   static const double large = 16;
