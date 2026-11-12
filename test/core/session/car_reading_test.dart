@@ -30,6 +30,28 @@ void main() {
     expect(reading, isA<CarSilent>());
   });
 
+  test('a bus error as the car switches off: the car went quiet', () async {
+    // As on the Tucson: the bus fails on the next request, then stays down.
+    final reading = await read(
+      {'ATRV': '11.1V', '010C': 'CAN ERROR', '0100': 'UNABLE TO CONNECT'},
+      {'battery_v', 'rpm'},
+    );
+
+    expect(reading, isA<CarSilent>());
+  });
+
+  test('a bus error while the car still answers stays an error', () async {
+    await expectLater(
+      read(
+        {'ATRV': '13.9V', '010C': 'CAN ERROR', '0100': '4100BE3EB811'},
+        {'battery_v', 'rpm'},
+      ),
+      throwsA(
+        isA<ElmException>().having((e) => e.error, 'error', ElmError.busError),
+      ),
+    );
+  });
+
   test('only the battery, but the car answers: ignition on', () async {
     final reading = await read(
       {'ATRV': '12.4V', '0100': '4100BE3EB811'},

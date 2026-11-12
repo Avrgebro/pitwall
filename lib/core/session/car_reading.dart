@@ -40,7 +40,7 @@ final class CarSilent extends CarReading {
 /// requests for [modelYear], and works out the car's state.
 ///
 /// Throws [ElmException] for adapter failures; the car not answering isn't
-/// one, it's [CarSilent].
+/// one, it's [CarSilent], also when its bus fails as it switches off.
 Future<CarReading> readCar(
   Elm327 elm, {
   required Set<String> keys,
@@ -81,7 +81,27 @@ Future<CarReading> readCar(
         ? CarAwake(carState, unreported: missing)
         : CarAnswered(values, carState, unreported: missing);
   } on ElmException catch (e) {
-    if (e.error != ElmError.unableToConnect) rethrow;
-    return const CarSilent();
+    if (e.error == ElmError.unableToConnect) return const CarSilent();
+    // The bus stopped mid-reading, as it does while the car switches off:
+    // silent if the car doesn't answer now either. If it does, the bus
+    // error was something else, and stays an error.
+    if (e.error == ElmError.busError && await _stoppedAnswering(elm)) {
+      return const CarSilent();
+    }
+    rethrow;
+  }
+}
+
+/// Whether the car no longer answers, as after a bus error while it was
+/// switched off: unable to connect, or its bus still in error.
+Future<bool> _stoppedAnswering(Elm327 elm) async {
+  try {
+    await elm.checkCarAnswers();
+    return false;
+  } on ElmException catch (e) {
+    return switch (e.error) {
+      ElmError.unableToConnect || ElmError.busError => true,
+      _ => throw e,
+    };
   }
 }
