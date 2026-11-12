@@ -51,7 +51,8 @@ class WebhookSender {
   final void Function(DeliveryAttempt attempt)? onAttempt;
 
   /// Called when the server refused a reading for what it holds, and it
-  /// was dropped, for the developer log.
+  /// was dropped, for the developer log. Only one in a row is dropped;
+  /// see [RejectionReason.refusedPayload].
   final void Function(QueuedReading reading, DeliveryAttempt attempt)?
   onDropped;
 
@@ -159,8 +160,20 @@ class WebhookSender {
   /// them: from the Retry button, or a change in the webhook settings.
   Future<void> retry() {
     _waitingForFix = false;
+    _outcome = _outcome.withoutDrops;
+    _publish();
     return flush();
   }
+
+  /// The user saw which readings were dropped: they're no longer shown.
+  void dismissDrops() {
+    _outcome = _outcome.withoutDrops;
+    _publish();
+  }
+
+  /// Whether the last reading the server answered was refused for what it
+  /// holds. A refusal after one, and the server refuses them all.
+  bool _refusedLast = false;
 
   Future<void> _deliver() async {
     _retry?.cancel();
@@ -184,13 +197,16 @@ class WebhookSender {
       final attempt = await _post(target, jsonEncode(sent.toPayload()));
       if (_disposed) return;
       // The server won't take this reading however often it's sent: it's
-      // dropped, so the ones behind it still go.
-      if (attempt.result case Rejected(
-        reason: RejectionReason.refusedPayload,
-      )) {
+      // dropped, so the ones behind it still go. Refused again, it's the
+      // server, and the reading stays, as below, until the user retries.
+      if (attempt.result case final Rejected refusal
+          when refusal.reason == RejectionReason.refusedPayload &&
+              !_refusedLast) {
+        _refusedLast = true;
         _queue.remove(sent);
         await _persist();
-        _outcome = _outcome.failed(attempt.result as DeliveryError, _clock());
+        if (_disposed) return;
+        _outcome = _outcome.droppedOne(refusal, _clock());
         onDropped?.call(sent, attempt);
         _publish();
         continue;
@@ -200,6 +216,7 @@ class WebhookSender {
         _failed(error);
         return;
       }
+      _refusedLast = false;
       _queue.remove(sent);
       _deliveredThrough = max(_deliveredThrough, sent.seq);
       await _persist();

@@ -291,6 +291,105 @@ void main() {
     },
   );
 
+  group('refused readings', () {
+    late int refused;
+    late bool refusing;
+    late List<int> dropped;
+    WebhookSender refusingSender() {
+      refused = 0;
+      refusing = true;
+      dropped = [];
+      return WebhookSender(
+        storage: storage,
+        webhookTarget: () async => _target,
+        client: MockClient((request) async {
+          if (refusing) {
+            refused++;
+            return http.Response('', 400);
+          }
+          received.add(jsonDecode(request.body) as Map<String, Object?>);
+          return http.Response('', 200);
+        }),
+        clock: () => DateTime.utc(2026, 10, 31, 19, 40),
+        onDropped: (reading, _) => dropped.add(reading.seq),
+      );
+    }
+
+    test('two in a row stop delivery, and only the first goes', () async {
+      final pitwall = refusingSender();
+      addTearDown(pitwall.dispose);
+      await pitwall.init();
+
+      await sendFuel(pitwall, 47.5);
+      await sendFuel(pitwall, 47);
+      await sendFuel(pitwall, 46.5);
+
+      expect(dropped, [_start]);
+      // The third waits behind the second, unsent.
+      expect(refused, 2);
+      expect(pitwall.status.value.queued, 2);
+      final outcome = pitwall.status.value.outcome;
+      expect(outcome.lastError, const Rejected(400));
+      expect(outcome.dropped, 1);
+    });
+
+    test('still refused after a retry, none are dropped', () async {
+      final pitwall = refusingSender();
+      addTearDown(pitwall.dispose);
+      await pitwall.init();
+      await sendFuel(pitwall, 47.5);
+      await sendFuel(pitwall, 47);
+
+      await pitwall.retry();
+
+      expect(dropped, [_start]);
+      expect(pitwall.status.value.queued, 1);
+    });
+
+    test('once the server takes them, the rest go', () async {
+      final pitwall = refusingSender();
+      addTearDown(pitwall.dispose);
+      await pitwall.init();
+      await sendFuel(pitwall, 47.5);
+      await sendFuel(pitwall, 47);
+      await sendFuel(pitwall, 46.5);
+
+      refusing = false;
+      await pitwall.retry();
+
+      expect(received.map((p) => p['seq']), [_start + 1, _start + 2]);
+      final outcome = pitwall.status.value.outcome;
+      expect(outcome.lastError, isNull);
+      expect(outcome.dropped, 0);
+    });
+
+    test('one dropped is no failure that stands, and is said', () async {
+      final pitwall = refusingSender();
+      addTearDown(pitwall.dispose);
+      await pitwall.init();
+
+      await sendFuel(pitwall, 47.5);
+
+      var outcome = pitwall.status.value.outcome;
+      expect(pitwall.status.value.queued, 0);
+      expect(outcome.lastError, isNull);
+      expect(outcome.dropped, 1);
+      expect(outcome.lastRefusal, const Rejected(400));
+
+      // Then a reading goes, and the next refused one is dropped too.
+      refusing = false;
+      await sendFuel(pitwall, 47);
+      refusing = true;
+      await sendFuel(pitwall, 46.5);
+      outcome = pitwall.status.value.outcome;
+      expect(dropped, [_start, _start + 2]);
+      expect(outcome.dropped, 2);
+
+      pitwall.dismissDrops();
+      expect(pitwall.status.value.outcome.dropped, 0);
+    });
+  });
+
   test('numbers never go back, even after the saved queue was lost', () async {
     var now = DateTime.utc(2026, 10, 31, 19, 40);
     WebhookSender at(DeliveryStorage storage) => WebhookSender(

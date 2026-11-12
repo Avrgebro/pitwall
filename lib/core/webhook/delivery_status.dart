@@ -75,7 +75,8 @@ enum RejectionReason {
   moved,
 
   /// 400, 413 or 422: the server won't take that reading, however often
-  /// it's sent. It's dropped, so the ones behind it still go.
+  /// it's sent. One is dropped, so the ones behind it still go; a second
+  /// in a row is the server refusing them all, so delivery stops.
   refusedPayload,
 
   /// Anything else, which may pass.
@@ -168,6 +169,8 @@ class DeliveryOutcome {
     this.lastSuccess,
     this.lastFailure,
     this.lastError,
+    this.dropped = 0,
+    this.lastRefusal,
   });
 
   /// Failed attempts since the last success.
@@ -175,17 +178,48 @@ class DeliveryOutcome {
   final DateTime? lastSuccess;
   final DateTime? lastFailure;
 
-  /// Why the last attempt failed. Null after a success.
+  /// Why the last attempt failed, while that still stands: null after a
+  /// success, and after a reading was dropped, as the server answered.
   final DeliveryError? lastError;
 
-  DeliveryOutcome succeeded(DateTime at) =>
-      DeliveryOutcome(lastSuccess: at, lastFailure: lastFailure);
+  /// Readings the server refused and that were dropped, so the ones
+  /// behind them went, since the user last retried.
+  final int dropped;
+
+  /// The refusal that dropped the last of them.
+  final Rejected? lastRefusal;
+
+  DeliveryOutcome succeeded(DateTime at) => DeliveryOutcome(
+    lastSuccess: at,
+    lastFailure: lastFailure,
+    dropped: dropped,
+    lastRefusal: lastRefusal,
+  );
 
   DeliveryOutcome failed(DeliveryError error, DateTime at) => DeliveryOutcome(
     failedAttempts: failedAttempts + 1,
     lastSuccess: lastSuccess,
     lastFailure: at,
     lastError: error,
+    dropped: dropped,
+    lastRefusal: lastRefusal,
+  );
+
+  /// A reading the server refused was dropped.
+  DeliveryOutcome droppedOne(Rejected refusal, DateTime at) => DeliveryOutcome(
+    failedAttempts: failedAttempts + 1,
+    lastSuccess: lastSuccess,
+    lastFailure: at,
+    dropped: dropped + 1,
+    lastRefusal: refusal,
+  );
+
+  /// As the user saw the drops, or retried: they're behind them.
+  DeliveryOutcome get withoutDrops => DeliveryOutcome(
+    failedAttempts: failedAttempts,
+    lastSuccess: lastSuccess,
+    lastFailure: lastFailure,
+    lastError: lastError,
   );
 }
 

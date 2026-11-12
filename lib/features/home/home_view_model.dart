@@ -32,7 +32,7 @@ enum DeliveryCardKind { healthy, queued, failing, noWebhook }
 enum DeliveryStatKind { lastSent, failed, queued }
 
 /// What the delivery card offers; it shows exactly these.
-enum DeliveryAction { setWebhook, openSettings, retry }
+enum DeliveryAction { setWebhook, openSettings, retry, dismissDrops }
 
 @immutable
 class HeroModel {
@@ -342,12 +342,30 @@ class HomeViewModel {
     }
 
     if (error == null) {
+      // Delivery goes on, but what was dropped is said until the user
+      // has seen it.
+      final dropped = switch (status.outcome) {
+        DeliveryOutcome(:final dropped, lastRefusal: final refusal?)
+            when dropped > 0 =>
+          DeliveryText.dropped(dropped, refusal),
+        _ => null,
+      };
       if (queued > 0) {
         return DeliveryCardModel(
           kind: DeliveryCardKind.queued,
           title: '${Formatters.count(queued, 'reading')} waiting',
-          message: 'Sending now.',
+          message: dropped ?? 'Sending now.',
           stats: stats(),
+          actions: {if (dropped != null) DeliveryAction.dismissDrops},
+        );
+      }
+      if (dropped != null) {
+        return DeliveryCardModel(
+          kind: DeliveryCardKind.queued,
+          title: 'Readings dropped',
+          message: dropped,
+          stats: stats(),
+          actions: const {DeliveryAction.dismissDrops},
         );
       }
       return DeliveryCardModel(

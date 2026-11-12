@@ -1,3 +1,4 @@
+import '../../core/format/formatters.dart';
 import '../../core/webhook/delivery_status.dart';
 import '../../core/webhook/webhook_auth.dart';
 import '../../core/webhook/webhook_target.dart';
@@ -43,11 +44,11 @@ abstract final class DeliveryText {
               'common cause.',
         ),
         Rejected(reason: RejectionReason.refusedPayload, :final statusCode) => (
-          title: 'The server refused a reading',
+          title: 'The server is refusing readings',
           message:
-              'It wouldn\'t take what Pitwall sent (HTTP $statusCode), so '
-              'that reading was dropped; the rest still go. Check how the '
-              'webhook is set up on the server.',
+              'It wouldn\'t take two readings in a row (HTTP $statusCode), so '
+              'Pitwall stopped sending; the rest stay on this phone. Check '
+              'how the webhook is set up on the server, then retry.',
         ),
         Rejected(reason: RejectionReason.notAllowed, :final statusCode) => (
           title: 'The webhook is refusing readings',
@@ -72,6 +73,13 @@ abstract final class DeliveryText {
               'running and the phone is online.',
         ),
       };
+
+  /// What became of the [count] readings the server refused one at a
+  /// time, the last with [refusal].
+  static String dropped(int count, Rejected refusal) =>
+      'The server refused ${Formatters.count(count, 'reading')} '
+      '(HTTP ${refusal.statusCode}), so ${count == 1 ? 'it was' : 'they were'} '
+      'dropped. Check how the webhook is set up on the server.';
 
   static String authProblem(AuthProblem problem) => switch (problem) {
     AuthProblem.missingToken => 'Enter the token.',

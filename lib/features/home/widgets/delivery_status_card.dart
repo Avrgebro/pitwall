@@ -13,12 +13,14 @@ class DeliveryStatusCard extends StatelessWidget {
     required this.onOpenSettings,
     required this.onSetWebhook,
     required this.onRetry,
+    required this.onDismissDrops,
   });
 
   final DeliveryCardModel model;
   final VoidCallback onOpenSettings;
   final VoidCallback onSetWebhook;
   final VoidCallback onRetry;
+  final VoidCallback onDismissDrops;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +65,12 @@ class DeliveryStatusCard extends StatelessWidget {
             onPressed: onRetry,
             style: TextButton.styleFrom(foregroundColor: colors.onContainer),
             child: const Text('Retry now'),
+          ),
+        if (model.actions.contains(DeliveryAction.dismissDrops))
+          TextButton(
+            onPressed: onDismissDrops,
+            style: TextButton.styleFrom(foregroundColor: colors.onContainer),
+            child: const Text('Got it'),
           ),
       ],
     );

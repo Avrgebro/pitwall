@@ -109,6 +109,27 @@ void main() {
     expect(model.values!.tiles.last.value, '34,000');
   });
 
+  test('readings the server dropped are said until seen', () {
+    final model = build(
+      delivery: DeliveryStatus(
+        outcome: DeliveryOutcome(
+          lastSuccess: now,
+          dropped: 2,
+          lastRefusal: const Rejected(422),
+        ),
+      ),
+    );
+
+    expect(model.delivery.kind, DeliveryCardKind.queued);
+    expect(model.delivery.title, 'Readings dropped');
+    expect(
+      model.delivery.message,
+      'The server refused 2 readings (HTTP 422), so they were dropped. '
+      'Check how the webhook is set up on the server.',
+    );
+    expect(model.delivery.actions, {DeliveryAction.dismissDrops});
+  });
+
   test('1b parked, waiting for the car', () {
     final model = build(
       delivery: DeliveryStatus(

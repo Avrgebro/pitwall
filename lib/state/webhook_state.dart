@@ -161,4 +161,7 @@ class DeliveryStatusNotifier extends Notifier<DeliveryStatus> {
 
   /// Tries to deliver queued readings now instead of at the next retry.
   Future<void> retryNow() => ref.read(webhookSenderProvider).retry();
+
+  /// The user saw which readings the server refused and were dropped.
+  void dismissDrops() => ref.read(webhookSenderProvider).dismissDrops();
 }

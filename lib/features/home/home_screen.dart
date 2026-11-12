@@ -66,6 +66,8 @@ class HomeScreen extends ConsumerWidget {
       onOpenSettings: () => context.go(Routes.settings),
       onSetWebhook: () => context.push(Routes.webhookSettings),
       onRetry: () => ref.read(deliveryStatusProvider.notifier).retryNow(),
+      onDismissDrops: () =>
+          ref.read(deliveryStatusProvider.notifier).dismissDrops(),
     );
 
     return AppPage(
