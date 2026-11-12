@@ -86,7 +86,7 @@ void main() {
   ) async {
     await _pumpApp(tester);
 
-    expect(find.text('Your car\'s data, in Home Assistant'), findsOneWidget);
+    expect(find.text('Your car\'s data, where you want it'), findsOneWidget);
     expect(find.text('Step 1 of 5'), findsOneWidget);
     expect(find.byType(FloatingNavBar), findsNothing);
   });

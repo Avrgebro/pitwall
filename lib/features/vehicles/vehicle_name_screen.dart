@@ -45,8 +45,9 @@ class _VehicleNameScreenState extends ConsumerState<VehicleNameScreen> {
           const InfoNote(
             text: TextSpan(
               text:
-                  'Home Assistant tells your cars apart by this id. Renaming '
-                  'changes it, so update automations that use the old one.',
+                  'Every reading carries this id, so whatever receives them '
+                  'can tell your cars apart. Renaming changes it, so update '
+                  'anything that uses the old one.',
             ),
           ),
         ],

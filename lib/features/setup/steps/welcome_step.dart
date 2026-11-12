@@ -16,7 +16,7 @@ class WelcomeStep extends StatelessWidget {
     ),
     (
       icon: Symbols.webhook_rounded,
-      text: 'Sends them as JSON to your webhook, usually Home Assistant',
+      text: 'Sends them as JSON to any webhook you choose',
     ),
     (
       icon: Symbols.motion_sensor_active_rounded,
@@ -36,7 +36,7 @@ class WelcomeStep extends StatelessWidget {
         ),
         const SizedBox(height: Insets.xl),
         Text(
-          'Your car\'s data, in Home Assistant',
+          'Your car\'s data, where you want it',
           style: theme.textTheme.headlineLarge,
         ),
         const SizedBox(height: Insets.m),

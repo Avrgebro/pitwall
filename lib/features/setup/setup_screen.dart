@@ -116,8 +116,8 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         steps: steps,
         title: 'Where should readings go?',
         message:
-            'In Home Assistant, create an automation with a Webhook trigger '
-            'and paste its URL here.',
+            'Paste the URL of the webhook that should receive them. Each '
+            'reading is posted to it as JSON.',
         primaryLabel: 'Continue',
         onPrimary: ref.watch(webhookProvider).value?.draftHasUrl ?? false
             ? () => _go(_Step.done)
