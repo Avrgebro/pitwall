@@ -1,5 +1,6 @@
 package io.github.avrgebro.pitwall
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -10,8 +11,8 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
-import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import io.flutter.plugin.common.BinaryMessenger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -55,19 +56,25 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         val link = GattLink(opening)
         opening.resource = link
         connections.begin(opening)
-        try {
-            withTimeout(CONNECT_TIMEOUT_MS) { link.open(adapter.getRemoteDevice(address)) }
-        } catch (e: Exception) {
-            // However it failed, it's no longer current, and nothing of it stays open.
+        // However it fails, it's no longer current, and nothing of it stays open.
+        fun abandon() {
             connections.ended(opening)
             opening.close()
-            if (e is CancellationException && e !is TimeoutCancellationException) throw e
-            throw when (e) {
-                is SecurityException -> FlutterError("permission", e.message)
-                is TimeoutCancellationException ->
-                    FlutterError("connect_failed", "The adapter didn't answer in time")
-                else -> FlutterError("connect_failed", e.message)
-            }
+        }
+        try {
+            withTimeout(CONNECT_TIMEOUT_MS) { link.open(adapter.getRemoteDevice(address)) }
+        } catch (e: SecurityException) {
+            abandon()
+            throw FlutterError("permission", e.message)
+        } catch (e: TimeoutCancellationException) {
+            abandon()
+            throw FlutterError("connect_failed", "The adapter didn't answer in time")
+        } catch (e: CancellationException) {
+            abandon()
+            throw e
+        } catch (e: Exception) {
+            abandon()
+            throw FlutterError("connect_failed", e.message)
         }
     }
 
@@ -114,6 +121,7 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         private var payload = DEFAULT_MTU - ATT_HEADER
 
         /** Connects, finds the characteristics, and switches replies on. */
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         suspend fun open(device: BluetoothDevice) {
             // Null when Bluetooth is off: not taken, so it fails at once.
             steps.run(GattOp.CONNECT) {
@@ -140,7 +148,9 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             } else {
                 BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
             }
-            steps.run(GattOp.DESCRIPTOR) { writeDescriptor(gatt, config, enable) }
+            steps.run(GattOp.DESCRIPTOR) {
+                gatt.writeDescriptor(config, enable) == BluetoothStatusCodes.SUCCESS
+            }
             // A drop since the last step already failed it, or comes now.
             if (!state.compareAndSet(LinkState.OPENING, LinkState.READY)) {
                 throw IOException("The adapter disconnected")
@@ -153,6 +163,7 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         }
 
         /** Sends [bytes] in writes the adapter takes, one after another. */
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         suspend fun write(bytes: ByteArray) {
             val gatt = gatt ?: throw IOException("Not connected")
             val commands = commands ?: throw IOException("Not connected")
@@ -160,18 +171,23 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             while (start < bytes.size) {
                 val end = minOf(start + payload, bytes.size)
                 val chunk = bytes.copyOfRange(start, end)
-                steps.run(GattOp.WRITE) { writeCharacteristic(gatt, commands, chunk) }
+                steps.run(GattOp.WRITE) {
+                    gatt.writeCharacteristic(commands, chunk, writeType) == BluetoothStatusCodes.SUCCESS
+                }
                 start = end
             }
         }
 
         override fun close() {
             steps.close()
-            gatt?.let {
-                it.disconnect()
-                it.close()
+            val gatt = gatt ?: return
+            this.gatt = null
+            try {
+                gatt.disconnect()
+                gatt.close()
+            } catch (_: SecurityException) {
+                // Revoking the permission ends the app's links along with it.
             }
-            gatt = null
         }
 
         /**
@@ -247,45 +263,6 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             value: ByteArray,
         ) {
             if (characteristic.uuid == replies?.uuid) AdapterEvents.bytes(connection.id, value)
-        }
-
-        // Before Android 13, the value comes on the characteristic.
-        @Deprecated("Android 12")
-        override fun onCharacteristicChanged(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-        ) {
-            @Suppress("DEPRECATION")
-            val value = characteristic.value ?: return
-            onCharacteristicChanged(gatt, characteristic, value.copyOf())
-        }
-
-        private fun writeDescriptor(
-            gatt: BluetoothGatt,
-            descriptor: BluetoothGattDescriptor,
-            value: ByteArray,
-        ): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeDescriptor(descriptor, value) == BluetoothStatusCodes.SUCCESS
-        } else {
-            @Suppress("DEPRECATION")
-            descriptor.value = value
-            @Suppress("DEPRECATION")
-            gatt.writeDescriptor(descriptor)
-        }
-
-        private fun writeCharacteristic(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray,
-        ): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeCharacteristic(characteristic, value, writeType) ==
-                BluetoothStatusCodes.SUCCESS
-        } else {
-            characteristic.writeType = writeType
-            @Suppress("DEPRECATION")
-            characteristic.value = value
-            @Suppress("DEPRECATION")
-            gatt.writeCharacteristic(characteristic)
         }
     }
 

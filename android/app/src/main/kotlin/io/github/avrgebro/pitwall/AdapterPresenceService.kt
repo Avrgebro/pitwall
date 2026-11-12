@@ -3,6 +3,8 @@ package io.github.avrgebro.pitwall
 import android.companion.AssociationInfo
 import android.companion.CompanionDeviceService
 import android.companion.DevicePresenceEvent
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * Started by Android when a watched adapter appears, as it wakes with the
@@ -11,7 +13,8 @@ import android.companion.DevicePresenceEvent
  * still start trips go on.
  */
 class AdapterPresenceService : CompanionDeviceService() {
-    // Android 16 and later.
+    // Android 16 and later; Android calls it only there.
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     override fun onDevicePresenceEvent(event: DevicePresenceEvent) {
         if (event.event != DevicePresenceEvent.EVENT_BLE_APPEARED) return
         appeared(AdapterWatch.address(this, event.associationId))
@@ -21,10 +24,6 @@ class AdapterPresenceService : CompanionDeviceService() {
     @Deprecated("Android 16")
     override fun onDeviceAppeared(associationInfo: AssociationInfo) =
         appeared(associationInfo.deviceMacAddress?.toString())
-
-    // Android 12.
-    @Deprecated("Android 13")
-    override fun onDeviceAppeared(address: String) = appeared(address)
 
     private fun appeared(address: String?) {
         if (address == null || !ServiceBridge.wakesTrip(this, address)) return

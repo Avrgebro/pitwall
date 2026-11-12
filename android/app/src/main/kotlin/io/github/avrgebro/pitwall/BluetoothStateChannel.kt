@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import io.flutter.plugin.common.BinaryMessenger
 
 /**
@@ -37,11 +36,7 @@ class BluetoothStateChannel(private val context: Context, messenger: BinaryMesse
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
         // A system broadcast, so the receiver needn't be reachable by other
         // apps.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
+        context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         this.receiver = receiver
     }
 

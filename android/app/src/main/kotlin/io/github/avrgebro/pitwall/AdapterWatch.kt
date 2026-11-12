@@ -6,6 +6,7 @@ import android.companion.ObservingDevicePresenceRequest
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 
 /**
  * Which adapters Android watches for, through the companion devices the
@@ -61,6 +62,7 @@ object AdapterWatch {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     private fun request(association: AssociationInfo) =
         ObservingDevicePresenceRequest.Builder().setAssociationId(association.id).build()
 

@@ -28,7 +28,7 @@ android {
         applicationId = "io.github.avrgebro.pitwall"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 31 // Android 12: companion device presence and background service start
+        minSdk = 33 // Android 13: companion device associations and presence
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

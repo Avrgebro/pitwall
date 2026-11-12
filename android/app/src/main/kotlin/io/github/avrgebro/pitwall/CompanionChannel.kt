@@ -7,9 +7,6 @@ import android.companion.AssociationRequest
 import android.companion.BluetoothLeDeviceFilter
 import android.companion.CompanionDeviceManager
 import android.content.IntentSender
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import kotlinx.coroutines.CompletableDeferred
 
 /**
@@ -41,9 +38,6 @@ class CompanionChannel(private val activity: Activity) : CompanionApi {
         val callback = object : CompanionDeviceManager.Callback() {
             override fun onAssociationPending(intentSender: IntentSender) = ask(intentSender)
 
-            @Deprecated("Android 12")
-            override fun onDeviceFound(intentSender: IntentSender) = ask(intentSender)
-
             override fun onAssociationCreated(association: AssociationInfo) {
                 AdapterWatch.start(manager, association)
                 result.complete(true)
@@ -53,12 +47,7 @@ class CompanionChannel(private val activity: Activity) : CompanionApi {
                 result.complete(false)
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            manager.associate(request, activity.mainExecutor, callback)
-        } else {
-            @Suppress("DEPRECATION")
-            manager.associate(request, callback, Handler(Looper.getMainLooper()))
-        }
+        manager.associate(request, activity.mainExecutor, callback)
         return result.await()
     }
 
