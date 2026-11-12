@@ -736,6 +736,24 @@ void main() {
     await notifier.deleteVehicle('tucson');
     expect(store.settings.vehicles, isEmpty);
     expect(reported, hasLength(2));
+    // Noted, so the next start deletes them, knowing whose they are.
+    expect(store.settings.removedVehicles, {'tucson'});
+  });
+
+  test('a deleted vehicle whose files went is noted no more', () async {
+    final store = FakeSettingsStore(
+      settings: const AppSettings(
+        vehicles: [Vehicle(id: 'tucson', name: 'Tucson')],
+      ),
+    );
+    final container = ProviderContainer(overrides: testOverrides(store: store));
+    addTearDown(container.dispose);
+    await container.read(appSettingsProvider.future);
+
+    await container.read(appSettingsProvider.notifier).deleteVehicle('tucson');
+
+    expect(store.settings.vehicles, isEmpty);
+    expect(store.settings.removedVehicles, isEmpty);
   });
 
   test('a webhook that can\'t be read can be entered again', () async {

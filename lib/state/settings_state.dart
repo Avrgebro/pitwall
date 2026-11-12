@@ -191,30 +191,39 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   /// Removes the vehicle and its profile files; its last values follow.
-  /// The settings go first: a profile file left behind does no harm, but
-  /// a vehicle whose file is gone would. So files that couldn't be deleted
-  /// are reported, not thrown: the vehicle is gone either way, and the
-  /// next start sweeps them.
+  /// The settings go first, noting the vehicle as removed: a profile file
+  /// left behind does no harm, but a vehicle whose file is gone would. So
+  /// files that couldn't be deleted are reported, not thrown: the vehicle
+  /// is gone either way, and the next start deletes them, as the settings
+  /// say they're a removed vehicle's.
   Future<void> deleteVehicle(String id) async {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await _save(_current.withoutVehicle(id));
-    await _queued(
+    final deleted = await _queued(
       (store) => _reported(
         'deleting the profile files of a deleted vehicle',
         () => store.deleteProfiles(id),
       ),
     );
+    if (!deleted) return;
+    // Left noted, if this can't be saved: deleting again does no harm.
+    await _reported(
+      'noting a deleted vehicle\'s files gone',
+      () => _save(_current.withFilesDeleted({id})),
+    );
   }
 
   /// Runs [action], reporting a failure rather than throwing it, for work
-  /// whose failure leaves nothing wrong: a file left behind.
-  static Future<void> _reported(
+  /// whose failure leaves nothing wrong: a file left behind. Says whether
+  /// it was done.
+  static Future<bool> _reported(
     String what,
     Future<void> Function() action,
   ) async {
     try {
       await action();
+      return true;
     } on Object catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(
@@ -224,6 +233,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
           context: ErrorDescription('while $what'),
         ),
       );
+      return false;
     }
   }
 

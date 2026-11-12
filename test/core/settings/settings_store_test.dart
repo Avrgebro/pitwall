@@ -205,21 +205,79 @@ void main() {
     final kept =
         'profiles/a1/${DateTime.utc(2026, 11, 1, 10).microsecondsSinceEpoch}.json';
 
-    test('ones the settings don\'t name are swept', () async {
-      for (final name in [kept, 'profiles/a1/1.json', 'profiles/gone/2.json']) {
+    void write(List<String> names) {
+      for (final name in names) {
         file(name)
           ..createSync(recursive: true)
           ..writeAsStringSync(testProfileJson);
       }
+    }
+
+    test('a vehicle\'s imports its settings don\'t name go', () async {
+      write([kept, 'profiles/a1/1.json']);
       final store = await saved(tucson);
 
       await store.load();
 
       expect(file(kept).existsSync(), isTrue);
       expect(file('profiles/a1/1.json').existsSync(), isFalse);
+    });
+
+    test('a vehicle the settings don\'t name keeps its files', () async {
+      // As after unreadable settings were set aside, and new ones saved.
+      write(['profiles/old/2.json', 'profiles/older.json']);
+      final store = await saved(tucson);
+
+      await store.load();
+
+      expect(file('profiles/old/2.json').existsSync(), isTrue);
+      expect(file('profiles/older.json').existsSync(), isTrue);
+    });
+
+    test('settings that name no vehicles delete nothing', () async {
+      write(['profiles/a1/1.json', 'profiles/a2.json']);
+      final store = await saved('[]');
+
+      await store.load();
+
+      expect(file('profiles/a1/1.json').existsSync(), isTrue);
+      expect(file('profiles/a2.json').existsSync(), isTrue);
+    });
+
+    test('a vehicle without an import time keeps its files', () async {
+      // Read leniently, its profile falls back to the one file.
+      write(['profiles/a1/1.json']);
+      final store = await saved(
+        '[{"id": "a1", "name": "Tucson", "profileName": "default.json", '
+        '"profileImportedAt": "not a time"}]',
+      );
+
+      await store.load();
+
+      expect(file('profiles/a1/1.json').existsSync(), isTrue);
+    });
+
+    test('a removed vehicle\'s files go, and the note with them', () async {
+      write(['profiles/gone/2.json', 'profiles/gone.json']);
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'settings',
+        '{"version": 2, "data": {"vehicles": $tucson, '
+            '"removedVehicles": ["gone"]}}',
+      );
+      final store = SettingsStore(preferences: preferences);
+
+      final settings = await store.load();
+
       expect(
         Directory('${directory.path}/profiles/gone').existsSync(),
         isFalse,
+      );
+      expect(file('profiles/gone.json').existsSync(), isFalse);
+      expect(settings.removedVehicles, isEmpty);
+      expect(
+        (await SettingsStore(preferences: preferences).load()).removedVehicles,
+        isEmpty,
       );
     });
 

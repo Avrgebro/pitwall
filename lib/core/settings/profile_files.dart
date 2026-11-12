@@ -61,17 +61,25 @@ class ProfileFiles {
         null => 'profiles/$vehicleId.json',
       };
 
-  /// Puts each vehicle's profile files in order, one vehicle at a time:
-  /// a profile kept in its vehicle's one file, from before each import had
-  /// its own, moves to the name its settings now give it ([fileName]);
-  /// files they don't name, as left by a crash or a delete that failed, go.
-  /// One vehicle's trouble leaves its files as they are, and its profile
-  /// then reads as unreadable, not every vehicle's.
+  /// Puts profile files in order, one vehicle at a time, and returns the
+  /// removed vehicles whose files are now gone:
+  /// - a profile kept in its vehicle's one file, from before each import
+  ///   had its own, moves to the name its settings now give it
+  ///   ([fileName]);
+  /// - the vehicle's other imports, as left by a crash or a delete that
+  ///   failed, go, but only when the settings name a file among them;
+  /// - the files of [AppSettings.removedVehicles] go.
   ///
-  /// What fails is handed to [report], with what was being done.
-  Future<void> tidy(
+  /// Files are deleted only on that evidence, never for a vehicle the
+  /// settings merely don't name: those may be settings read leniently, or
+  /// new ones after unreadable ones were set aside.
+  ///
+  /// One vehicle's trouble leaves its files as they are, and its profile
+  /// then reads as unreadable, not every vehicle's. What fails is handed to
+  /// [report], with what was being done, which says whether it was done.
+  Future<Set<String>> tidy(
     AppSettings settings, {
-    required Future<void> Function(String what, Future<void> Function() action)
+    required Future<bool> Function(String what, Future<void> Function() action)
     report,
   }) async {
     for (final vehicle in settings.vehicles) {
@@ -80,26 +88,25 @@ class ProfileFiles {
         () => _tidy(vehicle),
       );
     }
-    // A vehicle that's gone keeps nothing, as when its delete failed.
-    await report('removing the profiles of vehicles that are gone', () async {
-      final profiles = Directory((await appFile('profiles')).path);
-      if (!await profiles.exists()) return;
-      final ids = {for (final vehicle in settings.vehicles) vehicle.id};
-      await for (final entry in profiles.list()) {
-        final name = entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
-        if (!ids.contains(name.replaceAll(RegExp(r'\.json$'), ''))) {
-          await entry.delete(recursive: true);
-        }
-      }
-    });
+    return {
+      for (final id in settings.removedVehicles)
+        if (await report(
+          'deleting the profile files of a removed vehicle',
+          () => deleteAll(id),
+        ))
+          id,
+    };
   }
 
+  /// Only a file the settings name in the vehicle's folder tells what's
+  /// left over: settings that name none, or the one file from before, may
+  /// be read leniently, so nothing is deleted on their word.
   Future<void> _tidy(Vehicle vehicle) async {
     final ref = vehicle.profile;
+    if (ref == null || ref.importedAt == null) return;
+    final named = await appFile(fileName(vehicle.id, ref));
     final legacy = await appFile('profiles/${vehicle.id}.json');
-    final folder = Directory((await appFile('profiles/${vehicle.id}')).path);
-    final named = ref == null ? null : await appFile(fileName(vehicle.id, ref));
-    if (named != null && named.path != legacy.path && await legacy.exists()) {
+    if (await legacy.exists()) {
       if (await named.exists()) {
         await legacy.delete();
       } else {
@@ -107,12 +114,10 @@ class ProfileFiles {
         await legacy.rename(named.path);
       }
     }
-    if (named?.path != legacy.path && await legacy.exists()) {
-      await legacy.delete();
-    }
+    final folder = named.parent;
     if (!await folder.exists()) return;
     await for (final entry in folder.list()) {
-      if (entry is File && entry.path != named?.path) await entry.delete();
+      if (entry is File && entry.path != named.path) await entry.delete();
     }
   }
 }

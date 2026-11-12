@@ -53,19 +53,24 @@ class SettingsStore {
     final settings = await _loadSettings();
     await _reported('setting aside the saved webhook', _setAsideWebhook);
     // New settings name no files: none can be told unused.
-    if (settings != null) {
-      await _profiles.tidy(settings, report: _reported);
-    }
-    return settings ?? const AppSettings();
+    if (settings == null) return const AppSettings();
+    final deleted = await _profiles.tidy(settings, report: _reported);
+    if (deleted.isEmpty) return settings;
+    // Kept on, if this can't be saved: deleting again does no harm.
+    final tidied = settings.withFilesDeleted(deleted);
+    await _reported('noting removed vehicles\' files gone', () => save(tidied));
+    return tidied;
   }
 
-  /// Runs [action], reporting a failure rather than throwing it.
-  static Future<void> _reported(
+  /// Runs [action], reporting a failure rather than throwing it, and says
+  /// whether it was done.
+  static Future<bool> _reported(
     String what,
     Future<void> Function() action,
   ) async {
     try {
       await action();
+      return true;
     } on Object catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(
@@ -75,6 +80,7 @@ class SettingsStore {
           context: ErrorDescription('while $what'),
         ),
       );
+      return false;
     }
   }
 

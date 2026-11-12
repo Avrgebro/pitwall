@@ -10,6 +10,7 @@ class AppSettings {
     this.vehicles = const [],
     this.interval = defaultInterval,
     this.setupDone = false,
+    this.removedVehicles = const {},
   });
 
   static const defaultInterval = Duration(minutes: 1);
@@ -31,6 +32,12 @@ class AppSettings {
 
   /// Whether first-run setup has been completed.
   final bool setupDone;
+
+  /// The ids of vehicles removed whose profile files may still be on the
+  /// phone, as when their delete failed. Written with the removal itself,
+  /// so files are only ever deleted for a vehicle known to be gone, never
+  /// for one these settings merely don't name.
+  final Set<String> removedVehicles;
 
   /// The vehicle whose adapter has [address], if any.
   Vehicle? vehicleForAdapter(String address) =>
@@ -115,23 +122,34 @@ class AppSettings {
     );
   }
 
-  AppSettings withoutVehicle(String id) =>
-      copyWith(vehicles: vehicles.where((v) => v.id != id).toList());
+  /// Without the vehicle, which is then among [removedVehicles] until its
+  /// files are gone.
+  AppSettings withoutVehicle(String id) => copyWith(
+    vehicles: vehicles.where((v) => v.id != id).toList(),
+    removedVehicles: {...removedVehicles, id},
+  );
+
+  /// With the files of the removed vehicles [ids] gone.
+  AppSettings withFilesDeleted(Set<String> ids) =>
+      copyWith(removedVehicles: removedVehicles.difference(ids));
 
   AppSettings copyWith({
     List<Vehicle>? vehicles,
     Duration? interval,
     bool? setupDone,
+    Set<String>? removedVehicles,
   }) => AppSettings(
     vehicles: vehicles ?? this.vehicles,
     interval: interval ?? this.interval,
     setupDone: setupDone ?? this.setupDone,
+    removedVehicles: removedVehicles ?? this.removedVehicles,
   );
 
   Map<String, Object?> toJson() => {
     'vehicles': [for (final vehicle in vehicles) vehicle.toJson()],
     'intervalSeconds': interval.inSeconds,
     'setupDone': setupDone,
+    'removedVehicles': removedVehicles.toList(),
   };
 
   /// Tolerates missing or wrongly typed fields, falling back to defaults.
@@ -149,6 +167,11 @@ class AppSettings {
           ? Duration(seconds: seconds.toInt())
           : defaultInterval,
       setupDone: json['setupDone'] == true,
+      removedVehicles: {
+        if (json['removedVehicles'] case final List<Object?> ids)
+          for (final id in ids)
+            if (id is String) id,
+      },
     );
   }
 }
