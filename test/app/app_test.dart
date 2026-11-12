@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/app/app.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
+import 'package:pitwall/core/bluetooth/device_kind.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -536,6 +537,97 @@ void main() {
     await tester.tap(find.text('Choose now'));
     await tester.pumpAndSettle();
     expect(find.text('Car head unit'), findsOneWidget);
+  });
+
+  testWidgets('a new car with a Bluetooth LE adapter starts when it wakes', (
+    tester,
+  ) async {
+    final tripService = FakeTripServiceGateway();
+    final store = FakeSettingsStore(
+      settings: const AppSettings(setupDone: true),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          store: store,
+          tripService: tripService,
+          bluetooth: FakeBluetoothGateway()
+            ..nearby = const [
+              BluetoothDevice(
+                name: 'IOS-Vlink',
+                address: 'C0:FF:EE:00:00:01',
+                kind: DeviceKind.obdAdapter,
+                type: AdapterType.ble,
+              ),
+            ],
+        ),
+        child: const PitwallApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add vehicle'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Tucson');
+    await tester.tap(find.text('IOS-Vlink'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(GlassButton, 'Add vehicle'));
+    await tester.pumpAndSettle();
+
+    // Android was asked, and confirmed: nothing more to set up.
+    expect(tripService.watchRequests, ['C0:FF:EE:00:00:01']);
+    expect(find.text('Choose Tucson\'s Bluetooth?'), findsNothing);
+    expect(store.settings.vehicles.single.tripStart, TripStart.adapterWakes);
+    expect(find.text('When IOS-Vlink wakes'), findsOneWidget);
+  });
+
+  testWidgets('declining Android for a new BLE car offers its Bluetooth', (
+    tester,
+  ) async {
+    final tripService = FakeTripServiceGateway()..confirmsWatch = false;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          settings: const AppSettings(setupDone: true),
+          tripService: tripService,
+          bluetooth: FakeBluetoothGateway()
+            ..nearby = const [
+              BluetoothDevice(
+                name: 'IOS-Vlink',
+                address: 'C0:FF:EE:00:00:01',
+                kind: DeviceKind.obdAdapter,
+                type: AdapterType.ble,
+              ),
+            ],
+        ),
+        child: const PitwallApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vehicles'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add vehicle'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Tucson');
+    await tester.tap(find.text('IOS-Vlink'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(GlassButton, 'Add vehicle'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose Tucson\'s Bluetooth?'), findsOneWidget);
   });
 
   testWidgets('developer tools connect to the vehicle picked', (tester) async {

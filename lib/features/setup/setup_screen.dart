@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -47,7 +48,15 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
       );
       _vehicleId = vehicle.id;
     }
-    _go(_Step.permissions);
+    // A Bluetooth LE adapter's waking can start trips: one confirmation in
+    // Android's dialog, while it's awake and nearby. Declined, or if
+    // Android can't, trips start from the car's Bluetooth, set later.
+    try {
+      await notifier.offerAdapterWake(_vehicleId!);
+    } on PlatformException {
+      // The done step says what trip start still needs.
+    }
+    if (mounted) _go(_Step.permissions);
   }
 
   Future<void> _finish() async {

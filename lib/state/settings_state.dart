@@ -326,6 +326,24 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     return true;
   }
 
+  /// For a vehicle whose trips don't start on their own yet, as a new one,
+  /// with a Bluetooth LE adapter: asks Android to watch for it, in the
+  /// system dialog, so its waking starts trips with nothing else to set
+  /// up. Most of those adapters sleep while the car is off, which is what
+  /// that needs. Returns whether trips now start that way; declined, or
+  /// with trips already set to start some way, nothing changes. Fails
+  /// as [startTripsWhenAdapterWakes] does.
+  Future<bool> offerAdapterWake(String vehicleId) async {
+    final vehicle = _current.vehicleById(vehicleId);
+    if (vehicle == null ||
+        vehicle.adapter?.type != AdapterType.ble ||
+        vehicle.tripStart != TripStart.carBluetooth ||
+        vehicle.headUnit != null) {
+      return false;
+    }
+    return startTripsWhenAdapterWakes(vehicleId);
+  }
+
   /// The model year, which picks which of the profile's requests apply.
   Future<void> setModelYear(String vehicleId, int year) =>
       _modifyVehicle(vehicleId, (v) => v.copyWith(modelYear: year));

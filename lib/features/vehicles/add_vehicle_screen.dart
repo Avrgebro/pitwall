@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -20,9 +21,17 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   VehicleDraft _draft = const VehicleDraft();
 
   Future<void> _save(NewVehicle draft) async {
-    final vehicle = await ref
-        .read(appSettingsProvider.notifier)
-        .addVehicle(name: draft.name, adapter: draft.adapter);
+    final settings = ref.read(appSettingsProvider.notifier);
+    final vehicle = await settings.addVehicle(
+      name: draft.name,
+      adapter: draft.adapter,
+    );
+    // A Bluetooth LE adapter's waking can start trips: one confirmation
+    // in Android's dialog, while it's awake and nearby, and that's done.
+    if (await _adapterWakes(settings, vehicle.id)) {
+      if (mounted) context.go(Routes.vehicle(vehicle.id));
+      return;
+    }
     if (!mounted) return;
     // The phone is usually in the car right now, the best moment to pick
     // its stereo.
@@ -54,6 +63,20 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
           ? Routes.vehicleTripStart(vehicle.id)
           : Routes.vehicle(vehicle.id),
     );
+  }
+
+  /// Whether trips now start when the adapter wakes. Android failing to
+  /// is no different here from the user declining: the car's Bluetooth is
+  /// offered next, and Trip start says what's missing.
+  static Future<bool> _adapterWakes(
+    AppSettingsNotifier settings,
+    String vehicleId,
+  ) async {
+    try {
+      return await settings.offerAdapterWake(vehicleId);
+    } on PlatformException {
+      return false;
+    }
   }
 
   @override

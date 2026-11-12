@@ -1018,6 +1018,44 @@ void main() {
       ]);
     });
 
+    test('is offered for a BLE adapter whose trips don\'t start yet', () async {
+      final (container, store, service) = await start(type: AdapterType.ble);
+
+      final done = await container
+          .read(appSettingsProvider.notifier)
+          .offerAdapterWake('tucson');
+
+      expect(done, isTrue);
+      expect(
+        store.settings.vehicleById('tucson')!.tripStart,
+        TripStart.adapterWakes,
+      );
+    });
+
+    test('isn\'t offered for a classic adapter', () async {
+      final (container, _, service) = await start(type: AdapterType.classic);
+
+      final done = await container
+          .read(appSettingsProvider.notifier)
+          .offerAdapterWake('tucson');
+
+      expect(done, isFalse);
+      expect(service.watchRequests, isEmpty);
+    });
+
+    test('isn\'t offered once trips start from the car\'s Bluetooth', () async {
+      final (container, _, service) = await start(type: AdapterType.ble);
+      final settings = container.read(appSettingsProvider.notifier);
+      await settings.setHeadUnit(
+        'tucson',
+        address: 'AA:BB:CC:DD:EE:FF',
+        name: 'TUCSON',
+      );
+
+      expect(await settings.offerAdapterWake('tucson'), isFalse);
+      expect(service.watchRequests, isEmpty);
+    });
+
     test('a deleted vehicle\'s adapter is forgotten', () async {
       final (container, _, service) = await start(type: AdapterType.ble);
       final settings = container.read(appSettingsProvider.notifier);
