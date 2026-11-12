@@ -48,11 +48,10 @@ class VehicleAdapter {
     required this.name,
     required this.type,
     this.setsFlowControl,
-    this.watched = false,
   });
 
   /// [device], chosen as the adapter. What it can do isn't known until
-  /// it's connected to, and Android isn't watching for it yet.
+  /// it's connected to.
   VehicleAdapter.of(BluetoothDevice device)
     : this(address: device.address, name: device.name, type: device.type);
 
@@ -64,22 +63,16 @@ class VehicleAdapter {
   /// connected to; null before then. Some profile values need it.
   final bool? setsFlowControl;
 
-  /// Whether Android watches for it to wake, as the user confirmed; see
-  /// [TripStart.adapterWakes]. Another adapter starts unwatched.
-  final bool watched;
-
   /// Whether this is the adapter at [address].
   bool isAt(String address) => sameAddress(this.address, address);
 
   /// This adapter, chosen again as [device]: what it can do is kept, and
   /// its name and how it connects are taken as Android reports them now.
-  /// Only a Bluetooth LE adapter is watched for.
   VehicleAdapter chosenAgain(BluetoothDevice device) => VehicleAdapter(
     address: address,
     name: device.name,
     type: device.type,
     setsFlowControl: setsFlowControl,
-    watched: watched && device.type == AdapterType.ble,
   );
 
   VehicleAdapter withFlowControl(bool sets) => VehicleAdapter(
@@ -87,15 +80,6 @@ class VehicleAdapter {
     name: name,
     type: type,
     setsFlowControl: sets,
-    watched: watched,
-  );
-
-  VehicleAdapter withWatched(bool watched) => VehicleAdapter(
-    address: address,
-    name: name,
-    type: type,
-    setsFlowControl: setsFlowControl,
-    watched: watched,
   );
 
   @override
@@ -104,12 +88,10 @@ class VehicleAdapter {
       other.address == address &&
       other.name == name &&
       other.type == type &&
-      other.setsFlowControl == setsFlowControl &&
-      other.watched == watched;
+      other.setsFlowControl == setsFlowControl;
 
   @override
-  int get hashCode =>
-      Object.hash(address, name, type, setsFlowControl, watched);
+  int get hashCode => Object.hash(address, name, type, setsFlowControl);
 }
 
 /// The car's own Bluetooth (its head unit), whose connection can start
@@ -176,19 +158,21 @@ class Vehicle {
       tripStart == TripStart.carBluetooth ? headUnit?.address : null;
 
   /// The adapter whose waking starts this vehicle's trips, if its trips
-  /// start that way and Android watches for it.
+  /// start that way. Android watches for it once the user confirmed it.
   String? get startingAdapter => switch ((tripStart, adapter)) {
     (
       TripStart.adapterWakes,
-      VehicleAdapter(type: AdapterType.ble, watched: true, :final address),
+      VehicleAdapter(type: AdapterType.ble, :final address),
     ) =>
       address,
     _ => null,
   };
 
   /// What the vehicle lacks before it works on its own; empty when
-  /// nothing does. The adapter comes first.
-  List<VehicleNeed> get needs => [
+  /// nothing does. The adapter comes first. [watchable] is the adapters
+  /// Android can watch for, as it says; not known, none is said to need
+  /// it, rather than one that may not.
+  List<VehicleNeed> needs({required Set<String>? watchable}) => [
     if (adapter == null) VehicleNeed.adapter,
     ...switch (tripStart) {
       TripStart.carBluetooth when headUnit == null => [VehicleNeed.headUnit],
@@ -198,7 +182,10 @@ class Vehicle {
         VehicleAdapter(type: AdapterType.classic) => [
           VehicleNeed.bluetoothLeAdapter,
         ],
-        VehicleAdapter(watched: false) => [VehicleNeed.adapterWatch],
+        VehicleAdapter(:final address)
+            when watchable != null &&
+                !watchable.any((w) => sameAddress(w, address)) =>
+          [VehicleNeed.adapterWatch],
         VehicleAdapter() => const <VehicleNeed>[],
       },
     },
@@ -286,7 +273,6 @@ class Vehicle {
     'adapterName': adapter?.name,
     'adapterType': adapter?.type.name,
     'adapterSetsFlowControl': adapter?.setsFlowControl,
-    'adapterWatched': adapter?.watched,
     'tripStart': tripStart.name,
     'headUnitAddress': headUnit?.address,
     'headUnitName': headUnit?.name,
@@ -317,7 +303,6 @@ class Vehicle {
           final bool sets => sets,
           _ => null,
         },
-        watched: json['adapterWatched'] == true,
       ),
       null => null,
     },

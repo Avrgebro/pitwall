@@ -28,24 +28,6 @@ void main() {
       expect(again.address, saved.address);
     });
 
-    test('as classic is no longer watched', () {
-      final watched =
-          const VehicleAdapter(
-            address: 'C0:FF:EE:00:00:01',
-            name: 'IOS-Vlink',
-            type: AdapterType.ble,
-            watched: true,
-          ).chosenAgain(
-            const BluetoothDevice(
-              name: 'IOS-Vlink',
-              address: 'C0:FF:EE:00:00:01',
-              type: AdapterType.classic,
-            ),
-          );
-
-      expect(watched.watched, isFalse);
-    });
-
     test('is found by its address in any case', () {
       expect(saved.isAt('c0:ff:ee:00:00:01'), isTrue);
       expect(saved.isAt('C0:FF:EE:00:00:02'), isFalse);
@@ -63,17 +45,22 @@ void main() {
   );
 
   test('a vehicle with an adapter and a head unit needs nothing', () {
-    expect(ready.needs, isEmpty);
+    expect(ready.needs(watchable: const {}), isEmpty);
   });
 
   test('a missing adapter comes before a missing head unit', () {
     const bare = Vehicle(id: 'tucson');
-    expect(bare.needs, [VehicleNeed.adapter, VehicleNeed.headUnit]);
+    expect(bare.needs(watchable: const {}), [
+      VehicleNeed.adapter,
+      VehicleNeed.headUnit,
+    ]);
   });
 
   test('waking needs a Bluetooth LE adapter that Android watches for', () {
     final classic = ready.copyWith(tripStart: TripStart.adapterWakes);
-    expect(classic.needs, [VehicleNeed.bluetoothLeAdapter]);
+    expect(classic.needs(watchable: const {}), [
+      VehicleNeed.bluetoothLeAdapter,
+    ]);
     expect(classic.startingAdapter, isNull);
 
     const bluetoothLe = VehicleAdapter(
@@ -81,23 +68,14 @@ void main() {
       name: 'IOS-Vlink',
       type: AdapterType.ble,
     );
-    final unwatched = classic.copyWith(adapter: bluetoothLe);
-    expect(unwatched.needs, [VehicleNeed.adapterWatch]);
-
-    final watched = classic.copyWith(adapter: bluetoothLe.withWatched(true));
-    expect(watched.needs, isEmpty);
-    expect(watched.startingAdapter, 'C0:FF:EE:00:00:01');
+    final waking = classic.copyWith(adapter: bluetoothLe);
+    // As Android says: not watched, watched, or not known yet.
+    expect(waking.needs(watchable: const {}), [VehicleNeed.adapterWatch]);
+    expect(waking.needs(watchable: const {'c0:ff:ee:00:00:01'}), isEmpty);
+    expect(waking.needs(watchable: null), isEmpty);
+    expect(waking.startingAdapter, 'C0:FF:EE:00:00:01');
     // Its head unit no longer starts trips.
-    expect(watched.startingHeadUnit, isNull);
-  });
-
-  test('another adapter isn\'t watched until confirmed', () {
-    const device = BluetoothDevice(
-      name: 'IOS-Vlink',
-      address: 'C0:FF:EE:00:00:02',
-      type: AdapterType.ble,
-    );
-    expect(VehicleAdapter.of(device).watched, isFalse);
+    expect(waking.startingHeadUnit, isNull);
   });
 
   test('every way of copying keeps the fields it doesn\'t change', () {

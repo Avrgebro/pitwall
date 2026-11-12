@@ -11,6 +11,7 @@ import '../core/readings/readings.dart';
 import '../core/settings/settings.dart';
 import '../core/settings/settings_store.dart';
 import '../core/vehicles/vehicle.dart';
+import 'adapter_watch_state.dart';
 import 'infrastructure.dart';
 
 /// The user's settings and vehicles. Every change is saved right away.
@@ -160,16 +161,43 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     String vehicleId, {
     required String name,
     required BluetoothDevice adapter,
-  }) async {
-    await _modifyVehicle(
-      vehicleId,
-      (v) => _withAdapter(v.copyWith(name: name.trim()), adapter),
-    );
-  }
+  }) => _replaceAdapter(
+    vehicleId,
+    (v) => _withAdapter(v.copyWith(name: name.trim()), adapter),
+  );
 
   /// Makes [adapter] the vehicle's adapter.
   Future<void> setAdapter(String vehicleId, BluetoothDevice adapter) =>
-      _modifyVehicle(vehicleId, (v) => _withAdapter(v, adapter));
+      _replaceAdapter(vehicleId, (v) => _withAdapter(v, adapter));
+
+  /// Applies [change], which may give the vehicle another adapter. Once
+  /// that's saved, Android forgets the one it had, if it watched for it:
+  /// no vehicle uses it any more, as an adapter belongs to one at most.
+  Future<void> _replaceAdapter(
+    String vehicleId,
+    Vehicle Function(Vehicle vehicle) change,
+  ) async {
+    final before = _current.vehicleById(vehicleId)?.adapter;
+    await _modifyVehicle(vehicleId, change);
+    final after = _current.vehicleById(vehicleId)?.adapter;
+    if (before != null && !(after?.isAt(before.address) ?? false)) {
+      await _forgetAdapter(before);
+    }
+  }
+
+  /// Has Android forget [adapter], which no vehicle uses now. A failure
+  /// is reported, not thrown: what was saved stands, and an association
+  /// left behind only lingers in Android's settings.
+  Future<void> _forgetAdapter(VehicleAdapter adapter) async {
+    if (adapter.type != AdapterType.ble) return;
+    await _reported(
+      'having Android forget an adapter no vehicle uses',
+      () => ref.read(tripServiceGatewayProvider).forgetAdapter(adapter.address),
+    );
+    if (ref.mounted) {
+      await ref.read(watchableAdaptersProvider.notifier).refresh();
+    }
+  }
 
   /// The one place a device becomes a vehicle's adapter. The same adapter
   /// chosen again keeps what's known of it, and takes how it connects as
@@ -200,6 +228,7 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
     final vehicle = _current.vehicleById(id);
     if (vehicle == null) return;
     await _save(_current.withoutVehicle(id));
+    if (vehicle.adapter case final adapter?) await _forgetAdapter(adapter);
     final deleted = await _queued(
       (store) => _reported(
         'deleting the profile files of a deleted vehicle',
@@ -284,15 +313,15 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
         .read(tripServiceGatewayProvider)
         .watchAdapter(adapter.address);
     if (!watched || !ref.mounted) return false;
+    // Android's word changed: it's asked again, not noted here.
+    await ref.read(watchableAdaptersProvider.notifier).refresh();
+    if (!ref.mounted) return false;
     await _modifyVehicle(
       vehicleId,
-      (v) => v.copyWith(
-        tripStart: TripStart.adapterWakes,
-        // Only if it's still that adapter, as it was when asked.
-        adapter: v.adapter?.address == adapter.address
-            ? v.adapter?.withWatched(true)
-            : v.adapter,
-      ),
+      // Only if it's still that adapter, as it was when asked.
+      (v) => v.adapter?.isAt(adapter.address) ?? false
+          ? v.copyWith(tripStart: TripStart.adapterWakes)
+          : v,
     );
     return true;
   }

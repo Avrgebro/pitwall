@@ -7,6 +7,7 @@ import '../../core/bluetooth/adapter_type.dart';
 import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/bluetooth/device_kind.dart';
 import '../../core/vehicles/vehicle.dart';
+import '../../state/adapter_watch_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
@@ -31,6 +32,11 @@ class VehicleTripStartScreen extends ConsumerWidget {
     final headUnit = vehicle.headUnit?.name;
     final adapter = vehicle.adapter;
     final canWake = adapter?.type == AdapterType.ble;
+    // Android's word on it, not a note of the app's; null until it says.
+    final watched = switch ((ref.watch(watchableAdaptersProvider), adapter)) {
+      (AsyncData(:final value), final adapter?) => value.any(adapter.isAt),
+      _ => null,
+    };
 
     return AppPage(
       title: 'Trip start',
@@ -75,16 +81,18 @@ class VehicleTripStartScreen extends ConsumerWidget {
               GroupTile(
                 icon: Symbols.bluetooth_searching_rounded,
                 title: adapter.name,
-                subtitle: adapter.watched
-                    ? 'Android watches for it'
-                    : 'Android isn\'t watching for it yet',
-                subtitleTone: adapter.watched ? null : StatusTone.warning,
-                trailing: adapter.watched
-                    ? null
-                    : TextButton(
+                subtitle: switch (watched) {
+                  true => 'Android watches for it',
+                  false => 'Android isn\'t watching for it',
+                  null => 'Checking with Android',
+                },
+                subtitleTone: watched == false ? StatusTone.warning : null,
+                trailing: watched == false
+                    ? TextButton(
                         onPressed: () => _watchAdapter(context, ref, vehicle),
                         child: const Text('Confirm'),
-                      ),
+                      )
+                    : null,
               ),
             ],
           ),
@@ -146,14 +154,20 @@ class VehicleTripStartScreen extends ConsumerWidget {
           .read(appSettingsProvider.notifier)
           .startTripsWhenAdapterWakes(vehicle.id);
       if (!watched) {
-        message =
-            'Android isn\'t watching for the adapter, so trips still '
-            'start as before.';
+        message = vehicle.tripStart == TripStart.adapterWakes
+            ? 'Android isn\'t watching for the adapter, so its waking '
+                  'won\'t start trips.'
+            : 'Android isn\'t watching for the adapter, so trips still '
+                  'start as before.';
       }
-    } on PlatformException {
-      message =
-          'Android couldn\'t watch for the adapter. Try again with the '
-          'adapter awake and nearby.';
+    } on PlatformException catch (e) {
+      message = switch (e.code) {
+        // Its dialog is already open.
+        'busy' => null,
+        _ =>
+          'Android couldn\'t find the adapter. Try again with the engine '
+              'running, so the adapter is awake, and the phone nearby.',
+      };
     }
     if (message != null) {
       messenger.showSnackBar(SnackBar(content: Text(message)));

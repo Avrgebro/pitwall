@@ -13,25 +13,29 @@ class VehicleRow extends StatelessWidget {
   const VehicleRow({
     super.key,
     required this.vehicle,
+    required this.needs,
     required this.now,
     required this.onTap,
     this.badge = VehicleBadge.none,
   });
 
   final Vehicle vehicle;
+
+  /// What it lacks before it works on its own; see [Vehicle.needs].
+  final List<VehicleNeed> needs;
   final DateTime now;
   final VehicleBadge badge;
   final VoidCallback onTap;
 
   /// What the vehicle needs before it works on its own, if anything.
-  static String? _problem(Vehicle vehicle) => switch (vehicle.needs) {
+  String? get _problem => switch (needs) {
     [final need, ...] => need.label,
     [] => null,
   };
 
   @override
   Widget build(BuildContext context) {
-    final problem = _problem(vehicle);
+    final problem = _problem;
     final lastSeen = vehicle.lastSeen;
     final status = switch (badge) {
       VehicleBadge.connected => 'Connected now',

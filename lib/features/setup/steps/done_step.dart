@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/vehicles/vehicle.dart';
+import '../../../state/adapter_watch_state.dart';
 import '../../../state/webhook_state.dart';
 import '../../../ui/ui.dart';
 import '../../common/trip_start_text.dart';
@@ -79,7 +80,10 @@ class DoneStep extends ConsumerWidget {
                 icon: Symbols.bluetooth_drive_rounded,
                 label: 'Trip start',
                 value: switch (vehicle) {
-                  final vehicle? => TripStartText.summary(vehicle).text,
+                  final vehicle? => TripStartText.summary(
+                    vehicle,
+                    ref.watch(vehicleNeedsProvider(vehicle.id)),
+                  ).text,
                   null => 'Add a vehicle first',
                 },
                 caption: 'On the vehicle\'s page',

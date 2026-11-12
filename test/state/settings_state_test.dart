@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
@@ -13,6 +14,7 @@ import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 import 'package:pitwall/core/webhook/webhook_target.dart';
+import 'package:pitwall/state/adapter_watch_state.dart';
 import 'package:pitwall/state/last_values_state.dart';
 import 'package:pitwall/state/settings_state.dart';
 import 'package:pitwall/state/webhook_state.dart';
@@ -813,8 +815,8 @@ void main() {
       name: 'IOS-Vlink',
       type: AdapterType.ble,
       setsFlowControl: true,
-      watched: true,
     );
+    late FakeTripServiceGateway service;
 
     Future<(ProviderContainer, FakeSettingsStore)> start() async {
       final store = FakeSettingsStore(
@@ -829,8 +831,9 @@ void main() {
           ],
         ),
       );
+      service = FakeTripServiceGateway()..watchable.add(iCar.address);
       final container = ProviderContainer(
-        overrides: testOverrides(store: store),
+        overrides: testOverrides(store: store, tripService: service),
       );
       addTearDown(container.dispose);
       await container.read(appSettingsProvider.future);
@@ -853,7 +856,11 @@ void main() {
 
       final vehicle = store.settings.vehicleById('tucson')!;
       expect(vehicle.tripStart, TripStart.carBluetooth);
-      expect(vehicle.needs, [VehicleNeed.headUnit]);
+      expect(container.read(vehicleNeedsProvider('tucson')), [
+        VehicleNeed.headUnit,
+      ]);
+      // No vehicle uses the old one: Android forgets it.
+      expect(service.forgotten, [iCar.address]);
     });
 
     test('to another BLE one keeps waking, until it\'s watched', () async {
@@ -872,7 +879,10 @@ void main() {
 
       final vehicle = store.settings.vehicleById('tucson')!;
       expect(vehicle.tripStart, TripStart.adapterWakes);
-      expect(vehicle.needs, [VehicleNeed.adapterWatch]);
+      await container.read(watchableAdaptersProvider.future);
+      expect(container.read(vehicleNeedsProvider('tucson')), [
+        VehicleNeed.adapterWatch,
+      ]);
     });
 
     test('to the same one again keeps what\'s known of it', () async {
@@ -890,6 +900,8 @@ void main() {
           );
 
       expect(store.settings.vehicleById('tucson')!.adapter, iCar);
+      // Still in use, so Android keeps it.
+      expect(service.forgotten, isEmpty);
     });
 
     test('to the same one as classic corrects how it connects', () async {
@@ -951,7 +963,7 @@ void main() {
       expect(service.watchRequests, ['C0:FF:EE:00:00:01']);
       final vehicle = store.settings.vehicleById('tucson')!;
       expect(vehicle.tripStart, TripStart.adapterWakes);
-      expect(vehicle.adapter?.watched, isTrue);
+      expect(container.read(vehicleNeedsProvider('tucson')), isEmpty);
     });
 
     test('changes nothing if the user declines', () async {
@@ -967,6 +979,54 @@ void main() {
         store.settings.vehicleById('tucson')!.tripStart,
         TripStart.carBluetooth,
       );
+    });
+
+    test('fails, changing nothing, when Android couldn\'t', () async {
+      final (container, store, service) = await start(type: AdapterType.ble);
+      service.failWatch = true;
+
+      await expectLater(
+        container
+            .read(appSettingsProvider.notifier)
+            .startTripsWhenAdapterWakes('tucson'),
+        throwsA(
+          isA<PlatformException>().having(
+            (e) => e.code,
+            'code',
+            'watch_failed',
+          ),
+        ),
+      );
+      expect(
+        store.settings.vehicleById('tucson')!.tripStart,
+        TripStart.carBluetooth,
+      );
+    });
+
+    test('needs confirming again once Android forgot the adapter', () async {
+      final (container, store, service) = await start(type: AdapterType.ble);
+      final settings = container.read(appSettingsProvider.notifier);
+      await settings.startTripsWhenAdapterWakes('tucson');
+      expect(container.read(vehicleNeedsProvider('tucson')), isEmpty);
+
+      // Removed in Android's settings, or gone with a reinstall.
+      service.watchable.clear();
+      await container.read(watchableAdaptersProvider.notifier).refresh();
+
+      expect(container.read(vehicleNeedsProvider('tucson')), [
+        VehicleNeed.adapterWatch,
+      ]);
+    });
+
+    test('a deleted vehicle\'s adapter is forgotten', () async {
+      final (container, _, service) = await start(type: AdapterType.ble);
+      final settings = container.read(appSettingsProvider.notifier);
+      await settings.startTripsWhenAdapterWakes('tucson');
+
+      await settings.deleteVehicle('tucson');
+
+      expect(service.forgotten, ['C0:FF:EE:00:00:01']);
+      expect(service.watchable, isEmpty);
     });
 
     test('isn\'t offered for a classic adapter', () async {

@@ -27,8 +27,17 @@ abstract interface class TripServiceGateway {
   /// Asks Android to watch for the Bluetooth LE adapter at [address], so
   /// its waking can start trips with the app closed. Shows a system dialog
   /// the user confirms; true once Android watches for it, false if they
-  /// declined.
+  /// declined. Fails with a `PlatformException` when Android couldn't,
+  /// coded `watch_failed`, or `busy` while another request is open.
   Future<bool> watchAdapter(String address);
+
+  /// The adapters Android can watch for: the ones the user confirmed and
+  /// hasn't removed since.
+  Future<List<String>> watchableAdapters();
+
+  /// Removes Android's record of the adapter at [address], as when no
+  /// vehicle uses it any more.
+  Future<void> forgetAdapter(String address);
 
   /// Starts the service from the app for [target]. It comes back through
   /// [starts], as a head unit's start does.
@@ -67,6 +76,12 @@ class AndroidTripServiceGateway implements TripServiceGateway, TripStartApi {
 
   @override
   Future<bool> watchAdapter(String address) => CompanionApi().watch(address);
+
+  @override
+  Future<List<String>> watchableAdapters() => _api.watchableAdapters();
+
+  @override
+  Future<void> forgetAdapter(String address) => _api.forgetAdapter(address);
 
   @override
   Future<void> startService(AppTripTarget target) =>

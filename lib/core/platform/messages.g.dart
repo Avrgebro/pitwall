@@ -635,6 +635,50 @@ class TripServiceApi {
     );
   }
 
+  /// The Bluetooth LE adapters Android can watch for: those the user
+  /// confirmed as companion devices, and hasn't removed since. Android's
+  /// answer, as it stands now.
+  Future<List<String>> watchableAdapters() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.watchableAdapters$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return (pigeonVar_replyValue! as List<Object?>).cast<String>();
+  }
+
+  /// Removes Android's companion device for the adapter at [address], as
+  /// when a vehicle no longer uses it. Nothing if there's none.
+  Future<void> forgetAdapter(String address) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.TripServiceApi.forgetAdapter$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
   /// Starts the service for a trip the app asked for: a vehicle, or any.
   Future<void> startService(AppTripTargetMessage target) async {
     final pigeonVar_channelName =
@@ -738,7 +782,9 @@ class CompanionApi {
   /// Asks Android to watch for the Bluetooth LE adapter at [address], with
   /// the system dialog the user confirms. True once it does, also when it
   /// already did; false if the user declined. Fails with `unavailable`
-  /// without a screen to ask on.
+  /// without a screen to ask on, `busy` while another request is open,
+  /// and `watch_failed` when Android couldn't, as when it didn't find the
+  /// adapter.
   Future<bool> watch(String address) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.pitwall.CompanionApi.watch$pigeonVar_messageChannelSuffix';

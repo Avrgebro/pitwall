@@ -213,10 +213,28 @@ class FakeTripServiceGateway implements TripServiceGateway {
   bool confirmsWatch = true;
   final watchRequests = <String>[];
 
+  /// What Android can watch for: confirming adds to it, as on the phone.
+  final watchable = <String>{};
+
+  /// Makes watching fail, as when Android didn't find the adapter.
+  bool failWatch = false;
+  final forgotten = <String>[];
+
   @override
   Future<bool> watchAdapter(String address) async {
     watchRequests.add(address);
+    if (failWatch) throw PlatformException(code: 'watch_failed');
+    if (confirmsWatch) watchable.add(address.toUpperCase());
     return confirmsWatch;
+  }
+
+  @override
+  Future<List<String>> watchableAdapters() async => [...watchable];
+
+  @override
+  Future<void> forgetAdapter(String address) async {
+    forgotten.add(address);
+    watchable.remove(address.toUpperCase());
   }
 
   /// Like Android: the start comes back as the target it names.

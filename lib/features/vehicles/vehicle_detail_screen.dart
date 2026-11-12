@@ -7,6 +7,7 @@ import '../../app/routes.dart';
 import '../../core/profiles/stored_profile.dart';
 import '../../core/readings/readings.dart';
 import '../../core/vehicles/vehicle.dart';
+import '../../state/adapter_watch_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/profile_text.dart';
@@ -31,7 +32,8 @@ class VehicleDetailScreen extends ConsumerWidget {
     final vehicle = values.vehicle;
     final profile = _profileSummary(values);
     final selected = values.sent;
-    final tripStart = TripStartText.summary(vehicle);
+    final needs = ref.watch(vehicleNeedsProvider(vehicle.id));
+    final tripStart = TripStartText.summary(vehicle, needs);
 
     return AppPage(
       title: vehicle.name,
@@ -57,7 +59,7 @@ class VehicleDetailScreen extends ConsumerWidget {
                 final adapter? => AdapterTypeTag(adapter.type),
                 null => null,
               },
-              subtitleTone: vehicle.needs.contains(VehicleNeed.adapter)
+              subtitleTone: needs.contains(VehicleNeed.adapter)
                   ? StatusTone.error
                   : null,
               onTap: () => context.push(Routes.vehicleAdapter(vehicle.id)),

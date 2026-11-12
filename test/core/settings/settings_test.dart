@@ -85,46 +85,38 @@ void main() {
     });
   });
 
-  test('only adapters that wake and are watched start trips', () {
-    VehicleAdapter adapter({required bool watched}) => VehicleAdapter(
+  test('only Bluetooth LE adapters that wake start trips', () {
+    const bluetoothLe = VehicleAdapter(
       address: 'C0:FF:EE:00:00:01',
       name: 'IOS-Vlink',
       type: AdapterType.ble,
-      watched: watched,
     );
-    final watched = AppSettings(
+    const waking = AppSettings(
       vehicles: [
         Vehicle(
           id: 'a1',
           name: 'Tucson',
-          adapter: adapter(watched: true),
+          adapter: bluetoothLe,
           tripStart: TripStart.adapterWakes,
         ),
       ],
     );
 
-    expect(watched.startingAdapters, {'C0:FF:EE:00:00:01'});
+    // Android watches for those of them the user confirmed.
+    expect(waking.startingAdapters, {'C0:FF:EE:00:00:01'});
     expect(
-      watched
-          .tripCandidates(const AdapterTarget('c0:ff:ee:00:00:01'))
-          .single
-          .id,
+      waking.tripCandidates(const AdapterTarget('c0:ff:ee:00:00:01')).single.id,
       'a1',
     );
 
-    final unwatched = AppSettings(
+    final fromStereo = AppSettings(
       vehicles: [
-        Vehicle(
-          id: 'a1',
-          name: 'Tucson',
-          adapter: adapter(watched: false),
-          tripStart: TripStart.adapterWakes,
-        ),
+        waking.vehicles.single.copyWith(tripStart: TripStart.carBluetooth),
       ],
     );
-    expect(unwatched.startingAdapters, isEmpty);
+    expect(fromStereo.startingAdapters, isEmpty);
     expect(
-      unwatched.tripCandidates(const AdapterTarget('C0:FF:EE:00:00:01')),
+      fromStereo.tripCandidates(const AdapterTarget('C0:FF:EE:00:00:01')),
       isEmpty,
     );
   });

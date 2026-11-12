@@ -313,7 +313,6 @@ void main() {
       address: 'C0:FF:EE:00:00:01',
       name: 'IOS-Vlink',
       type: AdapterType.ble,
-      watched: true,
     );
     final waking = _tucson.copyWith(
       adapter: iCar,

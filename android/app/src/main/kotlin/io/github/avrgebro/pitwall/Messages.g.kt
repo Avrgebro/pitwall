@@ -721,6 +721,17 @@ interface TripServiceApi {
    * watching any others.
    */
   fun configure(headUnitAddresses: List<String>, wakingAdapterAddresses: List<String>)
+  /**
+   * The Bluetooth LE adapters Android can watch for: those the user
+   * confirmed as companion devices, and hasn't removed since. Android's
+   * answer, as it stands now.
+   */
+  fun watchableAdapters(): List<String>
+  /**
+   * Removes Android's companion device for the adapter at [address], as
+   * when a vehicle no longer uses it. Nothing if there's none.
+   */
+  fun forgetAdapter(address: String)
   /** Starts the service for a trip the app asked for: a vehicle, or any. */
   fun startService(target: AppTripTargetMessage)
   fun stopService()
@@ -749,6 +760,39 @@ interface TripServiceApi {
             val wakingAdapterAddressesArg = args[1] as List<String>
             val wrapped: List<Any?> = try {
               api.configure(headUnitAddressesArg, wakingAdapterAddressesArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.TripServiceApi.watchableAdapters$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.watchableAdapters())
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.TripServiceApi.forgetAdapter$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val addressArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.forgetAdapter(addressArg)
               listOf(null)
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
@@ -840,7 +884,9 @@ interface CompanionApi {
    * Asks Android to watch for the Bluetooth LE adapter at [address], with
    * the system dialog the user confirms. True once it does, also when it
    * already did; false if the user declined. Fails with `unavailable`
-   * without a screen to ask on.
+   * without a screen to ask on, `busy` while another request is open,
+   * and `watch_failed` when Android couldn't, as when it didn't find the
+   * adapter.
    */
   suspend fun watch(address: String): Boolean
 

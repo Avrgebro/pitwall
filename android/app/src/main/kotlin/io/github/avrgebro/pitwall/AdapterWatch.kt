@@ -22,6 +22,26 @@ object AdapterWatch {
             it.deviceMacAddress?.toString().equals(address, ignoreCase = true)
         }
 
+    /**
+     * The addresses of every adapter the user confirmed, and hasn't removed
+     * since, in system settings or by reinstalling: those Android can watch.
+     */
+    fun confirmed(context: Context): List<String> =
+        manager(context)?.myAssociations.orEmpty().mapNotNull {
+            it.deviceMacAddress?.toString()?.uppercase()
+        }
+
+    /**
+     * Removes the confirmed association for the adapter at [address], which
+     * stops watching for it too. Nothing if there's none.
+     */
+    fun forget(context: Context, address: String) {
+        val manager = manager(context) ?: return
+        val association = association(context, address) ?: return
+        stop(manager, association)
+        manager.disassociate(association.id)
+    }
+
     /** The address of the association numbered [id], if it's ours. */
     fun address(context: Context, id: Int): String? =
         manager(context)?.myAssociations?.firstOrNull { it.id == id }

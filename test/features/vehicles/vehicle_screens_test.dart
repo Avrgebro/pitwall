@@ -178,6 +178,86 @@ void main() {
     expect(enabled(), isFalse);
   });
 
+  group('trip start from a waking adapter', () {
+    Future<FakeTripServiceGateway> pump(
+      WidgetTester tester, {
+      Set<String> watchable = const {},
+    }) async {
+      final service = FakeTripServiceGateway()..watchable.addAll(watchable);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: testOverrides(
+            store: FakeSettingsStore(
+              settings: const AppSettings(
+                vehicles: [
+                  Vehicle(
+                    id: 'tucson',
+                    name: 'Tucson',
+                    adapter: VehicleAdapter(
+                      address: 'C0:FF:EE:00:00:01',
+                      name: 'IOS-Vlink',
+                      type: AdapterType.ble,
+                    ),
+                    tripStart: TripStart.adapterWakes,
+                  ),
+                ],
+              ),
+            ),
+            tripService: service,
+          ),
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const VehicleTripStartScreen(vehicleId: 'tucson'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return service;
+    }
+
+    testWidgets('says Android watches for it, as Android says', (tester) async {
+      await pump(tester, watchable: {'C0:FF:EE:00:00:01'});
+      expect(find.text('Android watches for it'), findsOneWidget);
+      expect(find.text('Confirm'), findsNothing);
+    });
+
+    testWidgets('says Android isn\'t watching, as Android says', (
+      tester,
+    ) async {
+      await pump(tester);
+      expect(find.text('Android isn\'t watching for it'), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
+    });
+
+    testWidgets('a pairing that failed says so, not that it was declined', (
+      tester,
+    ) async {
+      final service = await pump(tester);
+      service.failWatch = true;
+
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('couldn\'t find the adapter'), findsOneWidget);
+    });
+
+    testWidgets('declining says its waking won\'t start trips', (tester) async {
+      final service = await pump(tester);
+      service.confirmsWatch = false;
+
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Android isn\'t watching for the adapter, so its waking won\'t '
+          'start trips.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
   testWidgets('a new BLE adapter for waking trips is confirmed at once', (
     tester,
   ) async {
@@ -197,14 +277,14 @@ void main() {
               address: 'C0:FF:EE:00:00:01',
               name: 'IOS-Vlink',
               type: AdapterType.ble,
-              watched: true,
             ),
             tripStart: TripStart.adapterWakes,
           ),
         ],
       ),
     );
-    final service = FakeTripServiceGateway();
+    final service = FakeTripServiceGateway()
+      ..watchable.add('C0:FF:EE:00:00:01');
     await tester.pumpWidget(
       ProviderScope(
         overrides: testOverrides(
@@ -226,7 +306,9 @@ void main() {
     expect(service.watchRequests, ['C0:FF:EE:00:00:02']);
     final vehicle = store.settings.vehicleById('tucson')!;
     expect(vehicle.adapter?.address, 'C0:FF:EE:00:00:02');
-    expect(vehicle.needs, isEmpty);
+    // The old one no vehicle uses: Android forgets it.
+    expect(service.watchable, {'C0:FF:EE:00:00:02'});
+    expect(service.forgotten, ['C0:FF:EE:00:00:01']);
   });
 
   group('with a profile', () {

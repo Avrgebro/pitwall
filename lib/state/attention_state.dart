@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/webhook/delivery_status.dart';
 
+import 'adapter_watch_state.dart';
 import 'permissions_state.dart';
 import 'settings_state.dart';
 import 'webhook_state.dart';
@@ -17,11 +18,7 @@ final settingsAttentionProvider = Provider<bool>((ref) {
 });
 
 /// Whether a vehicle lacks something before it works on its own.
-final vehiclesAttentionProvider = Provider<bool>(
-  (ref) => ref.watch(
-    appSettingsProvider.select(
-      (settings) =>
-          settings.value?.vehicles.any((v) => v.needs.isNotEmpty) ?? false,
-    ),
-  ),
-);
+final vehiclesAttentionProvider = Provider<bool>((ref) {
+  final vehicles = ref.watch(appSettingsProvider).value?.vehicles ?? const [];
+  return vehicles.any((v) => ref.watch(vehicleNeedsProvider(v.id)).isNotEmpty);
+});

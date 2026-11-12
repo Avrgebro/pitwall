@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/bluetooth/bluetooth_gateway.dart';
 import '../../core/vehicles/vehicle.dart';
+import '../../state/adapter_watch_state.dart';
 import '../../state/settings_state.dart';
 import '../../ui/ui.dart';
 import '../common/widgets/adapter_picker.dart';
@@ -29,7 +30,13 @@ class VehicleAdapterScreen extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     await settings.setAdapter(vehicleId, device);
     final vehicle = ref.read(vehicleProvider(vehicleId));
-    if (vehicle == null || !vehicle.needs.contains(VehicleNeed.adapterWatch)) {
+    final watchable = await ref
+        .read(watchableAdaptersProvider.future)
+        .then<Set<String>?>((w) => w, onError: (_) => null);
+    if (vehicle == null ||
+        !vehicle
+            .needs(watchable: watchable)
+            .contains(VehicleNeed.adapterWatch)) {
       return;
     }
     try {

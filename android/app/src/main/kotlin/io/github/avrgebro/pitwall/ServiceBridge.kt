@@ -73,6 +73,10 @@ object ServiceBridge {
             AdapterWatch.observe(context, adapters)
         }
 
+        override fun watchableAdapters(): List<String> = AdapterWatch.confirmed(context)
+
+        override fun forgetAdapter(address: String) = AdapterWatch.forget(context, address)
+
         override fun startService(target: AppTripTargetMessage) =
             TripService.start(context, AppRequestMessage(target))
 

@@ -66,6 +66,15 @@ abstract class TripServiceApi {
     List<String> wakingAdapterAddresses,
   );
 
+  /// The Bluetooth LE adapters Android can watch for: those the user
+  /// confirmed as companion devices, and hasn't removed since. Android's
+  /// answer, as it stands now.
+  List<String> watchableAdapters();
+
+  /// Removes Android's companion device for the adapter at [address], as
+  /// when a vehicle no longer uses it. Nothing if there's none.
+  void forgetAdapter(String address);
+
   /// Starts the service for a trip the app asked for: a vehicle, or any.
   void startService(AppTripTargetMessage target);
 
@@ -85,7 +94,9 @@ abstract class CompanionApi {
   /// Asks Android to watch for the Bluetooth LE adapter at [address], with
   /// the system dialog the user confirms. True once it does, also when it
   /// already did; false if the user declined. Fails with `unavailable`
-  /// without a screen to ask on.
+  /// without a screen to ask on, `busy` while another request is open,
+  /// and `watch_failed` when Android couldn't, as when it didn't find the
+  /// adapter.
   @async
   bool watch(String address);
 }

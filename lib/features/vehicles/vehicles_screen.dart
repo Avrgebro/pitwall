@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/routes.dart';
+import '../../state/adapter_watch_state.dart';
 import '../../state/focus_state.dart';
 import '../../state/infrastructure.dart';
 import '../../state/live_activity_state.dart';
@@ -54,6 +55,7 @@ class VehiclesScreen extends ConsumerWidget {
             for (final vehicle in vehicles)
               VehicleRow(
                 vehicle: vehicle,
+                needs: ref.watch(vehicleNeedsProvider(vehicle.id)),
                 now: now,
                 badge: badgeFor(vehicle.id),
                 onTap: () => context.push(Routes.vehicle(vehicle.id)),

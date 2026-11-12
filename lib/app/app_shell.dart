@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../state/adapter_watch_state.dart';
 import '../state/attention_state.dart';
 import '../state/permissions_state.dart';
 import '../ui/ui.dart';
@@ -22,7 +23,11 @@ class _AppShellState extends ConsumerState<AppShell> {
   // Permissions can change in Android settings while Pitwall is away, and
   // the Settings badge depends on them.
   late final _lifecycle = AppLifecycleListener(
-    onResume: () => ref.read(permissionsProvider.notifier).refresh(),
+    // Either may have changed in Android's settings meanwhile.
+    onResume: () {
+      ref.read(permissionsProvider.notifier).refresh();
+      ref.read(watchableAdaptersProvider.notifier).refresh();
+    },
   );
 
   @override
