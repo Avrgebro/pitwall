@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 object ServiceBridge {
     private const val PREFS = "pitwall_service"
     private const val KEY_HEAD_UNITS = "head_unit_addresses"
+    private const val KEY_ADAPTERS = "waking_adapter_addresses"
 
     private val main = Handler(Looper.getMainLooper())
     private var dart: TripStartApi? = null
@@ -32,6 +33,10 @@ object ServiceBridge {
         dart = TripStartApi(messenger)
         TripServiceApi.setUp(messenger, Api(context.applicationContext))
     }
+
+    /** Whether [address] is an adapter whose waking starts a trip, as set in the app. */
+    fun wakesTrip(context: Context, address: String): Boolean =
+        address.uppercase() in prefs(context).getStringSet(KEY_ADAPTERS, emptySet()).orEmpty()
 
     /** Whether [address] is a head unit that starts a trip, as set in the app. */
     fun startsTrip(context: Context, address: String): Boolean =
@@ -56,10 +61,16 @@ object ServiceBridge {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private class Api(private val context: Context) : TripServiceApi {
-        override fun configure(headUnitAddresses: List<String>) {
+        override fun configure(
+            headUnitAddresses: List<String>,
+            wakingAdapterAddresses: List<String>,
+        ) {
+            val adapters = wakingAdapterAddresses.map { it.uppercase() }.toSet()
             prefs(context).edit()
                 .putStringSet(KEY_HEAD_UNITS, headUnitAddresses.map { it.uppercase() }.toSet())
+                .putStringSet(KEY_ADAPTERS, adapters)
                 .apply()
+            AdapterWatch.observe(context, adapters)
         }
 
         override fun startService(target: AppTripTargetMessage) =

@@ -9,6 +9,7 @@ class TripTargetExtrasTest {
     fun everyKindReadsBackAsItself() {
         val targets = listOf(
             HeadUnitMessage("AA:BB:CC:DD:EE:FF"),
+            AdapterMessage("C0:FF:EE:00:00:01"),
             AppRequestMessage(VehicleMessage("tucson")),
             AppRequestMessage(AnyVehicleMessage()),
         )
@@ -33,6 +34,7 @@ class TripTargetExtrasTest {
         // No separator: not "a vehicle called VEHICLE".
         assertNull(TripTargetExtras.decode("VEHICLE"))
         assertNull(TripTargetExtras.decode("HEAD_UNIT:"))
+        assertNull(TripTargetExtras.decode("ADAPTER:"))
         assertNull(TripTargetExtras.decode("VEHICLE:"))
     }
 }

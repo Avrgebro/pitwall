@@ -14,6 +14,8 @@ extension VehicleNeedText on VehicleNeed {
   String get label => switch (this) {
     VehicleNeed.adapter => 'Choose its adapter',
     VehicleNeed.headUnit => 'Choose the car\'s Bluetooth for trip start',
-    VehicleNeed.supportedTripStart => 'Its trip start isn\'t available yet',
+    VehicleNeed.bluetoothLeAdapter =>
+      'Choose a Bluetooth LE adapter, or another trip start',
+    VehicleNeed.adapterWatch => 'Let Android watch for its adapter',
   };
 }

@@ -12,9 +12,10 @@ enum TripStart {
   /// The phone connecting to the car's own Bluetooth (head unit).
   carBluetooth,
 
-  /// Android detecting that the phone is in a moving vehicle. Not built
-  /// yet.
-  drivingDetection,
+  /// A Bluetooth LE adapter that sleeps while the car is off waking up, as
+  /// Android notices it appear. Only for adapters that do sleep: one that
+  /// doesn't would start a trip whenever the phone passes the parked car.
+  adapterWakes,
 }
 
 /// Something a vehicle lacks before its trips start and send on their own.
@@ -25,8 +26,13 @@ enum VehicleNeed {
   /// Its trips start from the car's Bluetooth, but none is chosen.
   headUnit,
 
-  /// Its trip start isn't built yet.
-  supportedTripStart;
+  /// Its trips start when the adapter wakes, which only a Bluetooth LE
+  /// adapter can be watched for.
+  bluetoothLeAdapter,
+
+  /// Its trips start when the adapter wakes, but Android hasn't been asked
+  /// to watch for it, which the user confirms once.
+  adapterWatch;
 
   /// Whether this is about how trips start, rather than the adapter.
   bool get isTripStart => this != adapter;
@@ -41,10 +47,11 @@ class VehicleAdapter {
     required this.name,
     required this.type,
     this.setsFlowControl,
+    this.watched = false,
   });
 
   /// [device], chosen as the adapter. What it can do isn't known until
-  /// it's connected to.
+  /// it's connected to, and Android isn't watching for it yet.
   VehicleAdapter.of(BluetoothDevice device)
     : this(address: device.address, name: device.name, type: device.type);
 
@@ -56,11 +63,24 @@ class VehicleAdapter {
   /// connected to; null before then. Some profile values need it.
   final bool? setsFlowControl;
 
+  /// Whether Android watches for it to wake, as the user confirmed; see
+  /// [TripStart.adapterWakes]. Another adapter starts unwatched.
+  final bool watched;
+
   VehicleAdapter withFlowControl(bool sets) => VehicleAdapter(
     address: address,
     name: name,
     type: type,
     setsFlowControl: sets,
+    watched: watched,
+  );
+
+  VehicleAdapter withWatched(bool watched) => VehicleAdapter(
+    address: address,
+    name: name,
+    type: type,
+    setsFlowControl: setsFlowControl,
+    watched: watched,
   );
 
   @override
@@ -69,10 +89,12 @@ class VehicleAdapter {
       other.address == address &&
       other.name == name &&
       other.type == type &&
-      other.setsFlowControl == setsFlowControl;
+      other.setsFlowControl == setsFlowControl &&
+      other.watched == watched;
 
   @override
-  int get hashCode => Object.hash(address, name, type, setsFlowControl);
+  int get hashCode =>
+      Object.hash(address, name, type, setsFlowControl, watched);
 }
 
 /// The car's own Bluetooth (its head unit), whose connection can start
@@ -137,6 +159,17 @@ class Vehicle {
   String? get startingHeadUnit =>
       tripStart == TripStart.carBluetooth ? headUnit?.address : null;
 
+  /// The adapter whose waking starts this vehicle's trips, if its trips
+  /// start that way and Android watches for it.
+  String? get startingAdapter => switch ((tripStart, adapter)) {
+    (
+      TripStart.adapterWakes,
+      VehicleAdapter(type: AdapterType.ble, watched: true, :final address),
+    ) =>
+      address,
+    _ => null,
+  };
+
   /// What the vehicle lacks before it works on its own; empty when
   /// nothing does. The adapter comes first.
   List<VehicleNeed> get needs => [
@@ -144,7 +177,14 @@ class Vehicle {
     ...switch (tripStart) {
       TripStart.carBluetooth when headUnit == null => [VehicleNeed.headUnit],
       TripStart.carBluetooth => const <VehicleNeed>[],
-      TripStart.drivingDetection => [VehicleNeed.supportedTripStart],
+      TripStart.adapterWakes => switch (adapter) {
+        null => const <VehicleNeed>[],
+        VehicleAdapter(type: AdapterType.classic) => [
+          VehicleNeed.bluetoothLeAdapter,
+        ],
+        VehicleAdapter(watched: false) => [VehicleNeed.adapterWatch],
+        VehicleAdapter() => const <VehicleNeed>[],
+      },
     },
   ];
 
@@ -222,6 +262,7 @@ class Vehicle {
     'adapterName': adapter?.name,
     'adapterType': adapter?.type.name,
     'adapterSetsFlowControl': adapter?.setsFlowControl,
+    'adapterWatched': adapter?.watched,
     'tripStart': tripStart.name,
     'headUnitAddress': headUnit?.address,
     'headUnitName': headUnit?.name,
@@ -251,6 +292,7 @@ class Vehicle {
           final bool sets => sets,
           _ => null,
         },
+        watched: json['adapterWatched'] == true,
       ),
       null => null,
     },

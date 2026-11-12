@@ -789,6 +789,74 @@ void main() {
     expect(storage.saves, 0);
   });
 
+  group('starting trips when the adapter wakes', () {
+    Future<(ProviderContainer, FakeSettingsStore, FakeTripServiceGateway)>
+    start({required AdapterType type}) async {
+      final store = FakeSettingsStore(
+        settings: AppSettings(
+          vehicles: [
+            Vehicle(
+              id: 'tucson',
+              name: 'Tucson',
+              adapter: VehicleAdapter(
+                address: 'C0:FF:EE:00:00:01',
+                name: 'IOS-Vlink',
+                type: type,
+              ),
+            ),
+          ],
+        ),
+      );
+      final service = FakeTripServiceGateway();
+      final container = ProviderContainer(
+        overrides: testOverrides(store: store, tripService: service),
+      );
+      addTearDown(container.dispose);
+      await container.read(appSettingsProvider.future);
+      return (container, store, service);
+    }
+
+    test('takes once Android watches for the adapter', () async {
+      final (container, store, service) = await start(type: AdapterType.ble);
+
+      final done = await container
+          .read(appSettingsProvider.notifier)
+          .startTripsWhenAdapterWakes('tucson');
+
+      expect(done, isTrue);
+      expect(service.watchRequests, ['C0:FF:EE:00:00:01']);
+      final vehicle = store.settings.vehicleById('tucson')!;
+      expect(vehicle.tripStart, TripStart.adapterWakes);
+      expect(vehicle.adapter?.watched, isTrue);
+    });
+
+    test('changes nothing if the user declines', () async {
+      final (container, store, service) = await start(type: AdapterType.ble);
+      service.confirmsWatch = false;
+
+      final done = await container
+          .read(appSettingsProvider.notifier)
+          .startTripsWhenAdapterWakes('tucson');
+
+      expect(done, isFalse);
+      expect(
+        store.settings.vehicleById('tucson')!.tripStart,
+        TripStart.carBluetooth,
+      );
+    });
+
+    test('isn\'t offered for a classic adapter', () async {
+      final (container, _, service) = await start(type: AdapterType.classic);
+
+      final done = await container
+          .read(appSettingsProvider.notifier)
+          .startTripsWhenAdapterWakes('tucson');
+
+      expect(done, isFalse);
+      expect(service.watchRequests, isEmpty);
+    });
+  });
+
   test('a connection notes what the adapter can do', () async {
     final store = FakeSettingsStore(
       settings: const AppSettings(

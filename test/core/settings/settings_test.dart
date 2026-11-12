@@ -74,19 +74,59 @@ void main() {
               address: 'AA:BB:CC:DD:EE:FF',
               name: 'AA:BB:CC:DD:EE:FF',
             ),
-            tripStart: TripStart.drivingDetection,
+            tripStart: TripStart.adapterWakes,
           ),
         ],
       );
 
       expect(settings.startingHeadUnits, isEmpty);
-      expect(
-        settings.vehicles.single.needs,
-        contains(VehicleNeed.supportedTripStart),
-      );
       // It still belongs to the vehicle, so no other can take it.
       expect(settings.headUnitOwner('AA:BB:CC:DD:EE:FF')?.id, 'a1');
     });
+  });
+
+  test('only adapters that wake and are watched start trips', () {
+    VehicleAdapter adapter({required bool watched}) => VehicleAdapter(
+      address: 'C0:FF:EE:00:00:01',
+      name: 'IOS-Vlink',
+      type: AdapterType.ble,
+      watched: watched,
+    );
+    final watched = AppSettings(
+      vehicles: [
+        Vehicle(
+          id: 'a1',
+          name: 'Tucson',
+          adapter: adapter(watched: true),
+          tripStart: TripStart.adapterWakes,
+        ),
+      ],
+    );
+
+    expect(watched.startingAdapters, {'C0:FF:EE:00:00:01'});
+    expect(
+      watched
+          .tripCandidates(const AdapterTarget('c0:ff:ee:00:00:01'))
+          .single
+          .id,
+      'a1',
+    );
+
+    final unwatched = AppSettings(
+      vehicles: [
+        Vehicle(
+          id: 'a1',
+          name: 'Tucson',
+          adapter: adapter(watched: false),
+          tripStart: TripStart.adapterWakes,
+        ),
+      ],
+    );
+    expect(unwatched.startingAdapters, isEmpty);
+    expect(
+      unwatched.tripCandidates(const AdapterTarget('C0:FF:EE:00:00:01')),
+      isEmpty,
+    );
   });
 
   test('a head unit another vehicle has is that vehicle\'s', () {

@@ -181,7 +181,7 @@ void main() {
     expect(service.headUnitAddresses, isNull);
     expect(
       c.read(adapterLogProvider).entries.value.map((e) => e.text),
-      contains(startsWith('Telling Android which head units start trips')),
+      contains(startsWith('Telling Android what starts trips')),
     );
 
     // Any change to the settings tries again.
@@ -300,6 +300,72 @@ void main() {
     expect(trip.lastEnd, TripEnd.adapterNotFound);
     expect(received, isEmpty);
     expect(service.calls, contains('stopService'));
+  });
+
+  group('an adapter that wakes with the car', () {
+    const iCar = VehicleAdapter(
+      address: 'C0:FF:EE:00:00:01',
+      name: 'IOS-Vlink',
+      type: AdapterType.ble,
+      watched: true,
+    );
+    final waking = _tucson.copyWith(
+      adapter: iCar,
+      tripStart: TripStart.adapterWakes,
+    );
+
+    test('starts its vehicle\'s trip', () async {
+      final bluetooth = FakeBluetoothGateway(adapter: (_) => _Adapter());
+      final c = container(vehicles: [waking], bluetooth: bluetooth);
+      c.read(tripProvider);
+
+      service.send(const AdapterTarget('C0:FF:EE:00:00:01'));
+
+      expect((await running(c)).vehicleId, 'tucson');
+      expect(bluetooth.connected.first, 'C0:FF:EE:00:00:01');
+      c.read(tripProvider.notifier).stop();
+      await ended(c);
+    });
+
+    test('is watched for by Android', () async {
+      final c = container(vehicles: [waking]);
+      c.read(tripProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(service.wakingAdapterAddresses, {'C0:FF:EE:00:00:01'});
+      // Its head unit no longer starts trips.
+      expect(service.headUnitAddresses, isEmpty);
+    });
+
+    test('going to sleep after the car went quiet is the car off', () async {
+      final adapters = <_Adapter>[];
+      _Adapter? first() {
+        // Asleep once gone: it can't be reached again.
+        if (adapters.isNotEmpty) return null;
+        final adapter = _Adapter(carOn: false);
+        adapters.add(adapter);
+        return adapter;
+      }
+
+      final c = container(
+        vehicles: [waking],
+        adapter: (_) => first(),
+        timing: const TripTiming(
+          retryDelay: Duration(milliseconds: 5),
+          connectWindow: Duration(milliseconds: 40),
+          carOffWindow: Duration(seconds: 5),
+          finalDeliveryWait: Duration(seconds: 1),
+        ),
+      );
+      c.read(tripProvider);
+      service.send(const AdapterTarget('C0:FF:EE:00:00:01'));
+      await running(c);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      await adapters.single.disconnect();
+
+      expect((await ended(c)).lastEnd, TripEnd.carOff);
+    });
   });
 
   test('a car that stays off ends the trip', () async {

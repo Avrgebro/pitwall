@@ -9,6 +9,14 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
+    <!-- Starting trips when a Bluetooth LE adapter wakes with the car: Android
+         watches for adapters the user confirmed, and lets Pitwall start its
+         trip service when one appears, with the app closed. -->
+    <uses-feature
+        android:name="android.software.companion_device_setup"
+        android:required="false" />
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
     <!-- The notification Android requires while working in the background. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Asking to be exempt from battery optimisation, from the background checks. -->
@@ -50,6 +58,16 @@
             android:name=".TripService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+        <!-- Starts trips when a watched adapter wakes. Only the system can
+             bind it. -->
+        <service
+            android:name=".AdapterPresenceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
         <!-- Starts and ends trips with the car's head unit. ACL broadcasts are
              protected: only the system can send them. -->
         <receiver

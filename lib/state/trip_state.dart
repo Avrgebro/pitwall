@@ -174,17 +174,29 @@ class TripController extends Notifier<TripState> {
     final gateway = ref.watch(tripServiceGatewayProvider);
     final starts = gateway.starts.listen((target) => unawaited(_run(target)));
     ref.onDispose(starts.cancel);
-    // Android needs to know which head units start a trip, even while the
-    // app isn't running.
-    Set<String>? configured;
+    // Android needs to know which head units and adapters start a trip,
+    // even while the app isn't running.
+    ({Set<String> headUnits, Set<String> adapters})? configured;
     ref.listen(appSettingsProvider, (_, settings) {
-      final headUnits = settings.value?.startingHeadUnits;
-      if (headUnits == null || setEquals(headUnits, configured)) return;
+      final value = settings.value;
+      if (value == null) return;
+      final starting = (
+        headUnits: value.startingHeadUnits,
+        adapters: value.startingAdapters,
+      );
+      if (configured case final done?
+          when setEquals(done.headUnits, starting.headUnits) &&
+              setEquals(done.adapters, starting.adapters)) {
+        return;
+      }
       unawaited(
-        _guarded('Telling Android which head units start trips', () async {
-          await gateway.configure(headUnitAddresses: headUnits);
+        _guarded('Telling Android what starts trips', () async {
+          await gateway.configure(
+            headUnitAddresses: starting.headUnits,
+            wakingAdapterAddresses: starting.adapters,
+          );
           // Only once Android has them; otherwise the next change tries again.
-          configured = headUnits;
+          configured = starting;
         }),
       );
     }, fireImmediately: true);
@@ -318,6 +330,10 @@ class TripController extends Notifier<TripState> {
           break;
         case StepRefused(refusal: Refusal.vehicleRemoved):
           return TripEnd.noVehicle;
+        // A car already silent that then loses its adapter was switched
+        // off: an adapter that sleeps does just that a few minutes later.
+        case StepRefused() || StepFailed() when silent:
+          return TripEnd.carOff;
         case StepRefused() || StepFailed():
           lost = true;
         case StepDone(value: VehicleReading(reading: CarSilent())):

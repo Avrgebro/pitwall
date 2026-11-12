@@ -251,6 +251,48 @@ data class HeadUnitMessage (
 }
 
 /**
+ * A vehicle's Bluetooth LE adapter woke up, as the car started: the trip
+ * is for the vehicle whose trips start that way.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class AdapterMessage (
+  val address: String
+) : TripTargetMessage()
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): AdapterMessage {
+      val address = pigeonVar_list[0] as String
+      return AdapterMessage(address)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      address,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as AdapterMessage
+    return MessagesPigeonUtils.deepEquals(this.address, other.address)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.address)
+    return result
+  }
+  override fun toString(): String {
+    return "AdapterMessage(address=$address)"
+  }
+}
+
+/**
  * The app asked for the trip.
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -572,35 +614,40 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
       }
       130.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AppRequestMessage.fromList(it)
+          AdapterMessage.fromList(it)
         }
       }
       131.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          VehicleMessage.fromList(it)
+          AppRequestMessage.fromList(it)
         }
       }
       132.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AnyVehicleMessage.fromList(it)
+          VehicleMessage.fromList(it)
         }
       }
       133.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          BondedDeviceMessage.fromList(it)
+          AnyVehicleMessage.fromList(it)
         }
       }
       134.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AdapterBytes.fromList(it)
+          BondedDeviceMessage.fromList(it)
         }
       }
       135.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
-          AdapterDropped.fromList(it)
+          AdapterBytes.fromList(it)
         }
       }
       136.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          AdapterDropped.fromList(it)
+        }
+      }
+      137.toByte() -> {
         return (readValue(buffer) as? List<Any?>)?.let {
           FoundDeviceMessage.fromList(it)
         }
@@ -614,32 +661,36 @@ private open class MessagesPigeonCodec : StandardMessageCodec() {
         stream.write(129)
         writeValue(stream, value.toList())
       }
-      is AppRequestMessage -> {
+      is AdapterMessage -> {
         stream.write(130)
         writeValue(stream, value.toList())
       }
-      is VehicleMessage -> {
+      is AppRequestMessage -> {
         stream.write(131)
         writeValue(stream, value.toList())
       }
-      is AnyVehicleMessage -> {
+      is VehicleMessage -> {
         stream.write(132)
         writeValue(stream, value.toList())
       }
-      is BondedDeviceMessage -> {
+      is AnyVehicleMessage -> {
         stream.write(133)
         writeValue(stream, value.toList())
       }
-      is AdapterBytes -> {
+      is BondedDeviceMessage -> {
         stream.write(134)
         writeValue(stream, value.toList())
       }
-      is AdapterDropped -> {
+      is AdapterBytes -> {
         stream.write(135)
         writeValue(stream, value.toList())
       }
-      is FoundDeviceMessage -> {
+      is AdapterDropped -> {
         stream.write(136)
+        writeValue(stream, value.toList())
+      }
+      is FoundDeviceMessage -> {
+        stream.write(137)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -656,8 +707,12 @@ val MessagesPigeonMethodCodec = StandardMethodCodec(MessagesPigeonCodec())
  * Generated interface from Pigeon that represents a handler of messages from Flutter.
  */
 interface TripServiceApi {
-  /** The head units whose connection starts a trip. */
-  fun configure(headUnitAddresses: List<String>)
+  /**
+   * The head units whose connection starts a trip, and the Bluetooth LE
+   * adapters whose waking does: Android watches for those, and stops
+   * watching any others.
+   */
+  fun configure(headUnitAddresses: List<String>, wakingAdapterAddresses: List<String>)
   /** Starts the service for a trip the app asked for: a vehicle, or any. */
   fun startService(target: AppTripTargetMessage)
   fun stopService()
@@ -683,8 +738,9 @@ interface TripServiceApi {
           channel.setMessageHandler { message, reply ->
             val args = message as List<Any?>
             val headUnitAddressesArg = args[0] as List<String>
+            val wakingAdapterAddressesArg = args[1] as List<String>
             val wrapped: List<Any?> = try {
-              api.configure(headUnitAddressesArg)
+              api.configure(headUnitAddressesArg, wakingAdapterAddressesArg)
               listOf(null)
             } catch (exception: Throwable) {
               MessagesPigeonUtils.wrapError(exception)
@@ -757,6 +813,52 @@ interface TripServiceApi {
               MessagesPigeonUtils.wrapError(exception)
             }
             reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+    }
+  }
+}
+/**
+ * Android's companion devices, called from Dart while a screen is showing:
+ * asking Android to watch for an adapter needs the user to confirm it.
+ *
+ * Generated interface from Pigeon that represents a handler of messages from Flutter.
+ */
+interface CompanionApi {
+  /**
+   * Asks Android to watch for the Bluetooth LE adapter at [address], with
+   * the system dialog the user confirms. True once it does, also when it
+   * already did; false if the user declined. Fails with `unavailable`
+   * without a screen to ask on.
+   */
+  suspend fun watch(address: String): Boolean
+
+  companion object {
+    /** The codec used by CompanionApi. */
+    val codec: MessageCodec<Any?> by lazy {
+      MessagesPigeonCodec()
+    }
+    /** Sets up an instance of `CompanionApi` to handle messages through the `binaryMessenger`. */
+    @JvmOverloads
+    fun setUp(binaryMessenger: BinaryMessenger, api: CompanionApi?, messageChannelSuffix: String = "") {
+      val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.CompanionApi.watch$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val addressArg = args[0] as String
+            CoroutineScope(Dispatchers.Main).launch {
+              val wrapped: List<Any?> = try {
+                listOf(api.watch(addressArg))
+              } catch (exception: Throwable) {
+                MessagesPigeonUtils.wrapError(exception)
+              }
+              reply.reply(wrapped)
+            }
           }
         } else {
           channel.setMessageHandler(null)

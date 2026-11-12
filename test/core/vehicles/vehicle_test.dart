@@ -24,9 +24,33 @@ void main() {
     expect(bare.needs, [VehicleNeed.adapter, VehicleNeed.headUnit]);
   });
 
-  test('a trip start that is not built yet is a need', () {
-    final detecting = ready.copyWith(tripStart: TripStart.drivingDetection);
-    expect(detecting.needs, [VehicleNeed.supportedTripStart]);
+  test('waking needs a Bluetooth LE adapter that Android watches for', () {
+    final classic = ready.copyWith(tripStart: TripStart.adapterWakes);
+    expect(classic.needs, [VehicleNeed.bluetoothLeAdapter]);
+    expect(classic.startingAdapter, isNull);
+
+    const bluetoothLe = VehicleAdapter(
+      address: 'C0:FF:EE:00:00:01',
+      name: 'IOS-Vlink',
+      type: AdapterType.ble,
+    );
+    final unwatched = classic.copyWith(adapter: bluetoothLe);
+    expect(unwatched.needs, [VehicleNeed.adapterWatch]);
+
+    final watched = classic.copyWith(adapter: bluetoothLe.withWatched(true));
+    expect(watched.needs, isEmpty);
+    expect(watched.startingAdapter, 'C0:FF:EE:00:00:01');
+    // Its head unit no longer starts trips.
+    expect(watched.startingHeadUnit, isNull);
+  });
+
+  test('another adapter isn\'t watched until confirmed', () {
+    const device = BluetoothDevice(
+      name: 'IOS-Vlink',
+      address: 'C0:FF:EE:00:00:02',
+      type: AdapterType.ble,
+    );
+    expect(VehicleAdapter.of(device).watched, isFalse);
   });
 
   test('every way of copying keeps the fields it doesn\'t change', () {
@@ -35,7 +59,7 @@ void main() {
       id: 'tucson',
       name: 'Tucson',
       adapter: ready.adapter?.withFlowControl(false),
-      tripStart: TripStart.drivingDetection,
+      tripStart: TripStart.adapterWakes,
       headUnit: ready.headUnit,
       modelYear: 2023,
       selectedKeys: const {'rpm', 'battery_v'},

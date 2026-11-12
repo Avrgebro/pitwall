@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/bluetooth/adapter_type.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/profiles/profile_ref.dart';
@@ -245,6 +246,30 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
 
   Future<void> setTripStart(String vehicleId, TripStart tripStart) =>
       _modifyVehicle(vehicleId, (v) => v.copyWith(tripStart: tripStart));
+
+  /// Makes the vehicle's adapter waking start its trips, once the user
+  /// lets Android watch for it, in the system dialog this shows. Returns
+  /// whether they did; if not, nothing changes. Only for a Bluetooth LE
+  /// adapter.
+  Future<bool> startTripsWhenAdapterWakes(String vehicleId) async {
+    final adapter = _current.vehicleById(vehicleId)?.adapter;
+    if (adapter == null || adapter.type != AdapterType.ble) return false;
+    final watched = await ref
+        .read(tripServiceGatewayProvider)
+        .watchAdapter(adapter.address);
+    if (!watched || !ref.mounted) return false;
+    await _modifyVehicle(
+      vehicleId,
+      (v) => v.copyWith(
+        tripStart: TripStart.adapterWakes,
+        // Only if it's still that adapter, as it was when asked.
+        adapter: v.adapter?.address == adapter.address
+            ? v.adapter?.withWatched(true)
+            : v.adapter,
+      ),
+    );
+    return true;
+  }
 
   /// The model year, which picks which of the profile's requests apply.
   Future<void> setModelYear(String vehicleId, int year) =>

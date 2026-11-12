@@ -195,12 +195,28 @@ class FakeTripServiceGateway implements TripServiceGateway {
   }
 
   @override
-  Future<void> configure({required Set<String> headUnitAddresses}) async {
+  Future<void> configure({
+    required Set<String> headUnitAddresses,
+    required Set<String> wakingAdapterAddresses,
+  }) async {
     if (failConfigure) {
       failConfigure = false;
       throw PlatformException(code: 'channel-error');
     }
     this.headUnitAddresses = headUnitAddresses;
+    this.wakingAdapterAddresses = wakingAdapterAddresses;
+  }
+
+  Set<String>? wakingAdapterAddresses;
+
+  /// What the user answers when asked to let Android watch an adapter.
+  bool confirmsWatch = true;
+  final watchRequests = <String>[];
+
+  @override
+  Future<bool> watchAdapter(String address) async {
+    watchRequests.add(address);
+    return confirmsWatch;
   }
 
   /// Like Android: the start comes back as the target it names.
@@ -271,6 +287,7 @@ List<Override> testOverrides({
   FakeSettingsStore? store,
   FakeBluetoothGateway? bluetooth,
   FakeLastValuesStorage? lastValues,
+  FakeTripServiceGateway? tripService,
 }) {
   final sender = WebhookSender(
     storage: FakeDeliveryStorage(),
@@ -291,7 +308,9 @@ List<Override> testOverrides({
     bluetoothGatewayProvider.overrideWithValue(
       bluetooth ?? FakeBluetoothGateway(),
     ),
-    tripServiceGatewayProvider.overrideWithValue(FakeTripServiceGateway()),
+    tripServiceGatewayProvider.overrideWithValue(
+      tripService ?? FakeTripServiceGateway(),
+    ),
     packageInfoProvider.overrideWith(
       (ref) async => PackageInfo(
         appName: 'Pitwall',

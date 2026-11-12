@@ -156,6 +156,48 @@ class HeadUnitMessage extends TripTargetMessage {
   }
 }
 
+/// A vehicle's Bluetooth LE adapter woke up, as the car started: the trip
+/// is for the vehicle whose trips start that way.
+class AdapterMessage extends TripTargetMessage {
+  AdapterMessage({required this.address});
+
+  String address;
+
+  List<Object?> _toList() {
+    return <Object?>[address];
+  }
+
+  Object encode() {
+    return _toList();
+  }
+
+  static AdapterMessage decode(Object result) {
+    result as List<Object?>;
+    return AdapterMessage(address: result[0]! as String);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! AdapterMessage || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(address, other.address);
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
+
+  @override
+  String toString() {
+    return 'AdapterMessage(address: $address)';
+  }
+}
+
 /// The app asked for the trip.
 class AppRequestMessage extends TripTargetMessage {
   AppRequestMessage({required this.target});
@@ -482,26 +524,29 @@ class _PigeonCodec extends StandardMessageCodec {
     } else if (value is HeadUnitMessage) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    } else if (value is AppRequestMessage) {
+    } else if (value is AdapterMessage) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    } else if (value is VehicleMessage) {
+    } else if (value is AppRequestMessage) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    } else if (value is AnyVehicleMessage) {
+    } else if (value is VehicleMessage) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    } else if (value is BondedDeviceMessage) {
+    } else if (value is AnyVehicleMessage) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
-    } else if (value is AdapterBytes) {
+    } else if (value is BondedDeviceMessage) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
-    } else if (value is AdapterDropped) {
+    } else if (value is AdapterBytes) {
       buffer.putUint8(135);
       writeValue(buffer, value.encode());
-    } else if (value is FoundDeviceMessage) {
+    } else if (value is AdapterDropped) {
       buffer.putUint8(136);
+      writeValue(buffer, value.encode());
+    } else if (value is FoundDeviceMessage) {
+      buffer.putUint8(137);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -514,18 +559,20 @@ class _PigeonCodec extends StandardMessageCodec {
       case 129:
         return HeadUnitMessage.decode(readValue(buffer)!);
       case 130:
-        return AppRequestMessage.decode(readValue(buffer)!);
+        return AdapterMessage.decode(readValue(buffer)!);
       case 131:
-        return VehicleMessage.decode(readValue(buffer)!);
+        return AppRequestMessage.decode(readValue(buffer)!);
       case 132:
-        return AnyVehicleMessage.decode(readValue(buffer)!);
+        return VehicleMessage.decode(readValue(buffer)!);
       case 133:
-        return BondedDeviceMessage.decode(readValue(buffer)!);
+        return AnyVehicleMessage.decode(readValue(buffer)!);
       case 134:
-        return AdapterBytes.decode(readValue(buffer)!);
+        return BondedDeviceMessage.decode(readValue(buffer)!);
       case 135:
-        return AdapterDropped.decode(readValue(buffer)!);
+        return AdapterBytes.decode(readValue(buffer)!);
       case 136:
+        return AdapterDropped.decode(readValue(buffer)!);
+      case 137:
         return FoundDeviceMessage.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -555,8 +602,13 @@ class TripServiceApi {
 
   final String pigeonVar_messageChannelSuffix;
 
-  /// The head units whose connection starts a trip.
-  Future<void> configure(List<String> headUnitAddresses) async {
+  /// The head units whose connection starts a trip, and the Bluetooth LE
+  /// adapters whose waking does: Android watches for those, and stops
+  /// watching any others.
+  Future<void> configure(
+    List<String> headUnitAddresses,
+    List<String> wakingAdapterAddresses,
+  ) async {
     final pigeonVar_channelName =
         'dev.flutter.pigeon.pitwall.TripServiceApi.configure$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
@@ -565,7 +617,7 @@ class TripServiceApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
-      <Object?>[headUnitAddresses],
+      <Object?>[headUnitAddresses, wakingAdapterAddresses],
     );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
@@ -654,6 +706,51 @@ class TripServiceApi {
       isNullValid: true,
     );
     return pigeonVar_replyValue as TripTargetMessage?;
+  }
+}
+
+/// Android's companion devices, called from Dart while a screen is showing:
+/// asking Android to watch for an adapter needs the user to confirm it.
+class CompanionApi {
+  /// Constructor for [CompanionApi]. The [binaryMessenger] named argument is
+  /// available for dependency injection. If it is left null, the default
+  /// BinaryMessenger will be used which routes to the host platform.
+  CompanionApi({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
+
+  final BinaryMessenger? pigeonVar_binaryMessenger;
+  static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
+
+  final String pigeonVar_messageChannelSuffix;
+
+  /// Asks Android to watch for the Bluetooth LE adapter at [address], with
+  /// the system dialog the user confirms. True once it does, also when it
+  /// already did; false if the user declined. Fails with `unavailable`
+  /// without a screen to ask on.
+  Future<bool> watch(String address) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.CompanionApi.watch$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[address],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as bool;
   }
 }
 

@@ -12,7 +12,7 @@ object TripTargetExtras {
     private const val KEY_TARGET = "tripTarget"
 
     /** Each kind of target, by the name it travels under. */
-    enum class Kind { HEAD_UNIT, VEHICLE, ANY_VEHICLE }
+    enum class Kind { HEAD_UNIT, ADAPTER, VEHICLE, ANY_VEHICLE }
 
     /** Puts [target] in [intent]; see [from]. */
     fun putIn(intent: Intent, target: TripTargetMessage): Intent =
@@ -28,6 +28,7 @@ object TripTargetExtras {
     fun encode(target: TripTargetMessage): String {
         val (kind, value) = when (target) {
             is HeadUnitMessage -> Kind.HEAD_UNIT to target.address
+            is AdapterMessage -> Kind.ADAPTER to target.address
             is AppRequestMessage -> when (val request = target.target) {
                 is VehicleMessage -> Kind.VEHICLE to request.id
                 is AnyVehicleMessage -> Kind.ANY_VEHICLE to ""
@@ -46,6 +47,7 @@ object TripTargetExtras {
         val value = text.substringAfter(':')
         return when (kind) {
             Kind.HEAD_UNIT -> value.takeIf { it.isNotEmpty() }?.let(::HeadUnitMessage)
+            Kind.ADAPTER -> value.takeIf { it.isNotEmpty() }?.let(::AdapterMessage)
             Kind.VEHICLE ->
                 value.takeIf { it.isNotEmpty() }?.let { AppRequestMessage(VehicleMessage(it)) }
             Kind.ANY_VEHICLE -> AppRequestMessage(AnyVehicleMessage())

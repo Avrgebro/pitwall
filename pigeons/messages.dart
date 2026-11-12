@@ -26,6 +26,14 @@ class HeadUnitMessage extends TripTargetMessage {
   String address;
 }
 
+/// A vehicle's Bluetooth LE adapter woke up, as the car started: the trip
+/// is for the vehicle whose trips start that way.
+class AdapterMessage extends TripTargetMessage {
+  AdapterMessage({required this.address});
+
+  String address;
+}
+
 /// The app asked for the trip.
 class AppRequestMessage extends TripTargetMessage {
   AppRequestMessage({required this.target});
@@ -50,8 +58,13 @@ class AnyVehicleMessage extends AppTripTargetMessage {}
 /// The trip service, called from Dart.
 @HostApi()
 abstract class TripServiceApi {
-  /// The head units whose connection starts a trip.
-  void configure(List<String> headUnitAddresses);
+  /// The head units whose connection starts a trip, and the Bluetooth LE
+  /// adapters whose waking does: Android watches for those, and stops
+  /// watching any others.
+  void configure(
+    List<String> headUnitAddresses,
+    List<String> wakingAdapterAddresses,
+  );
 
   /// Starts the service for a trip the app asked for: a vehicle, or any.
   void startService(AppTripTargetMessage target);
@@ -63,6 +76,18 @@ abstract class TripServiceApi {
   /// The trip Android asked for before Dart was listening, if any. Asking
   /// also tells Android that Dart is now listening.
   TripTargetMessage? takeTripRequest();
+}
+
+/// Android's companion devices, called from Dart while a screen is showing:
+/// asking Android to watch for an adapter needs the user to confirm it.
+@HostApi()
+abstract class CompanionApi {
+  /// Asks Android to watch for the Bluetooth LE adapter at [address], with
+  /// the system dialog the user confirms. True once it does, also when it
+  /// already did; false if the user declined. Fails with `unavailable`
+  /// without a screen to ask on.
+  @async
+  bool watch(String address);
 }
 
 /// Trips Android starts, called from Android.

@@ -11,8 +11,16 @@ final class HeadUnitTarget extends TripTarget {
   final String address;
 }
 
-/// What the app can ask for: one vehicle, or any. Only a head unit names
-/// itself.
+/// A vehicle's Bluetooth LE adapter woke up, as the car started: the trip is
+/// for the vehicle whose trips start that way.
+final class AdapterTarget extends TripTarget {
+  const AdapterTarget(this.address);
+
+  final String address;
+}
+
+/// What the app can ask for: one vehicle, or any. Only a head unit or an
+/// adapter names itself.
 sealed class AppTripTarget extends TripTarget {
   const AppTripTarget();
 }

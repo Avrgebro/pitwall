@@ -56,6 +56,19 @@ class AppSettings {
       };
 
   /// Every head unit that starts a trip, for Android to watch for.
+  /// The adapters whose waking starts a vehicle's trips, which Android
+  /// watches for even while the app isn't running.
+  Set<String> get startingAdapters => {
+    for (final vehicle in vehicles)
+      if (vehicle.startingAdapter case final address?) address.toUpperCase(),
+  };
+
+  /// The vehicle whose trips start when the adapter at [address] wakes, if
+  /// any.
+  Vehicle? vehicleForWakingAdapter(String address) => vehicles
+      .where((v) => _sameAddress(v.startingAdapter, address))
+      .firstOrNull;
+
   Set<String> get startingHeadUnits => {
     for (final vehicle in vehicles)
       if (vehicle.startingHeadUnit case final address?) address.toUpperCase(),
@@ -79,6 +92,7 @@ class AppSettings {
   /// them. Only vehicles with an adapter count.
   List<Vehicle> tripCandidates(TripTarget target) => switch (target) {
     HeadUnitTarget(:final address) => [?vehicleForHeadUnit(address)],
+    AdapterTarget(:final address) => [?vehicleForWakingAdapter(address)],
     VehicleTarget(:final id) => [?vehicleById(id)],
     // The car seen most recently is the likeliest to be this one.
     AnyVehicleTarget() => [...vehicles]..sort(_mostRecentFirst),

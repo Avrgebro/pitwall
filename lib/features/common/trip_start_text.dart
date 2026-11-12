@@ -9,8 +9,10 @@ abstract final class TripStartText {
       (TripStart.carBluetooth, final headUnit?) when !problem =>
         'When ${headUnit.name} connects',
       (TripStart.carBluetooth, _) => 'Choose the car\'s Bluetooth',
-      (TripStart.drivingDetection, _) =>
-        'When driving is detected (not available yet)',
+      (TripStart.adapterWakes, _) when !problem =>
+        'When ${vehicle.adapter?.name ?? 'the adapter'} wakes',
+      (TripStart.adapterWakes, _) =>
+        'When the adapter wakes: confirm it with Android',
     };
     return (text: text, problem: problem);
   }

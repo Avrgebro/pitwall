@@ -17,8 +17,18 @@ abstract interface class TripServiceGateway {
   Future<TripTarget?> takeTripRequest();
 
   /// The head units whose connection starts a trip, one per vehicle at
-  /// most. Android keeps them, so it can start a trip with the app closed.
-  Future<void> configure({required Set<String> headUnitAddresses});
+  /// most, and the adapters whose waking does. Android keeps them, so it
+  /// can start a trip with the app closed.
+  Future<void> configure({
+    required Set<String> headUnitAddresses,
+    required Set<String> wakingAdapterAddresses,
+  });
+
+  /// Asks Android to watch for the Bluetooth LE adapter at [address], so
+  /// its waking can start trips with the app closed. Shows a system dialog
+  /// the user confirms; true once Android watches for it, false if they
+  /// declined.
+  Future<bool> watchAdapter(String address);
 
   /// Starts the service from the app for [target]. It comes back through
   /// [starts], as a head unit's start does.
@@ -50,8 +60,13 @@ class AndroidTripServiceGateway implements TripServiceGateway, TripStartApi {
       (await _api.takeTripRequest())?.toTarget();
 
   @override
-  Future<void> configure({required Set<String> headUnitAddresses}) =>
-      _api.configure([...headUnitAddresses]);
+  Future<void> configure({
+    required Set<String> headUnitAddresses,
+    required Set<String> wakingAdapterAddresses,
+  }) => _api.configure([...headUnitAddresses], [...wakingAdapterAddresses]);
+
+  @override
+  Future<bool> watchAdapter(String address) => CompanionApi().watch(address);
 
   @override
   Future<void> startService(AppTripTarget target) =>
@@ -76,6 +91,7 @@ extension AppTripTargetMessages on AppTripTarget {
 extension TripTargetMessageTargets on TripTargetMessage {
   TripTarget toTarget() => switch (this) {
     HeadUnitMessage(:final address) => HeadUnitTarget(address),
+    AdapterMessage(:final address) => AdapterTarget(address),
     AppRequestMessage(target: VehicleMessage(:final id)) => VehicleTarget(id),
     AppRequestMessage(target: AnyVehicleMessage()) => const AnyVehicleTarget(),
   };
