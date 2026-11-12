@@ -33,7 +33,8 @@ internal class Connection<R : Closeable>(val id: Long) {
  * Dart numbers connections, and its numbers only go up, even across a
  * restart of Dart (they start from the time). So closing one number closes
  * every earlier one too, and a connect that becomes current after Dart
- * closed its number, as one queued behind a slow one can, closes itself.
+ * closed its number, as one started while another was still connecting
+ * can, closes itself.
  */
 internal class Connections<R : Closeable> {
     private val current = AtomicReference<Connection<R>?>(null)

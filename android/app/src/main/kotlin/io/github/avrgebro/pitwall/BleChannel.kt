@@ -14,7 +14,6 @@ import android.os.Build
 import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
@@ -22,6 +21,7 @@ import kotlinx.coroutines.withTimeout
 import java.io.Closeable
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Bluetooth LE connections to an OBD adapter, for Dart's [BleApi]. The
@@ -37,18 +37,13 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
     private val adapter: BluetoothAdapter? =
         context.getSystemService(BluetoothManager::class.java)?.adapter
 
-    // A GATT link does one operation at a time, so connects and writes
-    // queue here. Closing doesn't: it ends whatever is waiting.
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private val io = Dispatchers.IO.limitedParallelism(1)
-
     private val connections = Connections<GattLink>()
 
     init {
         BleApi.setUp(messenger, this)
     }
 
-    override suspend fun connect(connection: Long, address: String): Unit = withContext(io) {
+    override suspend fun connect(connection: Long, address: String): Unit = withContext(Dispatchers.IO) {
         // Connecting replaces any other connection, even when it fails at once.
         connections.replace()
         val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
@@ -76,7 +71,7 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         }
     }
 
-    override suspend fun write(connection: Long, bytes: ByteArray): Unit = withContext(io) {
+    override suspend fun write(connection: Long, bytes: ByteArray): Unit = withContext(Dispatchers.IO) {
         try {
             val link = connections.live(connection)?.resource ?: throw IOException("Not connected")
             link.write(bytes)
@@ -84,47 +79,56 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             throw FlutterError("write_failed", e.message)
         } catch (e: SecurityException) {
             throw FlutterError("write_failed", e.message)
-        } catch (e: TimeoutCancellationException) {
-            throw FlutterError("write_failed", "The adapter didn't take the write")
         }
     }
 
     override fun disconnect(connection: Long) = connections.closedByDart(connection)
 
     /**
-     * One GATT link: its operations, each awaited before the next, and the
+     * One GATT link: its operations, one at a time through [steps], and the
      * characteristics it talks through. Closing it disconnects and ends
-     * whatever is waiting.
+     * whatever is waiting. Callbacks come on binder threads, so what they
+     * read is volatile.
      */
     private inner class GattLink(private val connection: Connection<GattLink>) :
         BluetoothGattCallback(), Closeable {
         @Volatile
         private var gatt: BluetoothGatt? = null
 
-        /** The operation under way, completed by its callback. */
-        @Volatile
-        private var pending: CompletableDeferred<Unit>? = null
+        private val steps = GattSteps(STEP_TIMEOUT_MS)
+
+        /** Opening until ready; dropped from either, once. */
+        private val state = AtomicReference(LinkState.OPENING)
 
         @Volatile
-        private var ready = false
-
         private var replies: BluetoothGattCharacteristic? = null
+
+        @Volatile
         private var commands: BluetoothGattCharacteristic? = null
+
+        @Volatile
         private var writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
 
         /** The most one write carries: the MTU less the ATT header. */
+        @Volatile
         private var payload = DEFAULT_MTU - ATT_HEADER
 
         /** Connects, finds the characteristics, and switches replies on. */
         suspend fun open(device: BluetoothDevice) {
-            step { gatt = device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE); true }
+            // Null when Bluetooth is off: not taken, so it fails at once.
+            steps.run(GattOp.CONNECT) {
+                gatt = device.connectGatt(context, false, this, BluetoothDevice.TRANSPORT_LE)
+                gatt != null
+            }
             val gatt = gatt ?: throw IOException("Disconnected while connecting")
-            step { gatt.discoverServices() }
+            steps.run(GattOp.DISCOVER) { gatt.discoverServices() }
             val replies = choose(gatt)
-            // Larger writes where the adapter takes them; it may refuse.
+            // Larger writes where the adapter takes them; it may refuse, or
+            // not answer, and writes stay small.
             try {
-                step { gatt.requestMtu(WANTED_MTU) }
-            } catch (_: IOException) {
+                steps.run(GattOp.MTU) { gatt.requestMtu(WANTED_MTU) }
+            } catch (e: IOException) {
+                Log.i(TAG, "Kept writes of $payload bytes: ${e.message}")
             }
             if (!gatt.setCharacteristicNotification(replies, true)) {
                 throw IOException("The adapter wouldn't send replies")
@@ -136,8 +140,11 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             } else {
                 BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
             }
-            step { writeDescriptor(gatt, config, enable) }
-            ready = true
+            steps.run(GattOp.DESCRIPTOR) { writeDescriptor(gatt, config, enable) }
+            // A drop since the last step already failed it, or comes now.
+            if (!state.compareAndSet(LinkState.OPENING, LinkState.READY)) {
+                throw IOException("The adapter disconnected")
+            }
             Log.i(
                 TAG,
                 "Connected: replies ${replies.uuid}, commands ${commands?.uuid}, " +
@@ -153,13 +160,13 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
             while (start < bytes.size) {
                 val end = minOf(start + payload, bytes.size)
                 val chunk = bytes.copyOfRange(start, end)
-                step { writeCharacteristic(gatt, commands, chunk) }
+                steps.run(GattOp.WRITE) { writeCharacteristic(gatt, commands, chunk) }
                 start = end
             }
         }
 
         override fun close() {
-            pending?.completeExceptionally(IOException("Disconnected"))
+            steps.close()
             gatt?.let {
                 it.disconnect()
                 it.close()
@@ -168,31 +175,14 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         }
 
         /**
-         * Starts an operation with [start] and waits for its callback. One
-         * that can't start, as when the link is busy or gone, fails at once.
-         */
-        private suspend fun step(start: () -> Boolean) {
-            if (connection.closed) throw IOException("Disconnected")
-            val done = CompletableDeferred<Unit>()
-            pending = done
-            if (!start()) throw IOException("The adapter didn't take the request")
-            withTimeout(STEP_TIMEOUT_MS) { done.await() }
-        }
-
-        private fun finish(ok: Boolean, what: String) {
-            val done = pending ?: return
-            if (ok) done.complete(Unit) else done.completeExceptionally(IOException(what))
-        }
-
-        /**
          * Picks the characteristics: in the first service that has both, one
-         * that notifies or indicates, and one that takes writes. The standard
-         * services every device has are passed over. Returns the one that
+         * that notifies or indicates, and one that takes writes, trying
+         * known OBD services first ([inTryOrder]). Returns the one that
          * carries replies.
          */
         private fun choose(gatt: BluetoothGatt): BluetoothGattCharacteristic {
-            for (service in gatt.services) {
-                if (service.uuid in STANDARD_SERVICES) continue
+            Log.i(TAG, "Services: ${gatt.services.joinToString { it.uuid.toString() }}")
+            for (service in inTryOrder(gatt.services) { it.uuid }) {
                 val notify = service.characteristics.firstOrNull {
                     it.properties and (NOTIFY or INDICATE) != 0
                 } ?: continue
@@ -213,12 +203,14 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> finish(status == BluetoothGatt.GATT_SUCCESS, "Couldn't connect")
+                BluetoothProfile.STATE_CONNECTED ->
+                    steps.finish(GattOp.CONNECT, status == BluetoothGatt.GATT_SUCCESS, "Couldn't connect")
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    finish(false, "The adapter disconnected")
+                    val was = state.getAndSet(LinkState.DROPPED)
+                    steps.close("The adapter disconnected")
                     // Only report links that dropped once ready, not ones
-                    // closed on purpose, or that never got that far.
-                    if (ready && !connection.closed) {
+                    // closed on purpose, or still opening: that fails open.
+                    if (was == LinkState.READY && !connection.closed) {
                         connections.ended(connection)
                         connection.close()
                         AdapterEvents.dropped(connection.id)
@@ -228,24 +220,26 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) =
-            finish(status == BluetoothGatt.GATT_SUCCESS, "Couldn't read the adapter's services")
+            steps.finish(GattOp.DISCOVER, status == BluetoothGatt.GATT_SUCCESS, "Couldn't read the adapter's services")
 
+        // Android may change the MTU on its own, unasked: the size still
+        // counts, and only a step that asked for it is finished.
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) payload = mtu - ATT_HEADER
-            finish(status == BluetoothGatt.GATT_SUCCESS, "The adapter kept its smaller writes")
+            steps.finish(GattOp.MTU, status == BluetoothGatt.GATT_SUCCESS, "The adapter kept its smaller writes")
         }
 
         override fun onDescriptorWrite(
             gatt: BluetoothGatt,
             descriptor: BluetoothGattDescriptor,
             status: Int,
-        ) = finish(status == BluetoothGatt.GATT_SUCCESS, "Couldn't switch the adapter's replies on")
+        ) = steps.finish(GattOp.DESCRIPTOR, status == BluetoothGatt.GATT_SUCCESS, "Couldn't switch the adapter's replies on")
 
         override fun onCharacteristicWrite(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
             status: Int,
-        ) = finish(status == BluetoothGatt.GATT_SUCCESS, "The adapter didn't take the write")
+        ) = steps.finish(GattOp.WRITE, status == BluetoothGatt.GATT_SUCCESS, "The adapter didn't take the write")
 
         override fun onCharacteristicChanged(
             gatt: BluetoothGatt,
@@ -295,6 +289,9 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
         }
     }
 
+    /** Where a link is: opening until ready, and dropped from either, once. */
+    private enum class LinkState { OPENING, READY, DROPPED }
+
     companion object {
         private const val TAG = "PitwallBle"
         private const val CONNECT_TIMEOUT_MS = 20_000L
@@ -311,11 +308,5 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
 
         /** The descriptor that switches notifications and indications on. */
         private val CLIENT_CONFIG: UUID = uuid16(0x2902)
-
-        /** Generic access, generic attribute, device information, battery. */
-        private val STANDARD_SERVICES = setOf(0x1800, 0x1801, 0x180A, 0x180F).map(::uuid16).toSet()
-
-        private fun uuid16(short: Int): UUID =
-            UUID.fromString(String.format("%08x-0000-1000-8000-00805f9b34fb", short))
     }
 }
