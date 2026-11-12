@@ -11,12 +11,11 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import io.flutter.plugin.common.BinaryMessenger
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.Closeable
@@ -45,36 +44,17 @@ class BleChannel(private val context: Context, messenger: BinaryMessenger) : Ble
     }
 
     override suspend fun connect(connection: Long, address: String): Unit = withContext(Dispatchers.IO) {
-        // Connecting replaces any other connection, even when it fails at once.
-        connections.replace()
-        val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
-        if (!adapter.isEnabled) throw FlutterError("disabled", "Bluetooth is off")
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
-            throw FlutterError("connect_failed", "Not a Bluetooth address")
-        }
-        val opening = Connection<GattLink>(connection)
-        val link = GattLink(opening)
-        opening.resource = link
-        connections.begin(opening)
-        // However it fails, it's no longer current, and nothing of it stays open.
-        fun abandon() {
-            connections.ended(opening)
-            opening.close()
-        }
-        try {
+        connections.connect(connection, address, adapter) { opening, adapter ->
+            if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                throw SecurityException("No permission to connect")
+            }
+            val link = GattLink(opening)
+            opening.resource = link
+            // Closed before the link was kept: closing didn't reach it.
+            if (opening.closed) throw IOException("Disconnected while connecting")
             withTimeout(CONNECT_TIMEOUT_MS) { link.open(adapter.getRemoteDevice(address)) }
-        } catch (e: SecurityException) {
-            abandon()
-            throw FlutterError("permission", e.message)
-        } catch (e: TimeoutCancellationException) {
-            abandon()
-            throw FlutterError("connect_failed", "The adapter didn't answer in time")
-        } catch (e: CancellationException) {
-            abandon()
-            throw e
-        } catch (e: Exception) {
-            abandon()
-            throw FlutterError("connect_failed", e.message)
         }
     }
 

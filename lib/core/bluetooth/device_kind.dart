@@ -26,26 +26,17 @@ enum DeviceKind {
   bluetoothLe;
 
   /// The kind for a Bluetooth LE device advertising [name].
-  factory DeviceKind.fromName(String name) {
-    final lower = name.toLowerCase();
-    return _adapterNames.any(lower.contains)
-        ? DeviceKind.obdAdapter
-        : DeviceKind.bluetoothLe;
-  }
+  factory DeviceKind.fromName(String name) =>
+      _adapterName.hasMatch(name.toLowerCase())
+      ? DeviceKind.obdAdapter
+      : DeviceKind.bluetoothLe;
 
   /// What OBD adapters' names contain, such as "IOS-Vlink", "OBDII",
-  /// "vLinker MC+" or "Veepeak".
-  static const _adapterNames = [
-    'obd',
-    'elm',
-    'vlink',
-    'v-link',
-    'vgate',
-    'icar',
-    'veepeak',
-    'konnwei',
-    'carista',
-  ];
+  /// "vLinker MC+" or "Veepeak". "elm" only starting a word, so "Helmet"
+  /// isn't taken for an ELM327.
+  static final _adapterName = RegExp(
+    r'obd|vlink|v-link|vgate|icar|veepeak|konnwei|carista|(^|[^a-z])elm',
+  );
 
   /// The kind for a Bluetooth device class, as Android reports it.
   factory DeviceKind.fromClass(int deviceClass) {

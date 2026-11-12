@@ -13,9 +13,9 @@ abstract interface class BluetoothGateway {
   /// without a name are left out.
   Stream<BluetoothDevice> nearbyDevices();
 
-  /// Starts connecting to the adapter at [address], of [type]. Only one
-  /// connection is open at a time: connecting again closes the previous
-  /// one.
+  /// Starts connecting to the adapter at [address], of [type]. Connecting
+  /// again over the same kind of Bluetooth closes that kind's previous
+  /// connection; one over the other kind stays open until it's closed.
   AdapterConnection connect(String address, AdapterType type);
 
   /// Whether Bluetooth is on: the current state, then each change.

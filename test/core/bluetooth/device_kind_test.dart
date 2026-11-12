@@ -32,6 +32,9 @@ void main() {
       expect(DeviceKind.fromName(name), DeviceKind.obdAdapter, reason: name);
     }
     expect(DeviceKind.fromName('Galaxy Watch'), DeviceKind.bluetoothLe);
+    expect(DeviceKind.fromName('Bike Helmet'), DeviceKind.bluetoothLe);
+    expect(DeviceKind.fromName('MyOBD'), DeviceKind.obdAdapter);
+    expect(DeviceKind.fromName('IOS-ELM327'), DeviceKind.obdAdapter);
     expect(DeviceRole.adapter.suits(DeviceKind.obdAdapter), isTrue);
     expect(DeviceRole.adapter.suits(DeviceKind.bluetoothLe), isFalse);
   });

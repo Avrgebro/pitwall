@@ -41,9 +41,8 @@ class _Connection {
   /// The adapter, once the connection is live; null while it's being made.
   Elm327? get live => _live ? _elm : null;
 
-  /// The trouble codes as last read on this connection, how many
-  /// confirmed ones the car counted then, and when.
-  ({TroubleCodes codes, int count, DateTime at})? codes;
+  /// The trouble codes read on this connection, and when they're due.
+  final codes = TroubleCodesReader();
 
   void asked(AdapterConnection adapter) => _adapter = adapter;
   void attach(Elm327 elm) => _elm = elm;
@@ -241,55 +240,28 @@ class SessionController extends Notifier<SessionState> {
     return outcome;
   });
 
-  /// How long trouble codes are kept before they're all read again, even
-  /// with the same count: pending codes don't change the count.
-  static const troubleCodesInterval = Duration(minutes: 10);
-
-  /// The car's trouble codes. The light and the count of confirmed codes
-  /// come with every reading; all the codes are read on a connection's
-  /// first, when the count changes, and every [troubleCodesInterval]. A
+  /// The car's trouble codes, as [TroubleCodesReader] reads them. A
   /// failure to read them never fails the reading: the codes known are
-  /// kept, and only a dropped adapter goes on as one.
+  /// kept, as read when they were, and only a dropped adapter goes on as
+  /// one. A reply that comes late is waited for by the next command; see
+  /// Elm327.
   Future<TroubleCodesRead?> _troubleCodes(
     _Connection connection,
     Elm327 elm,
   ) async {
     final log = ref.read(adapterLogProvider);
-    final known = connection.codes;
     try {
-      final light = await readLight(elm);
-      final now = DateTime.now();
-      if (known != null &&
-          known.count == light.count &&
-          now.difference(known.at) < troubleCodesInterval) {
-        // The light is new; the codes are as read then.
-        return (codes: known.codes.withLight(light.checkEngine), at: known.at);
-      }
-      final codes = await readTroubleCodes(elm, light: light);
-      connection.codes = (codes: codes, count: light.count, at: now);
-      if (known == null || known.codes != codes) log.note(_describe(codes));
-      return (codes: codes, at: now);
+      final (:read, :changed) = await connection.codes.read(
+        elm,
+        DateTime.now(),
+      );
+      if (changed) log.note(read.codes.summary);
+      return read;
     } on ElmException catch (e) {
       if (e.error == ElmError.disconnected) rethrow;
-      // A reply that comes late is waited for by the next command; see
-      // Elm327. The codes known are kept, as read when they were.
       log.note('Couldn\'t read the trouble codes', warning: true);
-      return switch (known) {
-        final known? => (codes: known.codes, at: known.at),
-        null => null,
-      };
+      return connection.codes.known;
     }
-  }
-
-  static String _describe(TroubleCodes codes) {
-    if (codes.isEmpty) return 'No trouble codes';
-    final parts = [
-      if (codes.checkEngine) 'check-engine light on',
-      if (codes.stored.isNotEmpty) 'stored ${codes.stored.join(' ')}',
-      if (codes.pending.isNotEmpty) 'pending ${codes.pending.join(' ')}',
-      if (codes.permanent.isNotEmpty) 'permanent ${codes.permanent.join(' ')}',
-    ];
-    return 'Trouble codes: ${parts.join(', ')}';
   }
 
   /// Says in the log which chosen values didn't come back, and why.

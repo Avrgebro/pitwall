@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-import kotlinx.coroutines.CancellationException
 
 /**
  * Serial (RFCOMM) connections to a classic Bluetooth OBD adapter, for Dart's
@@ -60,15 +59,7 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
     }
 
     override suspend fun connect(connection: Long, address: String): Unit = withContext(io) {
-        // Connecting replaces any other connection, even when it fails at once.
-        connections.replace()
-        val adapter = adapter ?: throw FlutterError("unavailable", "No Bluetooth on this device")
-        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
-            throw FlutterError("connect_failed", "Not a Bluetooth address")
-        }
-        val opening = Connection<BluetoothSocket>(connection)
-        connections.begin(opening)
-        try {
+        connections.connect(connection, address, adapter) { opening, adapter ->
             val device = adapter.getRemoteDevice(address)
             val socket = try {
                 open(opening) { device.createRfcommSocketToServiceRecord(SERIAL_PORT) }
@@ -78,15 +69,6 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
                 open(opening) { device.createInsecureRfcommSocketToServiceRecord(SERIAL_PORT) }
             }
             startReading(opening, socket)
-        } catch (e: Exception) {
-            // However it failed, it's no longer current, and nothing of it stays open.
-            connections.ended(opening)
-            opening.close()
-            if (e is CancellationException) throw e
-            throw when (e) {
-                is SecurityException -> FlutterError("permission", e.message)
-                else -> FlutterError("connect_failed", e.message)
-            }
         }
     }
 

@@ -30,6 +30,18 @@ class TroubleCodes {
   bool get isEmpty =>
       !checkEngine && stored.isEmpty && pending.isEmpty && permanent.isEmpty;
 
+  /// In words, as "Trouble codes: check-engine light on, stored P0133".
+  String get summary {
+    if (isEmpty) return 'No trouble codes';
+    final parts = [
+      if (checkEngine) 'check-engine light on',
+      if (stored.isNotEmpty) 'stored ${stored.join(' ')}',
+      if (pending.isNotEmpty) 'pending ${pending.join(' ')}',
+      if (permanent.isNotEmpty) 'permanent ${permanent.join(' ')}',
+    ];
+    return 'Trouble codes: ${parts.join(', ')}';
+  }
+
   /// The same codes, with the light as it is now.
   TroubleCodes withLight(bool checkEngine) => TroubleCodes(
     checkEngine: checkEngine,
@@ -146,4 +158,45 @@ Future<TroubleCodes> readTroubleCodes(
     pending: codesFrom(await elm.request(0x07, const [])),
     permanent: codesFrom(await elm.request(0x0A, const [])),
   );
+}
+
+/// One connection's trouble codes: the light and the count of confirmed
+/// codes come with every reading, one short request; all the codes are
+/// read on the first, when the count changes, and every [rereadAfter], as
+/// new pending codes don't change the count.
+class TroubleCodesReader {
+  TroubleCodesReader();
+
+  static const rereadAfter = Duration(minutes: 10);
+
+  ({TroubleCodes codes, int count, DateTime at})? _full;
+
+  /// The codes last read in full, and when, if any were.
+  TroubleCodesRead? get known => switch (_full) {
+    (:final codes, :final at, count: _) => (codes: codes, at: at),
+    null => null,
+  };
+
+  /// Reads the light, and all the codes if they're due, at [now]. Returns
+  /// them, as read when they were, and whether they differ from the codes
+  /// known before. Throws what [elm] throws; the codes known stay.
+  Future<({TroubleCodesRead read, bool changed})> read(
+    Elm327 elm,
+    DateTime now,
+  ) async {
+    final light = await readLight(elm);
+    if (_full case final full?
+        when full.count == light.count &&
+            now.difference(full.at) < rereadAfter) {
+      // The light is new; the codes are as read then.
+      return (
+        read: (codes: full.codes.withLight(light.checkEngine), at: full.at),
+        changed: false,
+      );
+    }
+    final codes = await readTroubleCodes(elm, light: light);
+    final changed = _full?.codes != codes;
+    _full = (codes: codes, count: light.count, at: now);
+    return (read: (codes: codes, at: now), changed: changed);
+  }
 }

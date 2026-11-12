@@ -53,11 +53,11 @@ void main() {
   test('reads every kind, and a kind the car refuses is none', () async {
     final elm = Elm327(
       FakeTransport({
-        '0101': '41 01 81 07 E5 00',
-        '03': '43 01 01 33',
-        '07': '47 01 04 20',
+        '0101': '41018107E500',
+        '03': '43010133',
+        '07': '47010420',
         // Permanent codes refused: request out of range.
-        '0A': '7F 0A 31',
+        '0A': '7F0A31',
       }),
     );
 
@@ -69,6 +69,78 @@ void main() {
         pending: ['P0420'],
       ),
     );
+  });
+
+  group('a connection\'s reader', () {
+    final start = DateTime(2026, 11, 12, 9);
+    late FakeTransport adapter;
+    late TroubleCodesReader reader;
+    setUp(() {
+      adapter = FakeTransport({
+        '0101': '410100076500',
+        '03': '4300',
+        '07': '4700',
+        '0A': '4A00',
+      });
+      reader = TroubleCodesReader();
+    });
+
+    test('reads them all first, then only the light', () async {
+      final elm = Elm327(adapter);
+
+      final first = await reader.read(elm, start);
+      final second = await reader.read(
+        elm,
+        start.add(const Duration(minutes: 1)),
+      );
+
+      expect(first.changed, isTrue);
+      expect(second.changed, isFalse);
+      // Still as read the first time.
+      expect(second.read.at, start);
+      expect(adapter.sent.where((c) => c == '03'), hasLength(1));
+      expect(adapter.sent.where((c) => c == '0101'), hasLength(2));
+    });
+
+    test('reads them all again when the count changes', () async {
+      final elm = Elm327(adapter);
+      await reader.read(elm, start);
+      adapter.replies
+        ..['0101'] = '410181076500'
+        ..['03'] = '43010133';
+
+      final later = start.add(const Duration(minutes: 1));
+      final read = await reader.read(elm, later);
+
+      expect(read.changed, isTrue);
+      expect(read.read.codes.stored, ['P0133']);
+      expect(read.read.at, later);
+    });
+
+    test('reads them all again after a while, for new pending ones', () async {
+      final elm = Elm327(adapter);
+      await reader.read(elm, start);
+      adapter.replies['07'] = '47010420';
+
+      final read = await reader.read(
+        elm,
+        start.add(TroubleCodesReader.rereadAfter),
+      );
+
+      expect(read.read.codes.pending, ['P0420']);
+    });
+
+    test('keeps what it knew when a read fails', () async {
+      final elm = Elm327(adapter);
+      await reader.read(elm, start);
+      adapter.replies['0101'] = '?';
+
+      await expectLater(
+        reader.read(elm, start.add(const Duration(minutes: 1))),
+        throwsA(isA<ElmException>()),
+      );
+      expect(reader.known?.at, start);
+    });
   });
 
   test('a round trip through JSON keeps them', () {

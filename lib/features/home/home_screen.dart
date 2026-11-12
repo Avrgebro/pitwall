@@ -70,6 +70,16 @@ class HomeScreen extends ConsumerWidget {
           ref.read(deliveryStatusProvider.notifier).dismissDrops(),
     );
 
+    // Built once; where it goes depends on whether it's a problem.
+    final codesFirst = model.troubleCodes?.isProblem ?? false;
+    final troubleCodes = switch (model.troubleCodes) {
+      final codes? => [
+        SectionHeader('Trouble codes', trailing: codes.meta),
+        TroubleCodesCard(model: codes),
+      ],
+      null => null,
+    };
+
     return AppPage(
       title: 'Pitwall',
       children: [
@@ -85,18 +95,12 @@ class HomeScreen extends ConsumerWidget {
           delivery,
         ],
         // The light on, or a confirmed fault, comes before the values.
-        if (model.troubleCodes case final codes? when codes.isProblem) ...[
-          SectionHeader('Trouble codes', trailing: codes.meta),
-          TroubleCodesCard(model: codes),
-        ],
+        if (codesFirst) ...?troubleCodes,
         if (model.values case final values?) ...[
           SectionHeader(values.title, trailing: values.meta),
           ValueGrid(values: values.tiles),
         ],
-        if (model.troubleCodes case final codes? when !codes.isProblem) ...[
-          SectionHeader('Trouble codes', trailing: codes.meta),
-          TroubleCodesCard(model: codes),
-        ],
+        if (!codesFirst) ...?troubleCodes,
         if (!model.delivery.isProblem) ...[
           const SizedBox(height: Insets.l),
           delivery,

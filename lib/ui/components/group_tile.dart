@@ -61,7 +61,10 @@ class GroupTile extends StatelessWidget {
       (final text?, null) => Text(text),
       (final text?, final tag?) => Row(
         children: [
-          Flexible(child: Text(text)),
+          // One line, so a long name doesn't wrap beside its tag.
+          Flexible(
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
           const SizedBox(width: Insets.s),
           tag,
         ],

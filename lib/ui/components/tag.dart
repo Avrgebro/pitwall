@@ -16,7 +16,10 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.tone(tone);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Insets.xsPlus,
+        vertical: Insets.xxs,
+      ),
       decoration: BoxDecoration(
         color: colors.container,
         borderRadius: const BorderRadius.all(Radius.circular(Corners.tag)),
