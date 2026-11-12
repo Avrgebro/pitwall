@@ -807,6 +807,45 @@ class CompanionApi {
   }
 }
 
+/// Android's share sheet, called from Dart while a screen is showing.
+class ShareApi {
+  /// Constructor for [ShareApi]. The [binaryMessenger] named argument is
+  /// available for dependency injection. If it is left null, the default
+  /// BinaryMessenger will be used which routes to the host platform.
+  ShareApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+    : pigeonVar_binaryMessenger = binaryMessenger,
+      pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+          ? '.$messageChannelSuffix'
+          : '';
+
+  final BinaryMessenger? pigeonVar_binaryMessenger;
+  static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
+
+  final String pigeonVar_messageChannelSuffix;
+
+  /// Offers [text] to the apps that take it, titled [subject] where they
+  /// use one, as email does.
+  Future<void> shareText(String subject, String text) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.pitwall.ShareApi.shareText$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[subject, text],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+}
+
 /// Trips Android starts, called from Android.
 abstract class TripStartApi {
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();

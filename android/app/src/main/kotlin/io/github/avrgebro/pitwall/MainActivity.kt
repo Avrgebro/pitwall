@@ -20,10 +20,12 @@ class MainActivity : FlutterActivity() {
         companion = CompanionChannel(this).also {
             CompanionApi.setUp(flutterEngine.dartExecutor.binaryMessenger, it)
         }
+        ShareApi.setUp(flutterEngine.dartExecutor.binaryMessenger, ShareChannel(this))
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         CompanionApi.setUp(flutterEngine.dartExecutor.binaryMessenger, null)
+        ShareApi.setUp(flutterEngine.dartExecutor.binaryMessenger, null)
         companion = null
         super.cleanUpFlutterEngine(flutterEngine)
     }

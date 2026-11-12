@@ -101,6 +101,14 @@ abstract class CompanionApi {
   bool watch(String address);
 }
 
+/// Android's share sheet, called from Dart while a screen is showing.
+@HostApi()
+abstract class ShareApi {
+  /// Offers [text] to the apps that take it, titled [subject] where they
+  /// use one, as email does.
+  void shareText(String subject, String text);
+}
+
 /// Trips Android starts, called from Android.
 @FlutterApi()
 abstract class TripStartApi {

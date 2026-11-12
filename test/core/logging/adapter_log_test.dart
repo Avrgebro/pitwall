@@ -20,4 +20,16 @@ void main() {
       endsWith('  → 010C  ← 7E8 41 0C 1A F8 7E9 41 0C 1A F0'),
     );
   });
+
+  test('each line is also handed on as it\'s added', () {
+    final mirrored = <String>[];
+    final log = AdapterLog(
+      clock: () => DateTime(2026, 11, 12, 17, 7, 42),
+      mirror: mirrored.add,
+    );
+
+    log.note('Car stopped answering', warning: true);
+
+    expect(mirrored, [log.asText()]);
+  });
 }

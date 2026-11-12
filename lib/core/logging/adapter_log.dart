@@ -67,9 +67,15 @@ class LogEntry {
 }
 
 /// Recent adapter and delivery activity, for the developer tools. Kept in
-/// memory only, and never holds the webhook URL or credentials.
+/// memory, each line also handed to [mirror], and never holds the webhook
+/// URL or credentials.
 class AdapterLog {
-  AdapterLog({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  AdapterLog({DateTime Function()? clock, this.mirror})
+    : _clock = clock ?? DateTime.now;
+
+  /// Told each line as it's added, as Android's log is, so a drive can be
+  /// read back from the phone after the app's own log has moved on.
+  final void Function(String line)? mirror;
 
   static const maxEntries = 500;
 
@@ -118,6 +124,7 @@ class AdapterLog {
   void dispose() => entries.dispose();
 
   void _add(LogEntry entry) {
+    mirror?.call(entry.toLine());
     final next = [...entries.value, entry];
     entries.value = next.length > maxEntries
         ? next.sublist(next.length - maxEntries)

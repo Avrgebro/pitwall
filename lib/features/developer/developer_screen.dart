@@ -71,7 +71,9 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
                     padding: EdgeInsets.all(Insets.xs),
                   ),
                 ),
-                OutlinedButton.icon(
+                // Icons, so all three fit beside the title on a phone.
+                IconButton.outlined(
+                  tooltip: 'Copy log',
                   onPressed: entries.isEmpty
                       ? null
                       : () async {
@@ -90,13 +92,25 @@ class _DeveloperScreenState extends ConsumerState<DeveloperScreen> {
                           );
                         },
                   icon: const Icon(Symbols.content_copy_rounded),
-                  label: const Text('Copy'),
                 ),
-                const SizedBox(width: Insets.s),
-                OutlinedButton.icon(
+                const SizedBox(width: Insets.xs),
+                IconButton.outlined(
+                  tooltip: 'Share log',
+                  onPressed: entries.isEmpty
+                      ? null
+                      : () => ref
+                            .read(shareGatewayProvider)
+                            .shareText(
+                              subject: 'Pitwall adapter log',
+                              text: log.asText(),
+                            ),
+                  icon: const Icon(Symbols.share_rounded),
+                ),
+                const SizedBox(width: Insets.xs),
+                IconButton.outlined(
+                  tooltip: 'Clear log',
                   onPressed: entries.isEmpty ? null : log.clear,
                   icon: const Icon(Symbols.delete_sweep_rounded),
-                  label: const Text('Clear'),
                 ),
               ],
             ),

@@ -10,6 +10,7 @@ import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/platform/permission_gateway.dart';
+import 'package:pitwall/core/platform/share_gateway.dart';
 import 'package:pitwall/core/platform/trip_service_gateway.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/settings/settings.dart';
@@ -311,6 +312,17 @@ class FixedSession extends SessionController {
   SessionState build() => initial;
 }
 
+/// Records what's shared, instead of opening Android's share sheet.
+class FakeShareGateway implements ShareGateway {
+  final shared = <({String subject, String text})>[];
+
+  @override
+  Future<void> shareText({
+    required String subject,
+    required String text,
+  }) async => shared.add((subject: subject, text: text));
+}
+
 /// Provider overrides for an app with no real phone behind it.
 List<Override> testOverrides({
   AppSettings settings = const AppSettings(),
@@ -320,6 +332,7 @@ List<Override> testOverrides({
   FakeBluetoothGateway? bluetooth,
   FakeLastValuesStorage? lastValues,
   FakeTripServiceGateway? tripService,
+  FakeShareGateway? share,
 }) {
   final sender = WebhookSender(
     storage: FakeDeliveryStorage(),
@@ -343,6 +356,7 @@ List<Override> testOverrides({
     tripServiceGatewayProvider.overrideWithValue(
       tripService ?? FakeTripServiceGateway(),
     ),
+    shareGatewayProvider.overrideWithValue(share ?? FakeShareGateway()),
     packageInfoProvider.overrideWith(
       (ref) async => PackageInfo(
         appName: 'Pitwall',

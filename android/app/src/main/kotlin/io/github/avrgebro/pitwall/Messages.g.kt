@@ -922,6 +922,49 @@ interface CompanionApi {
   }
 }
 /**
+ * Android's share sheet, called from Dart while a screen is showing.
+ *
+ * Generated interface from Pigeon that represents a handler of messages from Flutter.
+ */
+interface ShareApi {
+  /**
+   * Offers [text] to the apps that take it, titled [subject] where they
+   * use one, as email does.
+   */
+  fun shareText(subject: String, text: String)
+
+  companion object {
+    /** The codec used by ShareApi. */
+    val codec: MessageCodec<Any?> by lazy {
+      MessagesPigeonCodec()
+    }
+    /** Sets up an instance of `ShareApi` to handle messages through the `binaryMessenger`. */
+    @JvmOverloads
+    fun setUp(binaryMessenger: BinaryMessenger, api: ShareApi?, messageChannelSuffix: String = "") {
+      val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.pitwall.ShareApi.shareText$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val subjectArg = args[0] as String
+            val textArg = args[1] as String
+            val wrapped: List<Any?> = try {
+              api.shareText(subjectArg, textArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              MessagesPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+    }
+  }
+}
+/**
  * Trips Android starts, called from Android.
  *
  * Generated class from Pigeon that represents Flutter messages that can be called from Kotlin.

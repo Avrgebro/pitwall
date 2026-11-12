@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -8,6 +9,7 @@ import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/logging/adapter_log.dart';
 import '../core/platform/file_gateway.dart';
 import '../core/platform/permission_gateway.dart';
+import '../core/platform/share_gateway.dart';
 import '../core/platform/trip_service_gateway.dart';
 import '../core/readings/last_values.dart';
 import '../core/settings/settings_store.dart';
@@ -26,6 +28,10 @@ final bluetoothGatewayProvider = Provider<BluetoothGateway>(
 /// Whether Bluetooth is on, kept current.
 final bluetoothOnProvider = StreamProvider<bool>(
   (ref) => ref.watch(bluetoothGatewayProvider).enabled,
+);
+
+final shareGatewayProvider = Provider<ShareGateway>(
+  (ref) => const AndroidShareGateway(),
 );
 
 final permissionGatewayProvider = Provider<PermissionGateway>(
@@ -49,7 +55,9 @@ final lastValuesStorageProvider = Provider<LastValuesStorage>(
 );
 
 final adapterLogProvider = Provider<AdapterLog>((ref) {
-  final log = AdapterLog();
+  // Also in Android's log, under "flutter", as "Pitwall: ...", where adb
+  // reads it back.
+  final log = AdapterLog(mirror: (line) => debugPrint('Pitwall: $line'));
   ref.onDispose(log.dispose);
   return log;
 });
