@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
+import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
+import 'package:pitwall/core/bluetooth/device_kind.dart';
 import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/readings/unreported.dart';
@@ -174,6 +176,57 @@ void main() {
 
     await pump(AdapterType.classic);
     expect(enabled(), isFalse);
+  });
+
+  testWidgets('a new BLE adapter for waking trips is confirmed at once', (
+    tester,
+  ) async {
+    const veepeak = BluetoothDevice(
+      name: 'Veepeak BLE',
+      address: 'C0:FF:EE:00:00:02',
+      kind: DeviceKind.obdAdapter,
+      type: AdapterType.ble,
+    );
+    final store = FakeSettingsStore(
+      settings: const AppSettings(
+        vehicles: [
+          Vehicle(
+            id: 'tucson',
+            name: 'Tucson',
+            adapter: VehicleAdapter(
+              address: 'C0:FF:EE:00:00:01',
+              name: 'IOS-Vlink',
+              type: AdapterType.ble,
+              watched: true,
+            ),
+            tripStart: TripStart.adapterWakes,
+          ),
+        ],
+      ),
+    );
+    final service = FakeTripServiceGateway();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: testOverrides(
+          store: store,
+          tripService: service,
+          bluetooth: FakeBluetoothGateway()..nearby = [veepeak],
+        ),
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const VehicleAdapterScreen(vehicleId: 'tucson'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Veepeak BLE'));
+    await tester.pumpAndSettle();
+
+    expect(service.watchRequests, ['C0:FF:EE:00:00:02']);
+    final vehicle = store.settings.vehicleById('tucson')!;
+    expect(vehicle.adapter?.address, 'C0:FF:EE:00:00:02');
+    expect(vehicle.needs, isEmpty);
   });
 
   group('with a profile', () {

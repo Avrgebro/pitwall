@@ -171,8 +171,27 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setAdapter(String vehicleId, BluetoothDevice adapter) =>
       _modifyVehicle(vehicleId, (v) => _withAdapter(v, adapter));
 
-  static Vehicle _withAdapter(Vehicle vehicle, BluetoothDevice adapter) =>
-      vehicle.copyWith(adapter: VehicleAdapter.of(adapter));
+  /// The one place a device becomes a vehicle's adapter. The same adapter
+  /// chosen again keeps what's known of it; another starts afresh. A trip
+  /// start the new adapter can't do goes back to the car's Bluetooth: a
+  /// classic adapter doesn't wake.
+  static Vehicle _withAdapter(Vehicle vehicle, BluetoothDevice device) {
+    final current = vehicle.adapter;
+    final adapter =
+        current != null && _sameAddress(current.address, device.address)
+        ? current
+        : VehicleAdapter.of(device);
+    final wakes =
+        vehicle.tripStart == TripStart.adapterWakes &&
+        adapter.type == AdapterType.ble;
+    return vehicle.copyWith(
+      adapter: adapter,
+      tripStart: wakes ? TripStart.adapterWakes : TripStart.carBluetooth,
+    );
+  }
+
+  static bool _sameAddress(String a, String b) =>
+      a.toUpperCase() == b.toUpperCase();
 
   /// Removes the vehicle and its profile files; its last values follow.
   /// The settings go first: a profile file left behind does no harm, but

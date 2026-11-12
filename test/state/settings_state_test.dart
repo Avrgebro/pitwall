@@ -789,6 +789,92 @@ void main() {
     expect(storage.saves, 0);
   });
 
+  group('changing the adapter', () {
+    const iCar = VehicleAdapter(
+      address: 'C0:FF:EE:00:00:01',
+      name: 'IOS-Vlink',
+      type: AdapterType.ble,
+      setsFlowControl: true,
+      watched: true,
+    );
+
+    Future<(ProviderContainer, FakeSettingsStore)> start() async {
+      final store = FakeSettingsStore(
+        settings: const AppSettings(
+          vehicles: [
+            Vehicle(
+              id: 'tucson',
+              name: 'Tucson',
+              adapter: iCar,
+              tripStart: TripStart.adapterWakes,
+            ),
+          ],
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: testOverrides(store: store),
+      );
+      addTearDown(container.dispose);
+      await container.read(appSettingsProvider.future);
+      return (container, store);
+    }
+
+    test('to a classic one starts trips from the car\'s Bluetooth', () async {
+      final (container, store) = await start();
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .setAdapter(
+            'tucson',
+            const BluetoothDevice(
+              name: 'OBDII',
+              address: '00:1D:A5:68:98:8B',
+              type: AdapterType.classic,
+            ),
+          );
+
+      final vehicle = store.settings.vehicleById('tucson')!;
+      expect(vehicle.tripStart, TripStart.carBluetooth);
+      expect(vehicle.needs, [VehicleNeed.headUnit]);
+    });
+
+    test('to another BLE one keeps waking, until it\'s watched', () async {
+      final (container, store) = await start();
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .setAdapter(
+            'tucson',
+            const BluetoothDevice(
+              name: 'Veepeak BLE',
+              address: 'C0:FF:EE:00:00:02',
+              type: AdapterType.ble,
+            ),
+          );
+
+      final vehicle = store.settings.vehicleById('tucson')!;
+      expect(vehicle.tripStart, TripStart.adapterWakes);
+      expect(vehicle.needs, [VehicleNeed.adapterWatch]);
+    });
+
+    test('to the same one again keeps what\'s known of it', () async {
+      final (container, store) = await start();
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .setAdapter(
+            'tucson',
+            const BluetoothDevice(
+              name: 'IOS-Vlink',
+              address: 'c0:ff:ee:00:00:01',
+              type: AdapterType.ble,
+            ),
+          );
+
+      expect(store.settings.vehicleById('tucson')!.adapter, iCar);
+    });
+  });
+
   group('starting trips when the adapter wakes', () {
     Future<(ProviderContainer, FakeSettingsStore, FakeTripServiceGateway)>
     start({required AdapterType type}) async {
