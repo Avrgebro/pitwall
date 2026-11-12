@@ -80,14 +80,26 @@ class FakeBluetoothGateway implements BluetoothGateway {
   @override
   Future<List<BluetoothDevice>> bondedDevices() async => devices;
 
+  final _switched = StreamController<bool>.broadcast();
+
+  /// Turns Bluetooth on or off, as the user does in Android.
+  void turn({required bool on}) => _switched.add(on);
+
   @override
-  Stream<bool> get enabled => Stream.value(bluetoothOn);
+  Stream<bool> get enabled async* {
+    yield bluetoothOn;
+    yield* _switched.stream;
+  }
 
   /// Bluetooth LE devices "nearby", found one after another.
   List<BluetoothDevice> nearby = const [];
 
-  /// Whether a scan is listened to now.
+  /// Whether a scan is listened to now, and how many were started.
   bool scanning = false;
+  int scans = 0;
+
+  /// Makes the next scans fail after what they found, as Android does.
+  Object? scanError;
 
   @override
   Stream<BluetoothDevice> nearbyDevices() {
@@ -95,7 +107,9 @@ class FakeBluetoothGateway implements BluetoothGateway {
     controller = StreamController<BluetoothDevice>(
       onListen: () {
         scanning = true;
+        scans++;
         nearby.forEach(controller.add);
+        if (scanError case final error?) controller.addError(error);
       },
       onCancel: () => scanning = false,
     );

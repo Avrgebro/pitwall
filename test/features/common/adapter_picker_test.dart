@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -223,6 +224,68 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(bluetooth.scanning, isFalse);
+    });
+
+    testWidgets('refreshing keeps the one scan going', (tester) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar];
+      await _pump(tester, const [], bluetooth: bluetooth);
+
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+
+      // Android allows only a few to start in half a minute.
+      expect(bluetooth.scans, 1);
+      expect(find.text('IOS-Vlink'), findsOneWidget);
+    });
+
+    testWidgets('a scan that failed says so, and refreshing starts again', (
+      tester,
+    ) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar]
+        ..scanError = PlatformException(code: 'scan_failed');
+      await _pump(tester, const [], bluetooth: bluetooth);
+
+      expect(
+        find.textContaining('Not looking for Bluetooth LE', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Looking for Bluetooth LE adapters nearby'),
+        findsNothing,
+      );
+
+      bluetooth.scanError = null;
+      await tester.tap(find.byTooltip('Refresh'));
+      await tester.pumpAndSettle();
+
+      expect(bluetooth.scans, 2);
+      expect(
+        find.text('Looking for Bluetooth LE adapters nearby'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('stop while Bluetooth is off, and start once it\'s on', (
+      tester,
+    ) async {
+      final bluetooth = FakeBluetoothGateway(devices: [_adapter])
+        ..nearby = [iCar];
+      await _pump(tester, const [], bluetooth: bluetooth);
+
+      bluetooth.turn(on: false);
+      await tester.pumpAndSettle();
+      expect(bluetooth.scanning, isFalse);
+      expect(
+        find.textContaining('Bluetooth is off', findRichText: true),
+        findsOneWidget,
+      );
+
+      bluetooth.turn(on: true);
+      await tester.pumpAndSettle();
+      expect(bluetooth.scanning, isTrue);
+      expect(bluetooth.scans, 2);
     });
 
     testWidgets('aren\'t looked for when choosing a head unit', (tester) async {

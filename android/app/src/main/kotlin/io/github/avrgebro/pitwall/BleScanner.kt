@@ -19,12 +19,23 @@ class BleScanner(private val context: Context, messenger: BinaryMessenger) :
     private val main = Handler(Looper.getMainLooper())
     private var sink: PigeonEventSink<FoundDeviceMessage>? = null
 
+    /**
+     * The name each device was last sent with, this scan: a device
+     * advertises many times a second, and only news goes to Dart. Used on
+     * the main thread only.
+     */
+    private val sent = mutableMapOf<String, String>()
+
     private val callback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             // The advertised name; devices that give none aren't offered.
             val name = result.scanRecord?.deviceName?.takeIf { it.isNotBlank() } ?: return
             val address = result.device.address
-            main.post { sink?.success(FoundDeviceMessage(name, address)) }
+            main.post {
+                if (sent.put(address, name) != name) {
+                    sink?.success(FoundDeviceMessage(name, address))
+                }
+            }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -38,6 +49,7 @@ class BleScanner(private val context: Context, messenger: BinaryMessenger) :
 
     override fun onListen(p0: Any?, sink: PigeonEventSink<FoundDeviceMessage>) {
         this.sink = sink
+        sent.clear()
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null || !adapter.isEnabled) {
             sink.error("disabled", "Bluetooth is off", null)

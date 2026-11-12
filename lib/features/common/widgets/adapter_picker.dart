@@ -76,13 +76,36 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
               tooltip: 'Refresh',
               onPressed: () {
                 ref.invalidate(pairedDevicesProvider);
-                if (looks) ref.invalidate(nearbyDevicesProvider);
+                // The scan goes on: starting another would count towards
+                // Android's limit. Only one that failed starts again.
+                if (looks && nearby is AsyncError) {
+                  ref.invalidate(nearbyDevicesProvider);
+                }
+                // Refused before, so asked again.
+                if (devices.error is BluetoothPermissionDenied ||
+                    nearby?.error is BluetoothPermissionDenied) {
+                  ref.invalidate(bluetoothAccessProvider);
+                }
               },
             ),
           ],
         ),
         if (nearby case AsyncData()) ...[
           const _Looking(),
+          const SizedBox(height: Insets.s),
+        ],
+        // The paired list says it already when both fail alike.
+        if (nearby case AsyncError(:final error)
+            when devices is! AsyncError) ...[
+          InfoNote(
+            icon: Icons.bluetooth_disabled_rounded,
+            tone: StatusTone.warning,
+            text: TextSpan(
+              text:
+                  'Not looking for Bluetooth LE adapters: '
+                  '${_describe(error)} Refresh to try again.',
+            ),
+          ),
           const SizedBox(height: Insets.s),
         ],
         switch (devices) {
@@ -203,8 +226,11 @@ class _AdapterPickerState extends ConsumerState<AdapterPicker> {
 
   static String _describe(Object error) => switch (error) {
     BluetoothPermissionDenied() =>
-      'Pitwall needs the Nearby devices permission to find adapters.',
+      'Pitwall needs the Nearby devices permission to find adapters. If '
+          'Android no longer asks, allow it in Pitwall\'s app settings.',
     PlatformException(code: 'disabled') => 'Bluetooth is off. Turn it on.',
+    PlatformException(code: 'scan_failed') =>
+      'Android stopped the search, as when it\'s asked too often.',
     _ => 'Couldn\'t list Bluetooth devices.',
   };
 
