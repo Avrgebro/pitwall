@@ -25,6 +25,10 @@ enum ElmError {
 
   /// The connection to the adapter closed.
   disconnected,
+
+  /// Not sent: it would change something in the car, as clearing trouble
+  /// codes would. See [Elm327.onlyReads].
+  changesCar,
 }
 
 class ElmException implements Exception {
@@ -136,11 +140,47 @@ class Elm327 {
   /// Sends [command] and returns the reply without the echo, the prompt,
   /// blank lines and status lines like `SEARCHING...`.
   ///
-  /// Throws [ElmException] if the adapter reports an error or times out.
+  /// Throws [ElmException] if the adapter reports an error or times out,
+  /// and, without sending it, if [command] would change the car.
   Future<String> send(String command, {Duration timeout = defaultTimeout}) {
+    if (!onlyReads(command)) {
+      log?.call(
+        command,
+        '(not sent: it would change the car)',
+        ElmError.changesCar,
+      );
+      return Future.error(ElmException(ElmError.changesCar, command));
+    }
     final result = _queue.then((_) => _exchange(command, timeout));
     _queue = result.then((_) {}, onError: (_) {});
     return result;
+  }
+
+  /// The car services Pitwall sends, all of them reads: current data (01),
+  /// freeze frames (02), trouble codes (03, 07, 0A), test results (05, 06),
+  /// vehicle information (09), and manufacturer data and codes (19, 21,
+  /// 22). Never clearing codes (04, 14), writing (2E, 3B), resetting (11),
+  /// controlling (08, 2F, 30, 31) or programming.
+  static const _readServices = {
+    0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x09, 0x0A, 0x19, 0x21, 0x22, //
+  };
+
+  /// Whether [command] only reads: a command to the adapter itself
+  /// (`AT`, or `ST` and `VT` on clones), or a request to the car for one
+  /// of the services that only read. Anything else is never sent, as
+  /// Pitwall never changes the car.
+  static bool onlyReads(String command) {
+    final text = command.trim().toUpperCase();
+    if (text.startsWith('AT') ||
+        text.startsWith('ST') ||
+        text.startsWith('VT')) {
+      return true;
+    }
+    final request = text.replaceAll(' ', '');
+    if (!RegExp(r'^[0-9A-F]{2,}$').hasMatch(request)) return false;
+    return _readServices.contains(
+      int.parse(request.substring(0, 2), radix: 16),
+    );
   }
 
   /// Asks the car which mode 01 PIDs it supports, across all its ECUs.

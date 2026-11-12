@@ -424,6 +424,29 @@ void main() {
     expect(adapters.single.sent, containsAllInOrder(['ATI', '0100']));
   });
 
+  test('raw commands that would change the car are never sent', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+    adapters.single.replies['0100'] = '410000000000';
+    adapters.single.sent.clear();
+
+    final outcome = await session.sendRaw('04, 14FFFFFF, 0100');
+
+    expect(outcome, isA<StepDone<void>>());
+    expect(adapters.single.sent, ['0100']);
+    expect(
+      c
+          .read(adapterLogProvider)
+          .entries
+          .value
+          .where((e) => e.text == '04')
+          .single
+          .reply,
+      '(not sent: it would change the car)',
+    );
+  });
+
   test('a connect abandoned midway leaves the next connection alone', () async {
     final c = await start();
     final session = c.read(sessionProvider.notifier);

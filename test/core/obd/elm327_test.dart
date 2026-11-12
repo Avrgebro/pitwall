@@ -251,6 +251,32 @@ void main() {
     );
   });
 
+  test('only commands that read are ever sent', () async {
+    final transport = FakeTransport({'0902': '490201'});
+    final elm = Elm327(transport);
+
+    for (final command in ['04', '14FFFFFF', '2EF19001', '1101', '3101FF00']) {
+      await expectLater(
+        elm.send(command),
+        throwsA(
+          isA<ElmException>().having(
+            (e) => e.error,
+            'error',
+            ElmError.changesCar,
+          ),
+        ),
+        reason: command,
+      );
+    }
+    await elm.send('0902');
+
+    expect(transport.sent, ['0902']);
+    for (final command in ['ATZ', 'STDI', '010C', '03', '0A', '22F190']) {
+      expect(Elm327.onlyReads(command), isTrue, reason: command);
+    }
+    expect(Elm327.onlyReads('HELLO'), isFalse);
+  });
+
   test('supported PIDs follow the chain of ranges', () async {
     final transport = FakeTransport({
       '0100': '4100BE3EB811',
