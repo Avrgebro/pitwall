@@ -152,9 +152,10 @@ void main() {
     expect(find.text('vLinker MC+'), findsOneWidget);
   });
 
-  testWidgets('an adapter says how it connects', (tester) async {
+  testWidgets('an adapter says how it connects, in a badge', (tester) async {
     await _pump(tester, [_adapter]);
-    expect(find.text('Classic, A'), findsOneWidget);
+    expect(find.text('Classic'), findsOneWidget);
+    expect(find.text('A'), findsOneWidget);
   });
 
   testWidgets('a head unit shows just its address', (tester) async {
@@ -167,6 +168,8 @@ void main() {
       ),
     ], role: DeviceRole.headUnit);
     expect(find.text('B'), findsOneWidget);
+    // How a stereo connects doesn't matter: no badge.
+    expect(find.text('Classic'), findsNothing);
   });
 
   group('Bluetooth LE adapters nearby', () {
@@ -201,7 +204,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('IOS-Vlink'), findsOneWidget);
-      expect(find.text('Bluetooth LE, C0:FF:EE:00:00:01'), findsOneWidget);
+      expect(find.text('BLE'), findsOneWidget);
+      expect(find.text('C0:FF:EE:00:00:01'), findsOneWidget);
       // Not named like an adapter: folded away with the other devices.
       expect(find.text('Galaxy Watch'), findsNothing);
 

@@ -12,6 +12,7 @@ class AppRow extends StatelessWidget {
     required this.title,
     this.leading,
     this.subtitle,
+    this.badge,
     this.subtitleTone,
     this.trailing,
     this.opensPage = false,
@@ -28,6 +29,10 @@ class AppRow extends StatelessWidget {
   /// An icon here takes the row's accent colour unless it sets its own.
   final Widget? leading;
   final Widget? subtitle;
+
+  /// A small label right after the title, such as a [StatusChip], for a
+  /// fact about the row worth seeing at a glance.
+  final Widget? badge;
 
   /// Colours the subtitle, e.g. error for "Choose its adapter".
   final StatusTone? subtitleTone;
@@ -49,6 +54,7 @@ class AppRow extends StatelessWidget {
     final subtitleTone = this.subtitleTone;
     final leading = this.leading;
     final subtitle = this.subtitle;
+    final badge = this.badge;
     final trailing = this.trailing;
     final content = Padding(
       padding: const EdgeInsets.symmetric(
@@ -77,13 +83,23 @@ class AppRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.rowTitle.copyWith(
-                    color: tone == null
-                        ? theme.colorScheme.onSurface
-                        : context.tone(tone).accent,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.rowTitle.copyWith(
+                          color: tone == null
+                              ? theme.colorScheme.onSurface
+                              : context.tone(tone).accent,
+                        ),
+                      ),
+                    ),
+                    if (badge != null) ...[
+                      const SizedBox(width: Insets.s),
+                      badge,
+                    ],
+                  ],
                 ),
                 if (subtitle != null) ...[
                   const SizedBox(height: Insets.xxs),

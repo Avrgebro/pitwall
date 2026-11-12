@@ -106,6 +106,7 @@ class ChoiceRow<T> extends StatelessWidget {
     required this.value,
     required this.title,
     this.subtitle,
+    this.badge,
     this.enabled = true,
     this.child,
   });
@@ -113,6 +114,9 @@ class ChoiceRow<T> extends StatelessWidget {
   final T value;
   final String title;
   final String? subtitle;
+
+  /// A small label right after the title; see [AppRow.badge].
+  final Widget? badge;
   final bool enabled;
   final Widget? child;
 
@@ -140,6 +144,7 @@ class ChoiceRow<T> extends StatelessWidget {
       enabled: enabled,
       leading: Radio<T>(value: value, enabled: enabled),
       subtitle: subtitle == null ? null : Text(subtitle!),
+      badge: badge,
       onTap: child == null ? () => group?.onChanged(value) : null,
     );
     return switch (child) {
