@@ -111,7 +111,13 @@ class _TripRun {
     if (wake != null && !wake.isCompleted) wake.complete();
   }
 
-  /// Waits [duration], or less if asked to stop meanwhile.
+  /// Ends a wait early, without stopping, as when the adapter dropped.
+  void interrupt() {
+    final wake = this.wake;
+    if (wake != null && !wake.isCompleted) wake.complete();
+  }
+
+  /// Waits [duration], or less if asked to stop or interrupted meanwhile.
   Future<void> sleep(Duration duration) {
     if (stopRequested) return Future.value();
     final wake = Completer<void>();
@@ -294,63 +300,76 @@ class TripController extends Notifier<TripState> {
     var silent = reached.session.carState == CarState.off;
     var lost = false;
     DateTime? quietSince;
-    while (!run.stopRequested) {
-      if (lost) {
-        // As it is now, with any new adapter.
-        final current = ref.read(vehicleProvider(vehicle.id));
-        if (current == null) return TripEnd.noVehicle;
-        vehicle = current;
-        switch (await _connect(run, [vehicle])) {
-          // Not finding it again is losing it.
-          case _NotFound(end: TripEnd.adapterNotFound):
-            return TripEnd.adapterLost;
-          case _NotFound(:final end):
-            return end;
-          case _Found(:final session):
-            lost = false;
-            silent = session.carState == CarState.off;
-            // A car that answers again starts a new quiet window.
-            if (!silent) quietSince = null;
+    // The adapter dropping ends the wait for the next reading: that one
+    // finds it gone, and the trip goes on from there at once.
+    // Only a connection lost: failed attempts to make one, while
+    // reconnecting, keep their pause between them.
+    final drops = ref.listen(sessionProvider, (previous, next) {
+      if (previous is SessionConnected && next is SessionIdle) {
+        run.interrupt();
+      }
+    });
+    try {
+      while (!run.stopRequested) {
+        if (lost) {
+          // As it is now, with any new adapter.
+          final current = ref.read(vehicleProvider(vehicle.id));
+          if (current == null) return TripEnd.noVehicle;
+          vehicle = current;
+          switch (await _connect(run, [vehicle])) {
+            // Not finding it again is losing it.
+            case _NotFound(end: TripEnd.adapterNotFound):
+              return TripEnd.adapterLost;
+            case _NotFound(:final end):
+              return end;
+            case _Found(:final session):
+              lost = false;
+              silent = session.carState == CarState.off;
+              // A car that answers again starts a new quiet window.
+              if (!silent) quietSince = null;
+          }
         }
-      }
-      if (silent) {
-        quietSince ??= DateTime.now();
-        if (DateTime.now().difference(quietSince) > _timing.carOffWindow) {
-          return TripEnd.carOff;
+        if (silent) {
+          quietSince ??= DateTime.now();
+          if (DateTime.now().difference(quietSince) > _timing.carOffWindow) {
+            return TripEnd.carOff;
+          }
+          await _notify(TripNotificationText.waitingForCar(vehicle));
         }
-        await _notify(TripNotificationText.waitingForCar(vehicle));
+        final outcome = silent
+            ? await _session.checkCar()
+            : await _readings.readAndKeep();
+        switch (outcome) {
+          // Someone else is using the adapter, as from Developer tools; try
+          // again after the interval.
+          case StepRefused(refusal: Refusal.busy):
+            break;
+          case StepRefused(refusal: Refusal.vehicleRemoved):
+            return TripEnd.noVehicle;
+          // A car already silent that then loses its adapter was switched
+          // off: an adapter that sleeps does just that a few minutes later.
+          case StepRefused() || StepFailed() when silent:
+            return TripEnd.carOff;
+          case StepRefused() || StepFailed():
+            lost = true;
+          case StepDone(value: VehicleReading(reading: CarSilent())):
+            silent = true;
+          case StepDone(value: VehicleReading(reading: CarAwake())):
+            silent = false;
+            quietSince = null;
+          case StepDone(value: VehicleReading(reading: CarAnswered())):
+            silent = false;
+            quietSince = null;
+            run.sentReadings = true;
+            await _notify(TripNotificationText.reading(vehicle, interval));
+        }
+        // Reconnecting doesn't wait.
+        if (!lost) await run.sleep(interval);
       }
-      final outcome = silent
-          ? await _session.checkCar()
-          : await _readings.readAndKeep();
-      switch (outcome) {
-        // Someone else is using the adapter, as from Developer tools; try
-        // again after the interval.
-        case StepRefused(refusal: Refusal.busy):
-          break;
-        case StepRefused(refusal: Refusal.vehicleRemoved):
-          return TripEnd.noVehicle;
-        // A car already silent that then loses its adapter was switched
-        // off: an adapter that sleeps does just that a few minutes later.
-        case StepRefused() || StepFailed() when silent:
-          return TripEnd.carOff;
-        case StepRefused() || StepFailed():
-          lost = true;
-        case StepDone(value: VehicleReading(reading: CarSilent())):
-          silent = true;
-        case StepDone(value: VehicleReading(reading: CarAwake())):
-          silent = false;
-          quietSince = null;
-        case StepDone(value: VehicleReading(reading: CarAnswered())):
-          silent = false;
-          quietSince = null;
-          run.sentReadings = true;
-          await _notify(TripNotificationText.reading(vehicle, interval));
-      }
-      // Reconnecting doesn't wait.
-      if (!lost) await run.sleep(interval);
+      return TripEnd.stopped;
+    } finally {
+      drops.close();
     }
-    return TripEnd.stopped;
   }
 
   /// Tells the receiver the car disconnected, if readings went out.

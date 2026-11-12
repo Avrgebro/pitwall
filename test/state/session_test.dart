@@ -411,6 +411,25 @@ void main() {
     );
   });
 
+  test('an adapter that drops leaves the session idle at once', () async {
+    final c = await start();
+    final session = c.read(sessionProvider.notifier);
+    await session.connect(_tucson);
+
+    await adapters.single.disconnect();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      c.read(sessionProvider),
+      const SessionIdle(problem: ConnectionProblem.disconnected),
+    );
+    expect(adapters.single.closed, isTrue);
+    expect(
+      c.read(adapterLogProvider).entries.value.last.text,
+      'The adapter disconnected',
+    );
+  });
+
   test('raw commands are split and sent as typed, in capitals', () async {
     final c = await start();
     final session = c.read(sessionProvider.notifier);

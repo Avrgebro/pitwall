@@ -147,6 +147,7 @@ class SessionController extends Notifier<SessionState> {
     if (!_isCurrent(connection)) return abandoned;
     final elm = Elm327(transport, log: log.exchange);
     connection.attach(elm);
+    unawaited(elm.closed.then((_) => _dropped(connection)));
     try {
       final version = await elm.initialize();
       final car = await _askCar(elm);
@@ -394,6 +395,21 @@ class SessionController extends Notifier<SessionState> {
         _update((live) => live.copyWith(busy: false));
       }
     }
+  }
+
+  /// The adapter dropped [connection]'s link, as when it goes to sleep.
+  /// If it's the live connection, the session is idle at once, so a trip
+  /// waiting for its next reading hears now rather than when that fails.
+  /// One closed on purpose, still being made, or failed already, is the
+  /// business of whatever closed it or saw it fail.
+  void _dropped(_Connection connection) {
+    if (!_isCurrent(connection) || connection.live == null) return;
+    _connection = null;
+    ref
+        .read(adapterLogProvider)
+        .note('The adapter disconnected', warning: true);
+    state = const SessionIdle(problem: ConnectionProblem.disconnected);
+    unawaited(connection.close());
   }
 
   /// Applies [change] to the live session, if it's still live.

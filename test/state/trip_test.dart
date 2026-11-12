@@ -102,6 +102,7 @@ void main() {
     FakeBluetoothGateway? bluetooth,
     Future<http.Response>? Function()? answer,
     TripTiming timing = _fast,
+    Duration interval = const Duration(milliseconds: 10),
   }) {
     service = FakeTripServiceGateway(pendingRequest: pendingRequest);
     received = [];
@@ -109,7 +110,7 @@ void main() {
     final store = FakeSettingsStore(
       settings: AppSettings(
         vehicles: vehicles,
-        interval: const Duration(milliseconds: 10),
+        interval: interval,
         setupDone: true,
       ),
     )..webhook = const WebhookTarget('https://example.com/api/webhook/x');
@@ -371,6 +372,39 @@ void main() {
 
       expect((await ended(c)).lastEnd, TripEnd.carOff);
     });
+  });
+
+  test('an adapter that drops ends the trip at once, not at the next '
+      'reading', () async {
+    final adapters = <_Adapter>[];
+    final c = container(
+      adapter: (_) {
+        // Asleep once gone: it can't be reached again.
+        if (adapters.isNotEmpty) return null;
+        final adapter = _Adapter(carOn: false);
+        adapters.add(adapter);
+        return adapter;
+      },
+      // The next check an hour away: only the drop can end the wait.
+      interval: const Duration(hours: 1),
+      timing: const TripTiming(
+        retryDelay: Duration(milliseconds: 5),
+        connectWindow: Duration(milliseconds: 40),
+        carOffWindow: Duration(minutes: 5),
+        finalDeliveryWait: Duration(seconds: 1),
+      ),
+    );
+    c.read(tripProvider);
+    service.send(const HeadUnitTarget(_tucsonStereo));
+    await running(c);
+    await until(
+      () => c.read(sessionProvider) is SessionConnected,
+      'the session to connect',
+    );
+
+    await adapters.single.disconnect();
+
+    expect((await ended(c)).lastEnd, TripEnd.carOff);
   });
 
   test('a car that stays off ends the trip', () async {

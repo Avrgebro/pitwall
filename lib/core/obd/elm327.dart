@@ -100,6 +100,12 @@ class Elm327 {
   /// Whether the connection to the adapter has closed.
   bool get isClosed => _closed;
 
+  /// Completes once the connection closes: dropped by the adapter, or
+  /// [dispose]d. A drop shows here at once, not only when a command next
+  /// fails.
+  Future<void> get closed => _closedSignal.future;
+  final _closedSignal = Completer<void>();
+
   /// Whether the adapter takes the flow-control commands [setTarget] sends,
   /// as [initialize] found, once and for all.
   bool get setsFlowControl => _flowControlSupported;
@@ -376,6 +382,7 @@ class Elm327 {
 
   void _onClosed() {
     _closed = true;
+    if (!_closedSignal.isCompleted) _closedSignal.complete();
     final pending = _pending;
     _pending = null;
     if (pending == null) return;

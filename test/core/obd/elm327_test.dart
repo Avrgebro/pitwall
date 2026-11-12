@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/obd/can_id.dart';
 import 'package:pitwall/core/obd/elm327.dart';
@@ -327,6 +329,18 @@ void main() {
       await expectLater(elm.send('ATRV'), isDisconnected);
     },
   );
+
+  test('a drop is heard at once, with no command waiting', () async {
+    final transport = FakeTransport({});
+    final elm = Elm327(transport);
+    var closed = false;
+    unawaited(elm.closed.then((_) => closed = true));
+
+    await transport.disconnect();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(closed, isTrue);
+  });
 
   test('log receives each command, raw reply and what it means', () async {
     final logged = <String>[];
