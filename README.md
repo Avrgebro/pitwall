@@ -4,8 +4,16 @@ Pitwall is a phone app that sends live data from your car to any webhook. It
 reads the car through a cheap OBD-II Bluetooth adapter, such as an ELM327 or a
 Vgate iCar Pro.
 
-> **Status:** early development. Nothing works yet. Android comes first, then
-> iOS.
+> **Status:** early, and working on Android: tested daily on one car. Expect
+> rough edges. iOS comes later.
+
+## Install
+
+Download the APK from the
+[latest release](https://github.com/Avrgebro/pitwall/releases/latest) and
+open it on your Android phone (Android 13 or later). Android asks you to
+allow installing apps from your browser or file manager the first time.
+Each release lists the APK's SHA-256 checksum, to check the download.
 
 ## What it does
 
