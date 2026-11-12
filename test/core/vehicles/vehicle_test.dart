@@ -5,6 +5,53 @@ import 'package:pitwall/core/profiles/profile_ref.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
 
 void main() {
+  group('an adapter chosen again', () {
+    const saved = VehicleAdapter(
+      address: 'C0:FF:EE:00:00:01',
+      name: 'IOS-Vlink',
+      type: AdapterType.classic,
+      setsFlowControl: true,
+    );
+
+    test('takes how it connects as Android says now', () {
+      // Saved as classic before Android said it was Bluetooth LE.
+      final again = saved.chosenAgain(
+        const BluetoothDevice(
+          name: 'IOS-Vlink',
+          address: 'c0:ff:ee:00:00:01',
+          type: AdapterType.ble,
+        ),
+      );
+
+      expect(again.type, AdapterType.ble);
+      expect(again.setsFlowControl, isTrue);
+      expect(again.address, saved.address);
+    });
+
+    test('as classic is no longer watched', () {
+      final watched =
+          const VehicleAdapter(
+            address: 'C0:FF:EE:00:00:01',
+            name: 'IOS-Vlink',
+            type: AdapterType.ble,
+            watched: true,
+          ).chosenAgain(
+            const BluetoothDevice(
+              name: 'IOS-Vlink',
+              address: 'C0:FF:EE:00:00:01',
+              type: AdapterType.classic,
+            ),
+          );
+
+      expect(watched.watched, isFalse);
+    });
+
+    test('is found by its address in any case', () {
+      expect(saved.isAt('c0:ff:ee:00:00:01'), isTrue);
+      expect(saved.isAt('C0:FF:EE:00:00:02'), isFalse);
+    });
+  });
+
   const ready = Vehicle(
     id: 'tucson',
     adapter: VehicleAdapter(

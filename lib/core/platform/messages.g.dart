@@ -326,6 +326,7 @@ class BondedDeviceMessage {
     required this.name,
     required this.address,
     required this.deviceClass,
+    required this.lowEnergyOnly,
   });
 
   String name;
@@ -335,8 +336,12 @@ class BondedDeviceMessage {
   /// Android's major and minor device class.
   int deviceClass;
 
+  /// Whether it's a Bluetooth LE device only, with no classic Bluetooth
+  /// to connect over, as Android's paired list can hold.
+  bool lowEnergyOnly;
+
   List<Object?> _toList() {
-    return <Object?>[name, address, deviceClass];
+    return <Object?>[name, address, deviceClass, lowEnergyOnly];
   }
 
   Object encode() {
@@ -349,6 +354,7 @@ class BondedDeviceMessage {
       name: result[0]! as String,
       address: result[1]! as String,
       deviceClass: result[2]! as int,
+      lowEnergyOnly: result[3]! as bool,
     );
   }
 
@@ -363,7 +369,8 @@ class BondedDeviceMessage {
     }
     return _deepEquals(name, other.name) &&
         _deepEquals(address, other.address) &&
-        _deepEquals(deviceClass, other.deviceClass);
+        _deepEquals(deviceClass, other.deviceClass) &&
+        _deepEquals(lowEnergyOnly, other.lowEnergyOnly);
   }
 
   @override
@@ -372,7 +379,7 @@ class BondedDeviceMessage {
 
   @override
   String toString() {
-    return 'BondedDeviceMessage(name: $name, address: $address, deviceClass: $deviceClass)';
+    return 'BondedDeviceMessage(name: $name, address: $address, deviceClass: $deviceClass, lowEnergyOnly: $lowEnergyOnly)';
   }
 }
 

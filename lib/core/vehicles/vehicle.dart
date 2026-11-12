@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../bluetooth/adapter_type.dart';
+import '../bluetooth/bluetooth_address.dart';
 import '../bluetooth/bluetooth_gateway.dart';
 import '../profiles/profile_ref.dart';
 import 'device_id.dart';
@@ -66,6 +67,20 @@ class VehicleAdapter {
   /// Whether Android watches for it to wake, as the user confirmed; see
   /// [TripStart.adapterWakes]. Another adapter starts unwatched.
   final bool watched;
+
+  /// Whether this is the adapter at [address].
+  bool isAt(String address) => sameAddress(this.address, address);
+
+  /// This adapter, chosen again as [device]: what it can do is kept, and
+  /// its name and how it connects are taken as Android reports them now.
+  /// Only a Bluetooth LE adapter is watched for.
+  VehicleAdapter chosenAgain(BluetoothDevice device) => VehicleAdapter(
+    address: address,
+    name: device.name,
+    type: device.type,
+    setsFlowControl: setsFlowControl,
+    watched: watched && device.type == AdapterType.ble,
+  );
 
   VehicleAdapter withFlowControl(bool sets) => VehicleAdapter(
     address: address,

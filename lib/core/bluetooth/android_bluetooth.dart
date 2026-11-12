@@ -28,15 +28,25 @@ class AndroidBluetoothGateway implements BluetoothGateway {
   @override
   late final Stream<bool> enabled = bluetoothEnabled();
 
+  /// Paired devices connect over classic Bluetooth, unless Android says
+  /// one is Bluetooth LE only, as an LE adapter paired in its settings is.
   @override
   Future<List<BluetoothDevice>> bondedDevices() async => [
     for (final device in await _classic.bondedDevices())
-      BluetoothDevice(
-        name: device.name,
-        address: device.address,
-        kind: DeviceKind.fromClass(device.deviceClass),
-        type: AdapterType.classic,
-      ),
+      if (device.lowEnergyOnly)
+        BluetoothDevice(
+          name: device.name,
+          address: device.address,
+          kind: DeviceKind.fromName(device.name),
+          type: AdapterType.ble,
+        )
+      else
+        BluetoothDevice(
+          name: device.name,
+          address: device.address,
+          kind: DeviceKind.fromClass(device.deviceClass),
+          type: AdapterType.classic,
+        ),
   ];
 
   /// Each listen starts a scan of its own, stopped when it's cancelled.

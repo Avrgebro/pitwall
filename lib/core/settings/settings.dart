@@ -1,3 +1,4 @@
+import '../bluetooth/bluetooth_address.dart';
 import '../trips/trip_target.dart';
 import '../vehicles/vehicle.dart';
 
@@ -38,13 +39,13 @@ class AppSettings {
   /// The vehicle whose trips start when the head unit at [address]
   /// connects, if any.
   Vehicle? vehicleForHeadUnit(String address) => vehicles
-      .where((v) => _sameAddress(v.startingHeadUnit, address))
+      .where((v) => sameAddress(v.startingHeadUnit, address))
       .firstOrNull;
 
   /// The vehicle the head unit at [address] belongs to, whatever starts its
   /// trips. A head unit belongs to one vehicle at most.
   Vehicle? headUnitOwner(String address) => vehicles
-      .where((v) => _sameAddress(v.headUnit?.address, address))
+      .where((v) => sameAddress(v.headUnit?.address, address))
       .firstOrNull;
 
   /// The vehicle other than [vehicleId] the head unit at [address] belongs
@@ -66,7 +67,7 @@ class AppSettings {
   /// The vehicle whose trips start when the adapter at [address] wakes, if
   /// any.
   Vehicle? vehicleForWakingAdapter(String address) => vehicles
-      .where((v) => _sameAddress(v.startingAdapter, address))
+      .where((v) => sameAddress(v.startingAdapter, address))
       .firstOrNull;
 
   Set<String> get startingHeadUnits => {
@@ -151,8 +152,3 @@ class AppSettings {
     );
   }
 }
-
-/// Bluetooth addresses compare without case: Android reports them upper
-/// case, but stored ones may differ.
-bool _sameAddress(String? a, String b) =>
-    a != null && a.toUpperCase() == b.toUpperCase();

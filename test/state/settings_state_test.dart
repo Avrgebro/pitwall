@@ -873,6 +873,26 @@ void main() {
 
       expect(store.settings.vehicleById('tucson')!.adapter, iCar);
     });
+
+    test('to the same one as classic corrects how it connects', () async {
+      final (container, store) = await start();
+
+      await container
+          .read(appSettingsProvider.notifier)
+          .setAdapter(
+            'tucson',
+            const BluetoothDevice(
+              name: 'IOS-Vlink',
+              address: 'C0:FF:EE:00:00:01',
+              type: AdapterType.classic,
+            ),
+          );
+
+      final vehicle = store.settings.vehicleById('tucson')!;
+      expect(vehicle.adapter?.type, AdapterType.classic);
+      expect(vehicle.adapter?.setsFlowControl, isTrue);
+      expect(vehicle.tripStart, TripStart.carBluetooth);
+    });
   });
 
   group('starting trips when the adapter wakes', () {

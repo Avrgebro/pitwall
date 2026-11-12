@@ -425,7 +425,12 @@ data class BondedDeviceMessage (
   val name: String,
   val address: String,
   /** Android's major and minor device class. */
-  val deviceClass: Long
+  val deviceClass: Long,
+  /**
+   * Whether it's a Bluetooth LE device only, with no classic Bluetooth
+   * to connect over, as Android's paired list can hold.
+   */
+  val lowEnergyOnly: Boolean
 )
  {
   companion object {
@@ -433,7 +438,8 @@ data class BondedDeviceMessage (
       val name = pigeonVar_list[0] as String
       val address = pigeonVar_list[1] as String
       val deviceClass = pigeonVar_list[2] as Long
-      return BondedDeviceMessage(name, address, deviceClass)
+      val lowEnergyOnly = pigeonVar_list[3] as Boolean
+      return BondedDeviceMessage(name, address, deviceClass, lowEnergyOnly)
     }
   }
   fun toList(): List<Any?> {
@@ -441,6 +447,7 @@ data class BondedDeviceMessage (
       name,
       address,
       deviceClass,
+      lowEnergyOnly,
     )
   }
   override fun equals(other: Any?): Boolean {
@@ -451,7 +458,7 @@ data class BondedDeviceMessage (
       return true
     }
     val other = other as BondedDeviceMessage
-    return MessagesPigeonUtils.deepEquals(this.name, other.name) && MessagesPigeonUtils.deepEquals(this.address, other.address) && MessagesPigeonUtils.deepEquals(this.deviceClass, other.deviceClass)
+    return MessagesPigeonUtils.deepEquals(this.name, other.name) && MessagesPigeonUtils.deepEquals(this.address, other.address) && MessagesPigeonUtils.deepEquals(this.deviceClass, other.deviceClass) && MessagesPigeonUtils.deepEquals(this.lowEnergyOnly, other.lowEnergyOnly)
   }
 
   override fun hashCode(): Int {
@@ -459,10 +466,11 @@ data class BondedDeviceMessage (
     result = 31 * result + MessagesPigeonUtils.deepHash(this.name)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.address)
     result = 31 * result + MessagesPigeonUtils.deepHash(this.deviceClass)
+    result = 31 * result + MessagesPigeonUtils.deepHash(this.lowEnergyOnly)
     return result
   }
   override fun toString(): String {
-    return "BondedDeviceMessage(name=$name, address=$address, deviceClass=$deviceClass)"
+    return "BondedDeviceMessage(name=$name, address=$address, deviceClass=$deviceClass, lowEnergyOnly=$lowEnergyOnly)"
   }
 }
 

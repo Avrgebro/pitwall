@@ -1,6 +1,7 @@
 package io.github.avrgebro.pitwall
 
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
@@ -49,6 +50,8 @@ class ClassicBluetoothChannel(context: Context, messenger: BinaryMessenger) :
                     address = it.address,
                     // Major and minor class; uncategorized when not given.
                     deviceClass = (it.bluetoothClass?.deviceClass ?: 0x1F00).toLong(),
+                    // Dual-mode devices take classic Bluetooth.
+                    lowEnergyOnly = it.type == BluetoothDevice.DEVICE_TYPE_LE,
                 )
             }
         } catch (e: SecurityException) {

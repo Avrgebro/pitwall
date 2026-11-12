@@ -102,6 +102,7 @@ class BondedDeviceMessage {
     required this.name,
     required this.address,
     required this.deviceClass,
+    required this.lowEnergyOnly,
   });
 
   String name;
@@ -109,6 +110,10 @@ class BondedDeviceMessage {
 
   /// Android's major and minor device class.
   int deviceClass;
+
+  /// Whether it's a Bluetooth LE device only, with no classic Bluetooth
+  /// to connect over, as Android's paired list can hold.
+  bool lowEnergyOnly;
 }
 
 /// Classic Bluetooth serial adapters, called from Dart. Failures arrive as
