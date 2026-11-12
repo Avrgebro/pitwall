@@ -48,11 +48,7 @@ class VehicleTripStartScreen extends ConsumerWidget {
           },
           child: RowGroup(
             children: [
-              const ChoiceRow(
-                value: TripStart.carBluetooth,
-                title: 'When the phone connects to the car\'s Bluetooth',
-                subtitle: 'Starts within seconds of switching the car on.',
-              ),
+              // Recommended, so first; only a Bluetooth LE adapter can.
               ChoiceRow(
                 value: TripStart.adapterWakes,
                 enabled: canWake,
@@ -63,6 +59,11 @@ class VehicleTripStartScreen extends ConsumerWidget {
                           'car; no stereo needed.'
                     : 'Needs a Bluetooth LE adapter that sleeps while the '
                           'car is off.',
+              ),
+              const ChoiceRow(
+                value: TripStart.carBluetooth,
+                title: 'When the phone connects to the car\'s Bluetooth',
+                subtitle: 'Starts within seconds of switching the car on.',
               ),
             ],
           ),

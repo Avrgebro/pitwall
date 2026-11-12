@@ -124,6 +124,58 @@ void main() {
     expect(find.textContaining('Bluetooth LE'), findsNothing);
   });
 
+  testWidgets('waking comes first, and only a BLE adapter can choose it', (
+    tester,
+  ) async {
+    Future<void> pump(AdapterType type) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          key: ValueKey(type),
+          overrides: testOverrides(
+            settings: AppSettings(
+              vehicles: [
+                Vehicle(
+                  id: 'tucson',
+                  name: 'Tucson',
+                  adapter: VehicleAdapter(
+                    address: 'C0:FF:EE:00:00:01',
+                    name: 'IOS-Vlink',
+                    type: type,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const VehicleTripStartScreen(vehicleId: 'tucson'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    bool enabled() => tester
+        .widget<ChoiceRow<TripStart>>(
+          find.byWidgetPredicate(
+            (w) =>
+                w is ChoiceRow<TripStart> && w.value == TripStart.adapterWakes,
+          ),
+        )
+        .enabled;
+
+    await pump(AdapterType.ble);
+    final wakes = tester.getTopLeft(find.text('When the adapter wakes'));
+    final stereo = tester.getTopLeft(
+      find.text('When the phone connects to the car\'s Bluetooth'),
+    );
+    expect(wakes.dy, lessThan(stereo.dy));
+    expect(enabled(), isTrue);
+
+    await pump(AdapterType.classic);
+    expect(enabled(), isFalse);
+  });
+
   group('with a profile', () {
     Future<void> pump(WidgetTester tester, Widget screen) async {
       final store =
