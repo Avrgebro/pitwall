@@ -17,6 +17,7 @@ void main() {
       'ATSP0': 'OK',
       'ATFCSH7E0': 'OK',
       'ATFCSD300000': 'OK',
+      'ATFCSM1': 'OK',
       'ATFCSM0': 'OK',
     });
     final elm = Elm327(transport);
@@ -31,9 +32,31 @@ void main() {
       'ATSP0',
       'ATFCSH7E0',
       'ATFCSD300000',
+      // Manual mode is the one setTarget relies on, so it's tried too.
+      'ATFCSM1',
       'ATFCSM0',
     ]);
     expect(elm.setsFlowControl, isTrue);
+  });
+
+  test('an adapter that refuses manual flow control can\'t set it', () async {
+    final elm = Elm327(
+      FakeTransport({
+        'ATZ': 'ELM327 v2.1',
+        'ATE0': 'OK',
+        'ATL0': 'OK',
+        'ATS0': 'OK',
+        'ATH0': 'OK',
+        'ATSP0': 'OK',
+        'ATFCSH7E0': 'OK',
+        'ATFCSD300000': 'OK',
+        'ATFCSM1': '?',
+      }),
+    );
+
+    await elm.initialize();
+
+    expect(elm.setsFlowControl, isFalse);
   });
 
   test('initialize finds out an adapter can\'t set flow control', () async {
@@ -71,6 +94,29 @@ void main() {
     // Connecting still works.
     expect(await elm.initialize(), 'ELM327 v2.1');
     expect(elm.setsFlowControl, isFalse);
+  });
+
+  test('a probe answered late leaves the next command its own reply', () async {
+    final transport = FakeTransport(
+      {
+        'ATZ': 'ELM327 v2.1',
+        'ATE0': 'OK',
+        'ATL0': 'OK',
+        'ATS0': 'OK',
+        'ATH0': 'OK',
+        'ATSP0': 'OK',
+        'ATFCSH7E0': '?',
+        '0100': '4100BE3EB810',
+      },
+      delays: {'ATFCSH7E0': const Duration(milliseconds: 3200)},
+    );
+    final elm = Elm327(transport);
+
+    await elm.initialize();
+
+    expect(elm.setsFlowControl, isFalse);
+    // The late `?` isn't taken for the car's answer.
+    expect(await elm.supportedPids(), contains(0x0C));
   });
 
   test('reads a value with spaces and a SEARCHING line', () async {
@@ -138,6 +184,69 @@ void main() {
       elm.send('0100', timeout: const Duration(milliseconds: 50)),
       throwsA(
         isA<ElmException>().having((e) => e.error, 'error', ElmError.timeout),
+      ),
+    );
+  });
+
+  test('a reply that comes late goes to its own command', () async {
+    final transport = FakeTransport(
+      {'0902': '4902014B4D48', 'ATRV': '12.4V'},
+      delays: {'0902': const Duration(milliseconds: 100)},
+    );
+    final logged = <String>[];
+    final elm = Elm327(
+      transport,
+      log: (command, raw, error) => logged.add('$command|$raw|${error?.name}'),
+    );
+
+    await expectLater(
+      elm.send('0902', timeout: const Duration(milliseconds: 50)),
+      throwsA(
+        isA<ElmException>().having((e) => e.error, 'error', ElmError.timeout),
+      ),
+    );
+
+    expect(await elm.readBatteryVoltage(), 12.4);
+    expect(logged, [
+      '0902|(timeout)|timeout',
+      '0902|(late) 4902014B4D48\r\r|null',
+      'ATRV|12.4V\r\r|null',
+    ]);
+  });
+
+  test('a reply that never comes keeps later commands unsent', () async {
+    final transport = FakeTransport({'ATRV': '12.4V'});
+    final elm = Elm327(transport);
+    final timesOut = throwsA(
+      isA<ElmException>().having((e) => e.error, 'error', ElmError.timeout),
+    );
+    const short = Duration(milliseconds: 50);
+
+    await expectLater(elm.send('0100', timeout: short), timesOut);
+    await expectLater(elm.send('ATRV', timeout: short), timesOut);
+
+    // Written, the command's reply would be mistaken for the one owed.
+    expect(transport.sent, ['0100']);
+  });
+
+  test('a drop while a reply is owed fails the next command', () async {
+    final transport = FakeTransport({});
+    final elm = Elm327(transport);
+    const short = Duration(milliseconds: 50);
+    await expectLater(elm.send('0100', timeout: short), throwsA(anything));
+
+    final next = elm.send('ATRV');
+    await Future<void>.delayed(Duration.zero);
+    await transport.disconnect();
+
+    await expectLater(
+      next,
+      throwsA(
+        isA<ElmException>().having(
+          (e) => e.error,
+          'error',
+          ElmError.disconnected,
+        ),
       ),
     );
   });

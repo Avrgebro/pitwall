@@ -41,8 +41,12 @@ class ElmException implements Exception {
 /// Talks to an ELM327 adapter (or a compatible clone) over an [ObdTransport].
 ///
 /// Commands are sent one at a time; concurrent calls to [send] are queued.
-/// After an [ElmError.timeout] the adapter may still be answering the old
-/// command, so callers should run [initialize] again before continuing.
+///
+/// A command that times out may still be under way: the adapter answers it
+/// late, and only then takes another. Its reply stays owed, and the next
+/// command waits for it before it's written, so every reply goes to its
+/// own command. If the owed reply never comes, the adapter isn't answering
+/// at all, and every later command times out without being written.
 class Elm327 {
   /// [log], if given, receives each command and the adapter's raw reply,
   /// which is handy for recording real replies as test data.
@@ -79,6 +83,9 @@ class Elm327 {
   final _buffer = StringBuffer();
   Completer<String>? _pending;
   String _pendingCommand = '';
+
+  /// The reply a command that timed out still owes, if any.
+  Future<String>? _owed;
   bool _closed = false;
   Future<void> _queue = Future.value();
   CanId _header = CanId.broadcast;
@@ -114,8 +121,9 @@ class Elm327 {
   /// anyway, so the probe leaves nothing changed. Any answer but OK, a
   /// timeout too, means it can't: only a dropped connection is an error.
   Future<bool> _probeFlowControl() async {
+    const commands = ['ATFCSH7E0', 'ATFCSD300000', 'ATFCSM1', 'ATFCSM0'];
     try {
-      for (final command in ['ATFCSH7E0', 'ATFCSD300000', 'ATFCSM0']) {
+      for (final command in commands) {
         await send(command);
       }
       return true;
@@ -269,6 +277,7 @@ class Elm327 {
 
   Future<String> _exchange(String command, Duration timeout) async {
     if (_closed) throw ElmException(ElmError.disconnected, command);
+    await _awaitOwed(command, timeout);
     _buffer.clear();
     final completer = Completer<String>();
     _pending = completer;
@@ -286,7 +295,9 @@ class Elm327 {
     try {
       raw = await completer.future.timeout(timeout);
     } on TimeoutException {
-      _pending = null;
+      // Still pending: the reply that comes late completes it, not the
+      // next command's.
+      _owed = completer.future..ignore();
       log?.call(command, '(timeout)', ElmError.timeout);
       throw ElmException(ElmError.timeout, command);
     }
@@ -297,6 +308,29 @@ class Elm327 {
     } on ElmException catch (e) {
       log?.call(command, raw, e.error);
       rethrow;
+    }
+  }
+
+  /// Waits, within [command]'s own [timeout], for the reply a command that
+  /// timed out still owes, before [command] is written. Still owed then,
+  /// [command] times out unwritten.
+  Future<void> _awaitOwed(String command, Duration timeout) async {
+    final owed = _owed;
+    if (owed == null) return;
+    final late = _pendingCommand;
+    try {
+      final raw = await owed.timeout(timeout);
+      _owed = null;
+      log?.call(late, '(late) $raw', _errorIn(raw, late));
+    } on TimeoutException {
+      log?.call(
+        command,
+        '(not sent: still waiting on $late)',
+        ElmError.timeout,
+      );
+      throw ElmException(ElmError.timeout, command);
+    } on ElmException {
+      throw ElmException(ElmError.disconnected, command);
     }
   }
 
@@ -341,6 +375,15 @@ class Elm327 {
       if (error != null) throw ElmException(error, command, response);
     }
     return response;
+  }
+
+  static ElmError? _errorIn(String raw, String command) {
+    try {
+      _clean(raw, command);
+      return null;
+    } on ElmException catch (e) {
+      return e.error;
+    }
   }
 
   static ElmError? _errorFor(String line) => switch (line) {

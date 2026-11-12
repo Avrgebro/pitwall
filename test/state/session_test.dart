@@ -6,6 +6,7 @@ import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
 import 'package:pitwall/core/obd/trouble_codes.dart';
+import 'package:pitwall/core/session/car_reading.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
@@ -28,6 +29,7 @@ class _Adapter extends FakeTransport implements ClosableAdapter {
         'ATSP0': 'OK',
         'ATFCSH7E0': 'OK',
         'ATFCSD300000': 'OK',
+        'ATFCSM1': 'OK',
         'ATFCSM0': 'OK',
         '0100': '410000000000',
         'ATRV': '13.6V',
@@ -330,6 +332,24 @@ void main() {
         (outcome as StepDone<VehicleReading>).value.troubleCodes,
         const TroubleCodes(checkEngine: false),
       );
+    });
+
+    test('that time out leave the next reading its own replies', () async {
+      final (c, adapter) = await connected();
+      final session = c.read(sessionProvider.notifier);
+      Map<String, double> valuesOf(ReadOutcome outcome) =>
+          ((outcome as StepDone<VehicleReading>).value.reading as CarAnswered)
+              .values;
+      final before = valuesOf(await session.read());
+      // Read again in ten minutes; this time the adapter answers late.
+      adapter.replies['0101'] = '410181076500';
+      adapter.delays['0A'] = const Duration(milliseconds: 3200);
+
+      final late = await session.read();
+      expect(late, isA<StepDone<VehicleReading>>());
+      adapter.delays.clear();
+
+      expect(valuesOf(await session.read()), before);
     });
 
     test('aren\'t read for a vehicle that doesn\'t send them', () async {
