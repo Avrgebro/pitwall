@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pitwall/core/obd/trouble_codes.dart';
 import 'package:pitwall/core/webhook/delivery_storage.dart';
 import 'package:pitwall/core/webhook/queued_reading.dart';
 
@@ -50,6 +51,30 @@ void main() {
     );
 
     expect(back.queue.single.values['battery_v'], 14.123456);
+  });
+
+  test('trouble codes go out, and are kept, with their reading', () {
+    final withCodes = QueuedReading(
+      seq: 9,
+      device: 'hyundai-tucson',
+      timestamp: DateTime.utc(2026, 11, 2),
+      values: const {},
+      connected: true,
+      troubleCodes: const TroubleCodes(checkEngine: true, stored: ['P0133']),
+    );
+
+    expect(withCodes.toPayload()['trouble_codes'], {
+      'check_engine': true,
+      'stored': ['P0133'],
+      'pending': <String>[],
+      'permanent': <String>[],
+    });
+    final back = QueuedReading.fromJson(
+      jsonDecode(jsonEncode(withCodes.toJson())) as Map<String, Object?>,
+    );
+    expect(back?.troubleCodes, withCodes.troubleCodes);
+    // A reading without them sends none.
+    expect(reading.toPayload(), isNot(contains('trouble_codes')));
   });
 
   test('what goes out is the payload itself', () {

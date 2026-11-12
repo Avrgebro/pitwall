@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/obd/trouble_codes.dart';
 import '../core/readings/last_values.dart';
 import '../core/readings/unreported.dart';
 import 'infrastructure.dart';
@@ -48,6 +49,17 @@ class LastValuesNotifier extends AsyncNotifier<LastValues> {
     (current) =>
         current.record(vehicleId, values, at, seq: seq, missing: missing),
     unless: values.isEmpty && missing.isEmpty,
+  );
+
+  /// Keeps the vehicle's trouble codes, as read [at].
+  Future<void> recordTroubleCodes(
+    String vehicleId,
+    TroubleCodes codes,
+    DateTime at,
+  ) => _change(
+    vehicleId,
+    (current) => current.withTroubleCodes(vehicleId, codes, at),
+    unless: false,
   );
 
   /// Keeps [missing], asked for in a reading at [at] that had nothing to

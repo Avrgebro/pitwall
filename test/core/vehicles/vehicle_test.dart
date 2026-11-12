@@ -65,6 +65,8 @@ void main() {
       selectedKeys: const {'rpm', 'battery_v'},
       profile: ProfileRef('default.json', importedAt: DateTime.utc(2026, 11)),
       lastSeen: DateTime.utc(2026, 11, 3),
+      // Off, so a copy that falls back to the default shows.
+      sendsTroubleCodes: false,
     );
     expect(full.toJson().values, everyElement(isNotNull));
 

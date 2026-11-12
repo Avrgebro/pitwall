@@ -336,6 +336,10 @@ class AppSettingsNotifier extends AsyncNotifier<AppSettings> {
   Future<void> setSentValues(String vehicleId, Set<String> keys) =>
       _modifyVehicle(vehicleId, (v) => v.withSelectedKeys(keys));
 
+  /// Whether the vehicle's readings carry its trouble codes.
+  Future<void> setTroubleCodes(String vehicleId, {required bool send}) =>
+      _modifyVehicle(vehicleId, (v) => v.copyWith(sendsTroubleCodes: send));
+
   /// Goes back to sending the standard values.
   Future<void> resetValues(String vehicleId) =>
       _modifyVehicle(vehicleId, (v) => v.withSelectedKeys(null));

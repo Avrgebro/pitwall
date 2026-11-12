@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/bluetooth/bluetooth_gateway.dart';
 import '../core/obd/elm327.dart';
 import '../core/obd/obd_transport.dart';
+import '../core/obd/trouble_codes.dart';
 import '../core/platform/permission_gateway.dart';
 import '../core/profiles/signal_set.dart';
 import '../core/profiles/stored_profile.dart';
@@ -39,6 +40,10 @@ class _Connection {
 
   /// The adapter, once the connection is live; null while it's being made.
   Elm327? get live => _live ? _elm : null;
+
+  /// The trouble codes as last read on this connection, how many
+  /// confirmed ones the car counted then, and when.
+  ({TroubleCodes codes, int count, DateTime at})? codes;
 
   void asked(AdapterConnection adapter) => _adapter = adapter;
   void attach(Elm327 elm) => _elm = elm;
@@ -189,19 +194,22 @@ class SessionController extends Notifier<SessionState> {
     // With the profile loaded, its values are among the ones on offer.
     final sent = ref.read(vehicleValuesProvider(vehicle.id))?.sent;
     if (sent == null) return const StepRefused(Refusal.vehicleRemoved);
-    final outcome = await _exclusive(
-      connection,
-      (session, elm) async => VehicleReading(
+    final outcome = await _exclusive(connection, (session, elm) async {
+      final reading = await readCar(
+        elm,
+        keys: sent,
+        profile: profile,
+        modelYear: vehicle.modelYear,
+        supportedPids: session.supportedPids,
+      );
+      return VehicleReading(
         vehicle,
-        await readCar(
-          elm,
-          keys: sent,
-          profile: profile,
-          modelYear: vehicle.modelYear,
-          supportedPids: session.supportedPids,
-        ),
-      ),
-    );
+        reading,
+        troubleCodes: vehicle.sendsTroubleCodes && reading is! CarSilent
+            ? await _troubleCodes(connection, elm)
+            : null,
+      );
+    });
     switch (outcome) {
       case StepDone(value: VehicleReading(reading: CarSilent())):
         // The ignition went off; the adapter is still there.
@@ -232,6 +240,51 @@ class SessionController extends Notifier<SessionState> {
     }
     return outcome;
   });
+
+  /// How long trouble codes are kept before they're all read again, even
+  /// with the same count: pending codes don't change the count.
+  static const troubleCodesInterval = Duration(minutes: 10);
+
+  /// The car's trouble codes. The light and the count of confirmed codes
+  /// come with every reading; all the codes are read on a connection's
+  /// first, when the count changes, and every [troubleCodesInterval]. A
+  /// failure to read them never fails the reading: the codes known are
+  /// kept, and only a dropped adapter goes on as one.
+  Future<TroubleCodes?> _troubleCodes(
+    _Connection connection,
+    Elm327 elm,
+  ) async {
+    final log = ref.read(adapterLogProvider);
+    final known = connection.codes;
+    try {
+      final light = await readLight(elm);
+      final now = DateTime.now();
+      if (known != null &&
+          known.count == light.count &&
+          now.difference(known.at) < troubleCodesInterval) {
+        return known.codes.withLight(light.checkEngine);
+      }
+      final codes = await readTroubleCodes(elm, light: light);
+      connection.codes = (codes: codes, count: light.count, at: now);
+      if (known == null || known.codes != codes) log.note(_describe(codes));
+      return codes;
+    } on ElmException catch (e) {
+      if (e.error == ElmError.disconnected) rethrow;
+      log.note('Couldn\'t read the trouble codes', warning: true);
+      return known?.codes;
+    }
+  }
+
+  static String _describe(TroubleCodes codes) {
+    if (codes.isEmpty) return 'No trouble codes';
+    final parts = [
+      if (codes.checkEngine) 'check-engine light on',
+      if (codes.stored.isNotEmpty) 'stored ${codes.stored.join(' ')}',
+      if (codes.pending.isNotEmpty) 'pending ${codes.pending.join(' ')}',
+      if (codes.permanent.isNotEmpty) 'permanent ${codes.permanent.join(' ')}',
+    ];
+    return 'Trouble codes: ${parts.join(', ')}';
+  }
 
   /// Says in the log which chosen values didn't come back, and why.
   void _noteUnreported(Map<String, Unreported> unreported) {

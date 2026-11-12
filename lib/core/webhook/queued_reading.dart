@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../obd/trouble_codes.dart';
 import 'payload.dart';
 
 /// A reading waiting to be sent, kept as data and encoded only when
@@ -14,6 +15,7 @@ class QueuedReading {
     required this.values,
     required this.connected,
     this.engineRunning,
+    this.troubleCodes,
   });
 
   final int seq;
@@ -23,6 +25,9 @@ class QueuedReading {
   final bool connected;
   final bool? engineRunning;
 
+  /// The trouble codes as last read, if the vehicle sends them.
+  final TroubleCodes? troubleCodes;
+
   /// The JSON body to post.
   Map<String, Object?> toPayload() => buildPayload(
     device: device,
@@ -31,6 +36,7 @@ class QueuedReading {
     values: values,
     connected: connected,
     engineRunning: engineRunning,
+    troubleCodes: troubleCodes,
   );
 
   Map<String, Object?> toJson() => {
@@ -40,6 +46,7 @@ class QueuedReading {
     'values': values,
     'connected': connected,
     'engineRunning': engineRunning,
+    'troubleCodes': ?troubleCodes?.toJson(),
   };
 
   /// Null if [json] isn't a stored reading.
@@ -64,6 +71,10 @@ class QueuedReading {
         connected: connected,
         engineRunning: switch (json['engineRunning']) {
           final bool running => running,
+          _ => null,
+        },
+        troubleCodes: switch (json['troubleCodes']) {
+          final Map<String, Object?> codes => TroubleCodes.fromJson(codes),
           _ => null,
         },
       );

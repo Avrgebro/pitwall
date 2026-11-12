@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/obd/trouble_codes.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
 import '../core/vehicles/vehicle.dart';
@@ -22,14 +23,22 @@ class ReadingKeeper {
   /// failing disk can't hold it.
   Future<ReadOutcome> readAndKeep() async {
     final outcome = await _ref.read(sessionProvider.notifier).read();
+    if (outcome case StepDone(
+      value: VehicleReading(:final vehicle, troubleCodes: final codes?),
+    )) {
+      await _ref
+          .read(lastValuesProvider.notifier)
+          .recordTroubleCodes(vehicle.id, codes, DateTime.now());
+    }
     switch (outcome) {
       case StepDone(
         value: VehicleReading(
           :final vehicle,
           reading: final CarAnswered reading,
+          :final troubleCodes,
         ),
       ):
-        await _keep(vehicle, reading);
+        await _keep(vehicle, reading, troubleCodes);
       case StepDone(
         value: VehicleReading(
           :final vehicle,
@@ -59,7 +68,11 @@ class ReadingKeeper {
     await sender.flush().timeout(wait, onTimeout: () {});
   }
 
-  Future<void> _keep(Vehicle vehicle, CarAnswered reading) async {
+  Future<void> _keep(
+    Vehicle vehicle,
+    CarAnswered reading,
+    TroubleCodes? troubleCodes,
+  ) async {
     final seq = await _ref
         .read(webhookSenderProvider)
         .queue(
@@ -67,6 +80,7 @@ class ReadingKeeper {
           values: reading.values,
           connected: true,
           engineRunning: reading.carState == CarState.engineRunning,
+          troubleCodes: troubleCodes,
         );
     await _ref
         .read(lastValuesProvider.notifier)

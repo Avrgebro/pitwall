@@ -1,8 +1,11 @@
+import '../obd/trouble_codes.dart';
+
 /// Builds the JSON body sent to the webhook, as documented in the README.
 ///
 /// Values are rounded to two decimals, and whole numbers are sent without
 /// a decimal point (`52`, not `52.0`). [engineRunning] becomes `"engine":
-/// "running"` or `"off"`, on readings taken from the car.
+/// "running"` or `"off"`, on readings taken from the car. [troubleCodes],
+/// when the reading has them, go out as `trouble_codes`.
 Map<String, Object?> buildPayload({
   required String device,
   required int seq,
@@ -10,6 +13,7 @@ Map<String, Object?> buildPayload({
   required Map<String, double> values,
   required bool connected,
   bool? engineRunning,
+  TroubleCodes? troubleCodes,
 }) => {
   'device': device,
   'seq': seq,
@@ -22,6 +26,7 @@ Map<String, Object?> buildPayload({
     false => 'off',
     null => null,
   },
+  'trouble_codes': ?troubleCodes?.toJson(),
   'connected': connected,
 };
 

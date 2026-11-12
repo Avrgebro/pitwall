@@ -30,6 +30,14 @@ class TroubleCodes {
   bool get isEmpty =>
       !checkEngine && stored.isEmpty && pending.isEmpty && permanent.isEmpty;
 
+  /// The same codes, with the light as it is now.
+  TroubleCodes withLight(bool checkEngine) => TroubleCodes(
+    checkEngine: checkEngine,
+    stored: stored,
+    pending: pending,
+    permanent: permanent,
+  );
+
   Map<String, Object?> toJson() => {
     'check_engine': checkEngine,
     'stored': stored,
@@ -121,9 +129,13 @@ Future<({bool checkEngine, int count})> readLight(Elm327 elm) async =>
     lightFrom(await elm.request(0x01, [0x01]));
 
 /// Reads every kind of trouble code. A kind the car doesn't support, as
-/// older cars with permanent codes, reads as none.
-Future<TroubleCodes> readTroubleCodes(Elm327 elm) async {
-  final light = await readLight(elm);
+/// older cars with permanent codes, reads as none. [light], when just read,
+/// isn't asked for again.
+Future<TroubleCodes> readTroubleCodes(
+  Elm327 elm, {
+  ({bool checkEngine, int count})? light,
+}) async {
+  light ??= await readLight(elm);
   return TroubleCodes(
     checkEngine: light.checkEngine,
     stored: codesFrom(await elm.request(0x03, const [])),

@@ -128,6 +128,7 @@ class Vehicle {
     this.selectedKeys,
     this.profile,
     this.lastSeen,
+    this.sendsTroubleCodes = true,
   });
 
   /// A new vehicle with a fresh id.
@@ -200,6 +201,10 @@ class Vehicle {
   /// When the vehicle's adapter last connected.
   final DateTime? lastSeen;
 
+  /// Whether readings carry the car's trouble codes and check-engine
+  /// light. On unless turned off: cheap to read, and worth knowing.
+  final bool sendsTroubleCodes;
+
   /// Whether its adapter can set flow control, as found the last time it
   /// was connected to. Until then, as if it could: what it can read is
   /// only narrowed once it's known.
@@ -214,6 +219,7 @@ class Vehicle {
     HeadUnit? headUnit,
     int? modelYear,
     DateTime? lastSeen,
+    bool? sendsTroubleCodes,
   }) => Vehicle(
     id: id,
     name: name ?? this.name,
@@ -224,6 +230,7 @@ class Vehicle {
     selectedKeys: selectedKeys,
     profile: profile,
     lastSeen: lastSeen ?? this.lastSeen,
+    sendsTroubleCodes: sendsTroubleCodes ?? this.sendsTroubleCodes,
   );
 
   /// With [profile], or none, read for [modelYear], which only matters
@@ -239,6 +246,7 @@ class Vehicle {
         selectedKeys: selectedKeys,
         profile: profile,
         lastSeen: lastSeen,
+        sendsTroubleCodes: sendsTroubleCodes,
       );
 
   /// Sending [keys], or the default set with none.
@@ -252,6 +260,7 @@ class Vehicle {
     selectedKeys: keys,
     profile: profile,
     lastSeen: lastSeen,
+    sendsTroubleCodes: sendsTroubleCodes,
   );
 
   /// The same keys as earlier versions, so saved vehicles keep loading.
@@ -271,6 +280,7 @@ class Vehicle {
     'profileName': profile?.name,
     'profileImportedAt': profile?.importedAt?.toUtc().toIso8601String(),
     'lastSeen': lastSeen?.toUtc().toIso8601String(),
+    'sendsTroubleCodes': sendsTroubleCodes,
   };
 
   /// Tolerates missing or wrongly typed fields, falling back to defaults.
@@ -322,6 +332,8 @@ class Vehicle {
       null => null,
     },
     lastSeen: _time(json['lastSeen']),
+    // On for vehicles saved before it was a choice.
+    sendsTroubleCodes: json['sendsTroubleCodes'] != false,
   );
 
   static String _newId() {

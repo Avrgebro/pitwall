@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
 import 'package:pitwall/core/bluetooth/bluetooth_gateway.dart';
 import 'package:pitwall/core/obd/obd_transport.dart';
+import 'package:pitwall/core/obd/trouble_codes.dart';
 import 'package:pitwall/core/session/car_state.dart';
 import 'package:pitwall/core/settings/settings.dart';
 import 'package:pitwall/core/vehicles/vehicle.dart';
@@ -30,6 +31,11 @@ class _Adapter extends FakeTransport implements ClosableAdapter {
         'ATFCSM0': 'OK',
         '0100': '410000000000',
         'ATRV': '13.6V',
+        // No trouble codes, the light off.
+        '0101': '410100076500',
+        '03': '4300',
+        '07': '4700',
+        '0A': '4A00',
       });
 
   bool closed = false;
@@ -252,6 +258,94 @@ void main() {
     await c.read(sessionProvider.notifier).connect(bluetoothLe);
 
     expect(bluetooth.connectedTypes, [AdapterType.ble]);
+  });
+
+  group('trouble codes', () {
+    Future<(ProviderContainer, _Adapter)> connected() async {
+      final c = await start();
+      await c.read(sessionProvider.notifier).connect(_tucson);
+      return (c, adapters.single);
+    }
+
+    test('come with a reading', () async {
+      final (c, adapter) = await connected();
+      adapter.replies
+        ..['0101'] = '410181076500'
+        ..['03'] = '43010133'
+        ..['07'] = '47010420';
+
+      final outcome = await c.read(sessionProvider.notifier).read();
+
+      expect(
+        outcome,
+        isA<StepDone<VehicleReading>>().having(
+          (o) => o.value.troubleCodes,
+          'codes',
+          const TroubleCodes(
+            checkEngine: true,
+            stored: ['P0133'],
+            pending: ['P0420'],
+          ),
+        ),
+      );
+      expect(
+        c.read(adapterLogProvider).entries.value.map((e) => e.text),
+        contains(
+          'Trouble codes: check-engine light on, stored P0133, pending P0420',
+        ),
+      );
+    });
+
+    test('are all read again only when the count changes', () async {
+      final (c, adapter) = await connected();
+      final session = c.read(sessionProvider.notifier);
+      await session.read();
+      adapter.sent.clear();
+
+      await session.read();
+      expect(adapter.sent, contains('0101'));
+      expect(adapter.sent, isNot(contains('03')));
+
+      adapter.replies
+        ..['0101'] = '410181076500'
+        ..['03'] = '43010133';
+      final outcome = await session.read();
+      expect(adapter.sent, contains('03'));
+      expect((outcome as StepDone<VehicleReading>).value.troubleCodes?.stored, [
+        'P0133',
+      ]);
+    });
+
+    test('that can\'t be read don\'t fail the reading', () async {
+      final (c, adapter) = await connected();
+      final session = c.read(sessionProvider.notifier);
+      await session.read();
+      // Unanswered from now on: each times out.
+      adapter.replies.remove('0101');
+
+      final outcome = await session.read();
+
+      expect(outcome, isA<StepDone<VehicleReading>>());
+      expect(
+        (outcome as StepDone<VehicleReading>).value.troubleCodes,
+        const TroubleCodes(checkEngine: false),
+      );
+    });
+
+    test('aren\'t read for a vehicle that doesn\'t send them', () async {
+      final c = await start();
+      await c
+          .read(appSettingsProvider.notifier)
+          .setTroubleCodes('tucson', send: false);
+      await c
+          .read(sessionProvider.notifier)
+          .connect(_tucson.copyWith(sendsTroubleCodes: false));
+
+      final outcome = await c.read(sessionProvider.notifier).read();
+
+      expect((outcome as StepDone<VehicleReading>).value.troubleCodes, isNull);
+      expect(adapters.single.sent, isNot(contains('03')));
+    });
   });
 
   test('a reading says which vehicle it was for', () async {

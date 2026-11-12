@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import '../core/obd/trouble_codes.dart';
 import '../core/session/car_reading.dart';
 import '../core/session/car_state.dart';
 import '../core/vehicles/vehicle.dart';
@@ -72,10 +73,14 @@ typedef ConnectResult = StepOutcome<SessionConnected>;
 /// What asking a vehicle's car found, with the vehicle it was asked for.
 @immutable
 final class VehicleReading {
-  const VehicleReading(this.vehicle, this.reading);
+  const VehicleReading(this.vehicle, this.reading, {this.troubleCodes});
 
   final Vehicle vehicle;
   final CarReading reading;
+
+  /// The car's trouble codes as last read, if the vehicle sends them and
+  /// the car answered.
+  final TroubleCodes? troubleCodes;
 }
 
 /// How asking the car something ended: done with what it said.

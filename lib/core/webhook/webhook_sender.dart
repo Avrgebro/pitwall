@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../obd/trouble_codes.dart';
 import 'delivery_status.dart';
 import 'delivery_storage.dart';
 import 'payload.dart';
@@ -117,6 +118,7 @@ class WebhookSender {
     required Map<String, double> values,
     required bool connected,
     bool? engineRunning,
+    TroubleCodes? troubleCodes,
   }) async {
     _seq = max(_seq + 1, _clock().millisecondsSinceEpoch);
     final reading = QueuedReading(
@@ -126,6 +128,7 @@ class WebhookSender {
       values: values,
       connected: connected,
       engineRunning: engineRunning,
+      troubleCodes: troubleCodes,
     );
     _queue.add(reading);
     if (_queue.length > maxQueued) {

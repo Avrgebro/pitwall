@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../obd/trouble_codes.dart';
 import '../storage/app_files.dart';
 import 'unreported.dart';
 
@@ -67,7 +68,11 @@ class UnreportedValue {
 /// reporting, say as it switches off, keeps the time it was last read.
 @immutable
 class LastValues {
-  const LastValues([this.byVehicle = const {}, this.unreported = const {}]);
+  const LastValues([
+    this.byVehicle = const {},
+    this.unreported = const {},
+    this.troubleCodes = const {},
+  ]);
 
   final Map<String, Map<String, LastValue>> byVehicle;
 
@@ -80,6 +85,19 @@ class LastValues {
 
   Map<String, UnreportedValue> unreportedOf(String vehicleId) =>
       unreported[vehicleId] ?? const {};
+
+  /// By vehicle id: the trouble codes as last read, and when.
+  final Map<String, ({TroubleCodes codes, DateTime at})> troubleCodes;
+
+  /// With the vehicle's trouble codes as read [at].
+  LastValues withTroubleCodes(
+    String vehicleId,
+    TroubleCodes codes,
+    DateTime at,
+  ) => LastValues(byVehicle, unreported, {
+    ...troubleCodes,
+    vehicleId: (codes: codes, at: at),
+  });
 
   /// The vehicle's values for [keys] only, and the newest of them. A value
   /// it no longer sends says nothing about the car now.
@@ -128,6 +146,7 @@ class LastValues {
           key: UnreportedValue(why, at),
       },
     },
+    troubleCodes,
   );
 
   /// With [missing], asked for in a reading at [at] that sent nothing.
@@ -149,10 +168,21 @@ class LastValues {
       for (final MapEntry(:key, :value) in unreported.entries)
         if (vehicleIds.contains(key)) key: value,
     },
+    {
+      for (final MapEntry(:key, :value) in troubleCodes.entries)
+        if (vehicleIds.contains(key)) key: value,
+    },
   );
 
   Map<String, Object?> toJson() => {
     'values': _valuesJson(),
+    'troubleCodes': {
+      for (final MapEntry(key: vehicleId, value: read) in troubleCodes.entries)
+        vehicleId: {
+          'codes': read.codes.toJson(),
+          'at': read.at.toIso8601String(),
+        },
+    },
     'unreported': {
       for (final MapEntry(key: vehicleId, value: missing) in unreported.entries)
         vehicleId: {
@@ -198,6 +228,16 @@ class LastValues {
                 ))
                   key: missing,
             },
+    },
+    {
+      if (json['troubleCodes'] case final Map<String, Object?> byVehicle)
+        for (final MapEntry(key: vehicleId, value: read) in byVehicle.entries)
+          if (read case {
+            'codes': final Map<String, Object?> codes,
+            'at': final String at,
+          })
+            if (DateTime.tryParse(at) case final at?)
+              vehicleId: (codes: TroubleCodes.fromJson(codes), at: at),
     },
   );
 
