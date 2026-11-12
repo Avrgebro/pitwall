@@ -98,6 +98,43 @@ class ValuesModel {
   final List<ValueTileData> tiles;
 }
 
+/// The kinds of trouble code, as the car reports them.
+enum TroubleCodeKind { stored, pending, permanent }
+
+/// One kind of trouble code, with its codes.
+typedef TroubleCodeGroup = ({TroubleCodeKind kind, List<String> codes});
+
+/// The car's trouble codes as last read: the check-engine light, and each
+/// kind that has codes.
+@immutable
+class TroubleCodesModel {
+  const TroubleCodesModel({
+    required this.checkEngine,
+    required this.meta,
+    required this.groups,
+  });
+
+  final bool checkEngine;
+
+  /// When they were read, like "Read 2 min ago".
+  final String meta;
+
+  /// Stored, pending and permanent, each only if it has codes.
+  final List<TroubleCodeGroup> groups;
+
+  /// What the light and codes say together.
+  String get title => switch ((checkEngine, groups.isEmpty)) {
+    (true, _) => 'Check-engine light on',
+    (false, true) => 'No trouble codes',
+    (false, false) => 'Light off, codes found',
+  };
+
+  /// Something to look at: the light is on, or a fault is confirmed.
+  bool get isProblem =>
+      checkEngine ||
+      groups.any((group) => group.kind == TroubleCodeKind.stored);
+}
+
 /// Everything Home shows for one vehicle, in words, worked out from the
 /// app's state. Kept free of widgets so each state can be tested directly.
 @immutable
@@ -106,6 +143,7 @@ class HomeViewModel {
     required this.hero,
     required this.delivery,
     required this.values,
+    this.troubleCodes,
   });
 
   factory HomeViewModel.build({
@@ -137,6 +175,21 @@ class HomeViewModel {
         options: values.options,
         now: now,
       ),
+      troubleCodes: switch (lastValues.troubleCodes[vehicle.id]) {
+        final read? when vehicle.sendsTroubleCodes => TroubleCodesModel(
+          checkEngine: read.codes.checkEngine,
+          meta: 'Read ${Formatters.ago(read.at, now)}',
+          groups: [
+            for (final (kind, codes) in [
+              (TroubleCodeKind.stored, read.codes.stored),
+              (TroubleCodeKind.pending, read.codes.pending),
+              (TroubleCodeKind.permanent, read.codes.permanent),
+            ])
+              if (codes.isNotEmpty) (kind: kind, codes: codes),
+          ],
+        ),
+        _ => null,
+      },
     );
   }
 
@@ -145,6 +198,9 @@ class HomeViewModel {
 
   /// Null until a reading from this vehicle exists.
   final ValuesModel? values;
+
+  /// Null until they've been read, or if the vehicle doesn't send them.
+  final TroubleCodesModel? troubleCodes;
 
   static HeroModel _hero({
     required Vehicle vehicle,

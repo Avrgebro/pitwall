@@ -319,6 +319,18 @@ void main() {
       return store;
     }
 
+    testWidgets('trouble codes can be turned off', (tester) async {
+      final store = await pump(
+        tester,
+        const ValuesToSendScreen(vehicleId: 'tucson'),
+      );
+
+      await tester.tap(find.text('Trouble codes'));
+      await tester.pumpAndSettle();
+
+      expect(store.settings.vehicleById('tucson')!.sendsTroubleCodes, isFalse);
+    });
+
     testWidgets('a name is saved when typing is done, not on each key', (
       tester,
     ) async {

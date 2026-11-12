@@ -17,6 +17,7 @@ import 'home_view_model.dart';
 import 'setup_checklist.dart';
 import 'widgets/delivery_status_card.dart';
 import 'widgets/setup_checklist_card.dart';
+import 'widgets/trouble_codes_card.dart';
 import 'widgets/vehicle_hero_card.dart';
 
 /// Status at a glance: what's left to set up, the vehicle seen most
@@ -81,9 +82,18 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: Insets.l),
           delivery,
         ],
+        // The light on, or a confirmed fault, comes before the values.
+        if (model.troubleCodes case final codes? when codes.isProblem) ...[
+          SectionHeader('Trouble codes', trailing: codes.meta),
+          TroubleCodesCard(model: codes),
+        ],
         if (model.values case final values?) ...[
           SectionHeader(values.title, trailing: values.meta),
           ValueGrid(values: values.tiles),
+        ],
+        if (model.troubleCodes case final codes? when !codes.isProblem) ...[
+          SectionHeader('Trouble codes', trailing: codes.meta),
+          TroubleCodesCard(model: codes),
         ],
         if (!model.delivery.isProblem) ...[
           const SizedBox(height: Insets.l),

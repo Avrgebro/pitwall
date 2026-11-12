@@ -45,6 +45,12 @@ Example payload (not final yet):
     "battery_v": 14.1
   },
   "engine": "running",
+  "trouble_codes": {
+    "check_engine": false,
+    "stored": [],
+    "pending": ["P0420"],
+    "permanent": []
+  },
   "connected": true
 }
 ```
@@ -52,6 +58,13 @@ Example payload (not final yet):
 `seq` only ever goes up, across restarts too, so a receiver can drop
 anything it has already seen. It comes from the clock, so it isn't a
 count of readings.
+
+`trouble_codes` is the check-engine light and the standard trouble codes
+the car reports, as last read: `stored` are the confirmed faults behind
+the light, `pending` faults seen once and not yet confirmed, and
+`permanent` ones that stay until the car has verified the repair. Pitwall
+reads them on the first reading, whenever the count changes, and every 10
+minutes; it never clears them. It can be turned off per vehicle.
 
 `engine` is `"running"` or `"off"` (ignition on, engine stopped). When the
 car is switched off, a last message with `"connected": false` and no values
@@ -65,8 +78,8 @@ accents removed, everything else turned into dashes. A car named
 
 - **No accounts, no cloud, no tracking.** Pitwall talks only to your adapter
   and to the URL you set.
-- **Read-only.** It never sends commands that change anything in the car,
-  and it doesn't read or clear trouble codes.
+- **Read-only.** It never sends commands that change anything in the car.
+  It reads trouble codes, and never clears them.
 - **Set up once, then forget it.** Nothing to do while driving.
 
 ## Supported adapters

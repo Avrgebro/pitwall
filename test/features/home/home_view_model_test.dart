@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pitwall/core/bluetooth/adapter_type.dart';
+import 'package:pitwall/core/obd/trouble_codes.dart';
 import 'package:pitwall/core/readings/last_values.dart';
 import 'package:pitwall/core/readings/readings.dart';
 import 'package:pitwall/core/session/car_state.dart';
@@ -51,14 +52,26 @@ void main() {
     DeliveryStatus delivery = const DeliveryStatus(),
     bool hasWebhook = true,
     Map<String, LastValue> lastValues = const {},
+    TroubleCodes? troubleCodes,
+    Vehicle? showing,
   }) => HomeViewModel.build(
-    vehicle: vehicle,
+    vehicle: showing ?? vehicle,
     settings: settings,
     activity: activity,
     delivery: delivery,
     hasWebhook: hasWebhook,
     values: VehicleValues.of(vehicle, null),
-    lastValues: LastValues({vehicle.id: lastValues}),
+    lastValues: LastValues(
+      {vehicle.id: lastValues},
+      const {},
+      {
+        if (troubleCodes != null)
+          vehicle.id: (
+            codes: troubleCodes,
+            at: now.subtract(const Duration(minutes: 2)),
+          ),
+      },
+    ),
     now: now,
   );
 
@@ -338,5 +351,59 @@ void main() {
     );
 
     expect(model.hero.stats.last.value, '1 h ago');
+  });
+
+  group('trouble codes', () {
+    test('aren\'t shown before they\'re read', () {
+      expect(build().troubleCodes, isNull);
+    });
+
+    test('with the light on, are the first thing to look at', () {
+      final codes = build(
+        troubleCodes: const TroubleCodes(
+          checkEngine: true,
+          stored: ['P0133'],
+          pending: ['P0420'],
+        ),
+      ).troubleCodes!;
+
+      expect(codes.title, 'Check-engine light on');
+      expect(codes.meta, 'Read 2 min ago');
+      expect(codes.isProblem, isTrue);
+      expect(codes.groups.map((g) => (g.kind, g.codes.join(' '))), [
+        (TroubleCodeKind.stored, 'P0133'),
+        (TroubleCodeKind.pending, 'P0420'),
+      ]);
+    });
+
+    test('pending only is worth knowing, not a problem yet', () {
+      final codes = build(
+        troubleCodes: const TroubleCodes(
+          checkEngine: false,
+          pending: ['P0420'],
+        ),
+      ).troubleCodes!;
+
+      expect(codes.title, 'Light off, codes found');
+      expect(codes.isProblem, isFalse);
+    });
+
+    test('none read says so', () {
+      final codes = build(troubleCodes: const TroubleCodes(checkEngine: false))
+          .troubleCodes!;
+
+      expect(codes.title, 'No trouble codes');
+      expect(codes.groups, isEmpty);
+    });
+
+    test('aren\'t shown for a vehicle that doesn\'t send them', () {
+      expect(
+        build(
+          troubleCodes: const TroubleCodes(checkEngine: true),
+          showing: vehicle.copyWith(sendsTroubleCodes: false),
+        ).troubleCodes,
+        isNull,
+      );
+    });
   });
 }

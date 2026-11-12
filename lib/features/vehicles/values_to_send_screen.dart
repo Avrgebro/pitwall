@@ -120,6 +120,30 @@ class _ValuesToSendScreenState extends ConsumerState<ValuesToSendScreen> {
                       .read(appSettingsProvider.notifier)
                       .resetValues(vehicle.id),
                 ),
+              // Not one value but a set, so not among the ones filtered.
+              if (category == null && _query.isEmpty) ...[
+                const SectionHeader('Diagnostics'),
+                RowGroup(
+                  children: [
+                    ToggleRow(
+                      title: 'Trouble codes',
+                      caption: 'trouble_codes',
+                      value: vehicle.sendsTroubleCodes,
+                      onChanged: (send) => ref
+                          .read(appSettingsProvider.notifier)
+                          .setTroubleCodes(vehicle.id, send: send),
+                    ),
+                  ],
+                ),
+                const InfoNote(
+                  text: TextSpan(
+                    text:
+                        'The check-engine light and the codes behind it: '
+                        'stored, pending and permanent. Pitwall only reads '
+                        'them; it never clears them.',
+                  ),
+                ),
+              ],
               if (view.standard.isNotEmpty) ...[
                 const SectionHeader('Standard', trailing: 'Works on most cars'),
                 RowGroup(
