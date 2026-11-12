@@ -183,8 +183,28 @@ void main() {
     final result = await pitwall.sendTest(_target);
 
     // Only the kind is kept: the exception text, which names the URL, isn't.
-    expect(result.result, const Unreachable());
+    expect(result.result, isA<Unreachable>());
     pitwall.dispose();
+  });
+
+  test('network errors are told apart by their code, not their text', () {
+    SocketException socket(int code) =>
+        SocketException('example.com', osError: OSError('', code));
+
+    expect(networkFailureOf(socket(7)), NetworkFailure.hostNotFound);
+    expect(networkFailureOf(socket(101)), NetworkFailure.noNetwork);
+    expect(networkFailureOf(socket(111)), NetworkFailure.refused);
+    expect(networkFailureOf(socket(104)), NetworkFailure.reset);
+    expect(networkFailureOf(socket(110)), NetworkFailure.timedOut);
+    expect(
+      networkFailureOf(const HandshakeException('bad certificate')),
+      NetworkFailure.secureConnection,
+    );
+    expect(
+      networkFailureOf(http.ClientException('Connection closed')),
+      NetworkFailure.reset,
+    );
+    expect(networkFailureOf(socket(999)), NetworkFailure.other);
   });
 
   test('a test send is marked as a test and not queued', () async {

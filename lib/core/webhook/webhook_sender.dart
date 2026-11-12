@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -276,9 +277,9 @@ class WebhookSender {
       };
     } on TimeoutException {
       result = const TimedOut();
-    } on Exception {
+    } on Exception catch (error) {
       // Network errors can mention the URL, so only the kind is kept.
-      result = const Unreachable();
+      result = Unreachable(networkFailureOf(error));
     }
     stopwatch.stop();
     final attempt = DeliveryAttempt(
@@ -338,3 +339,25 @@ class WebhookSender {
     );
   }
 }
+
+/// The kind of [error] a failed POST threw, read from its type and the
+/// operating system's error code, never from its text, which can name the
+/// webhook's host.
+@visibleForTesting
+NetworkFailure networkFailureOf(Exception error) => switch (error) {
+  // Android's error numbers, as Linux has them.
+  SocketException(osError: OSError(errorCode: 101 || 113)) =>
+    NetworkFailure.noNetwork,
+  SocketException(osError: OSError(errorCode: 111)) => NetworkFailure.refused,
+  SocketException(osError: OSError(errorCode: 32 || 103 || 104)) =>
+    NetworkFailure.reset,
+  SocketException(osError: OSError(errorCode: 110)) => NetworkFailure.timedOut,
+  // A lookup fails with the resolver's own codes, which aren't errno.
+  SocketException(osError: OSError(errorCode: 7 || -2 || -3 || -5)) =>
+    NetworkFailure.hostNotFound,
+  HandshakeException() || TlsException() => NetworkFailure.secureConnection,
+  SocketException() => NetworkFailure.other,
+  // The http package's own: the connection broke off mid-exchange.
+  http.ClientException() => NetworkFailure.reset,
+  _ => NetworkFailure.other,
+};

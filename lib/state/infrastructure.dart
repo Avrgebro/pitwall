@@ -79,7 +79,7 @@ void _logAttempt(AdapterLog log, DeliveryAttempt attempt) {
     Rejected(:final statusCode) => '← $statusCode',
     UnusableWebhook() || UnreadableWebhook() => '✕ webhook not usable',
     TimedOut() => '✕ timeout',
-    Unreachable() => '✕ unreachable',
+    Unreachable(:final failure) => '✕ unreachable (${failure.label})',
   };
   log.delivery(
     'POST $target $result, $elapsed',

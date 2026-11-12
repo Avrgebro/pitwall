@@ -147,18 +147,58 @@ final class TimedOut extends DeliveryError {
   int get hashCode => (TimedOut).hashCode;
 }
 
+/// What kept the server from being reached, as far as the phone can tell.
+enum NetworkFailure {
+  /// The phone has no network, or no route to it.
+  noNetwork,
+
+  /// The webhook's host name didn't resolve.
+  hostNotFound,
+
+  /// Something answered at the address, but refused the connection.
+  refused,
+
+  /// The connection was cut, by the network or the server.
+  reset,
+
+  /// Connecting took too long.
+  timedOut,
+
+  /// The secure connection couldn't be set up, as with a bad certificate.
+  secureConnection,
+
+  /// Anything else.
+  other;
+
+  /// In a few words, for the log.
+  String get label => switch (this) {
+    noNetwork => 'no network',
+    hostNotFound => 'host not found',
+    refused => 'connection refused',
+    reset => 'connection cut',
+    timedOut => 'connecting timed out',
+    secureConnection => 'secure connection failed',
+    other => 'network error',
+  };
+}
+
 /// The server couldn't be reached: no signal, wrong host, server down.
+/// Only the [failure]'s kind is kept, never the error's text, which can
+/// name the webhook's host.
 final class Unreachable extends DeliveryError {
-  const Unreachable();
+  const Unreachable([this.failure = NetworkFailure.other]);
+
+  final NetworkFailure failure;
 
   @override
   DeliveryFix get fix => DeliveryFix.retry;
 
   @override
-  bool operator ==(Object other) => other is Unreachable;
+  bool operator ==(Object other) =>
+      other is Unreachable && other.failure == failure;
 
   @override
-  int get hashCode => (Unreachable).hashCode;
+  int get hashCode => failure.hashCode;
 }
 
 /// How the attempts so far went. Only deliveries change it.
